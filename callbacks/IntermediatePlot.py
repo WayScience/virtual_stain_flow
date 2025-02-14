@@ -5,7 +5,6 @@ import torch.nn as nn
 
 from .AbstractCallback import AbstractCallback
 from ..datasets.PatchDataset import PatchDataset
-from ..datasets.PatchDataset2 import PatchDataset as PDS2
 
 from ..evaluation.visualization_utils import plot_patches
 
@@ -17,7 +16,7 @@ class IntermediatePatchPlot(AbstractCallback):
     def __init__(self, 
                  name: str, 
                  path: str, 
-                 dataset: PatchDataset | PDS2, 
+                 dataset: PatchDataset, 
                  plot_n_patches: int=5,
                  plot_metrics: List[nn.Module]=None,
                  **kwargs):
@@ -27,7 +26,7 @@ class IntermediatePatchPlot(AbstractCallback):
         """
         super().__init__(name)
         self._path = path
-        if not isinstance(dataset, Union[PatchDataset, PDS2]):
+        if not isinstance(dataset, PatchDataset):
             raise TypeError(f"Expected PatchDataset, got {type(dataset)}")
         self._dataset = dataset
 
