@@ -142,7 +142,7 @@ class WGaNTrainer(AbstractTrainer):
             self._gen_optimizer.zero_grad()
 
             discriminator_fake_score = self._discriminator(torch.cat((generated_images, inputs), 1)).mean()
-            generator_loss = self._generator_loss_fn(discriminator_fake_score, generated_images, real_images, self.epoch)
+            generator_loss = self._generator_loss_fn(discriminator_fake_score, real_images, generated_images, self.epoch)
             generator_loss.backward()
             self._gen_optimizer.step()
 

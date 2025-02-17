@@ -1,4 +1,3 @@
-
 import torch
 import torch.autograd as autograd
 
@@ -13,14 +12,25 @@ class GradientPenaltyLoss(AbstractLoss):
         self._discriminator = discriminator
         self._weight = weight
 
-    def forward(self, real_imgs, fake_imgs):
+    def forward(self, truth, generated):
+        """
+        Computes Gradient Penalty Loss for wGaN GP
+
+        :param truth: The tensor containing the ground truth image, 
+            should be of shape [batch_size, channel_number, img_height, img_width].
+        :type truth: torch.Tensor
+        :param generated: The tensor containing model generated image, 
+            should be of shape [batch_size, channel_number, img_height, img_width].
+        :type generated: torch.Tensor
+        :return: The computed metric as a float value.
+        :rtype: float
+        """
 
         device = self.trainer.device
 
-        batch_size = real_imgs.size(0)
-        ## TODO: check if expand_as behaves as expected
-        eta = torch.rand(batch_size, 1, 1, 1, device=device).expand_as(real_imgs)
-        interpolated = (eta * real_imgs + (1 - eta) * fake_imgs).requires_grad_(True)
+        batch_size = truth.size(0)
+        eta = torch.rand(batch_size, 1, 1, 1, device=device).expand_as(truth)
+        interpolated = (eta * truth + (1 - eta) * generated).requires_grad_(True)
         prob_interpolated = self._discriminator(interpolated)
 
         gradients = autograd.grad(
