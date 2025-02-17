@@ -47,7 +47,7 @@ class AbstractTrainer(ABC):
         self._batch_size = batch_size
         self._epochs = epochs
         self._patience = patience
-        self._callbacks = callbacks if callbacks else []
+        self.initialize_callbacks(callbacks)
         self._metrics = metrics if metrics else {}
 
         if isinstance(device, torch.device):
@@ -167,7 +167,7 @@ class AbstractTrainer(ABC):
 
         # callbacks 
         for callback in self.callbacks:
-            callback.on_train_start(self)
+            callback.on_train_start()
 
         for epoch in range(self.epochs):
 
@@ -176,7 +176,7 @@ class AbstractTrainer(ABC):
 
             # callbacks
             for callback in self.callbacks:
-                callback.on_epoch_start(self)
+                callback.on_epoch_start()
 
             # Access all the metrics and reset them
             for _, metric in self.metrics.items():
@@ -200,7 +200,7 @@ class AbstractTrainer(ABC):
 
             # Invoke callback on epoch_end
             for callback in self.callbacks:
-                callback.on_epoch_end(self)
+                callback.on_epoch_end()
 
             # Update early stopping
             val_loss = next(iter(val_loss.values()))
@@ -211,7 +211,7 @@ class AbstractTrainer(ABC):
                 break
 
         for callback in self.callbacks:
-            callback.on_train_end(self)
+            callback.on_train_end()
 
     def update_early_stop(self, val_loss: torch.Tensor):
         """
@@ -227,6 +227,28 @@ class AbstractTrainer(ABC):
             self.best_model = self.model.state_dict().copy()
         else:
             self.early_stop_counter += 1
+
+    def initialize_callbacks(self, callbacks):
+        """
+        Helper to iterate over all callbacks and set trainer property
+
+        :param callbacks: List of callback objects that can be invoked 
+            at epcoh start, epoch end, train start and train end
+        :type callbacks: Callback class or subclass or list of Callback class  
+        """
+
+        if callbacks is None:
+            self._callbacks = []
+            return
+
+        if not isinstance(callbacks, List):
+            callbacks = [callbacks]
+        for callback in callbacks:
+            if not isinstance(callback, AbstractCallback):
+                raise TypeError("Invalid callback object type")
+            callback._set_trainer(self)
+        
+        self._callbacks = callbacks
 
     """
     Log property
