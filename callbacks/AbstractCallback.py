@@ -1,7 +1,4 @@
-from abc import ABC, abstractmethod
-from typing import List, Callable, Dict
-
-import torch
+from abc import ABC
 
 class AbstractCallback(ABC):
     """

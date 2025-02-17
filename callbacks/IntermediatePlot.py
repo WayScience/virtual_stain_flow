@@ -10,7 +10,8 @@ from ..evaluation.visualization_utils import plot_patches
 
 class IntermediatePatchPlot(AbstractCallback):
     """
-    Callback to save the model weights at the end of each epoch.
+    Callback to plot model generated outputs alongside ground 
+    truth and input at the end end of each epoch.
     """
     
     def __init__(self,                
@@ -50,7 +51,9 @@ class IntermediatePatchPlot(AbstractCallback):
 
     def on_epoch_end(self):
         """
-        Plot dataset with model predictions at the end of each epoch.
+        Called at the end of each epoch.
+
+        Plot dataset with model predictions on n random images from dataset at the end of each epoch.
         """
 
         original_device = next(self.trainer.model.parameters()).device

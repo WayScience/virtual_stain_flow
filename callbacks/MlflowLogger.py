@@ -53,6 +53,8 @@ class MlflowLogger(AbstractCallback):
     def on_train_start(self):
         """
         Called at the start of training.
+
+        Calls mlflow start run and logs params if provided
         """
         mlflow.start_run(
             **self._mlflow_start_run_args
@@ -64,6 +66,8 @@ class MlflowLogger(AbstractCallback):
     def on_epoch_end(self):
         """
         Called at the end of each epoch.
+
+        Iterate over the most recent log items in trainer and call mlflow log metric
         """
         for key, values in self.trainer.log.items():
             if values is not None and len(values) > 0: 
@@ -75,6 +79,9 @@ class MlflowLogger(AbstractCallback):
     def on_train_end(self):
         """
         Called at the end of training.
+
+        Saves trainer best model to a temporary directory and calls mlflow log artifact
+        Then ends run
         """
         # Save weights to a temporary directory and log artifacts
         with tempfile.TemporaryDirectory() as tmpdirname:
