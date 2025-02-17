@@ -1,4 +1,3 @@
-import logging
 import math
 import pathlib
 import random
@@ -28,6 +27,30 @@ class PatchDataset(ImageDataset):
             candidate_y: str = 'Metadata_Cells_Location_Center_Y',
             **kwargs
     ):
+        """        
+        Initialize the PatchDataset.
+        This method initializes the PatchDataset by setting up patch size, coordinates, and other parameters.
+        It also generates patches and initializes caches for input and target images.
+
+        :param _sc_feature: Single-cell feature data or path to the data, by default None.
+        :type _sc_feature: Optional[pd.DataFrame | pathlib.Path], optional
+        :param patch_size: Size of the patches to generate, by default 64.
+        :type patch_size: int, optional
+        :param patch_generation_method: Method to generate patches ('random' or other methods), by default 'random'.
+        :type patch_generation_method: str, optional
+        :param patch_generation_random_seed: Random seed for patch generation, by default None.
+        :type patch_generation_random_seed: Optional[int], optional
+        :param patch_generation_max_attempts: Maximum number of attempts to generate patches, by default 1,000.
+        :type patch_generation_max_attempts: int, optional
+        :param n_expected_patches_per_img: Number of expected patches per image, by default 5.
+        :type n_expected_patches_per_img: int, optional
+        :param candidate_x: Column name for x-coordinates of candidate cells, by default 'Metadata_Cells_Location_Center_X'.
+        :type candidate_x: str, optional
+        :param candidate_y: Column name for y-coordinates of candidate cells, by default 'Metadata_Cells_Location_Center_Y'.
+        :type candidate_y: str, optional
+        :param kwargs: Additional keyword arguments. Namely those required by ImageDataset
+        :type kwargs: dict
+        """
 
         self._patch_size = patch_size
         self._merge_fields = None
@@ -42,7 +65,7 @@ class PatchDataset(ImageDataset):
                           candidate_y=candidate_y,
                           **kwargs)
         
-        
+        ## Generates patches with the specified arguments
         self.__patch_coords = self._generate_patches(
             _patch_size=self._patch_size,
             patch_generation_method=patch_generation_method,
@@ -79,6 +102,7 @@ class PatchDataset(ImageDataset):
     def __getitem__(self, _idx: int)->Tuple[torch.Tensor, torch.Tensor]:
         """
         Return the input and target images
+
         :param _idx: The index of the image
         :type _idx: int
         :return: The input and target images, each with dimension [n_channels, height, width]
@@ -149,11 +173,14 @@ class PatchDataset(ImageDataset):
                              _sc_feature: pd.DataFrame | pathlib.Path | None) -> List[str]:
         """
         Preload the sc feature dataframe/parquet file limiting only to the column headers
-        If a dataframe is supplied, use as is
+        If a dataframe is supplied, use as is and return the column names
         If a path to a csv file is supplied, load only the header row
         If a path to a parquet file is supplied, load only the parquet schema name
+
         :param _sc_feature: The path to a csv file containing the cell profiler sc features
         :type _sc_feature: str or pathlib.Path
+        :return: List of column names of dataframe/csv/parquet file
+        :rtype: List of strings
         """
 
         if _sc_feature is None:
@@ -219,7 +246,10 @@ class PatchDataset(ImageDataset):
                             candidate_x: str, 
                             candidate_y: str) -> Tuple[str, str]:
         """
-        Infer the columns that contain the x and y coordinates of the patches
+        Infer the columns that contain the x and y coordinates of the patches. 
+        Will look for user specified patterns first but when no patterns 
+        match this function returns the first columns that ends with _x and _y
+
         :param candidate_x: The candidate column name for the x coordinates
         :type candidate_x: str
         :param candidate_y: The candidate column name for the y coordinates
@@ -259,7 +289,9 @@ class PatchDataset(ImageDataset):
                           _y_col: str
                           ) -> pd.DataFrame | None:
         """
-        Load the actual sc feature as a dataframe, limiting the columns to the merge fields and the x and y coordinates
+        Load the actual sc feature as a dataframe, limiting the columns 
+        to the merge fields and the x and y coordinates
+
         :param _sc_feature: The path to a csv file containing the cell profiler sc features
         :type _sc_feature: str or pathlib.Path
         :return: The dataframe containing the cell profiler sc features
@@ -303,6 +335,21 @@ class PatchDataset(ImageDataset):
         """
         Overridden function from parent class
         Calls the parent class to get the loaddata df and then merges it with sc_feature
+
+        :param _loaddata_csv: The path to the loaddata CSV file or a DataFrame.
+        :type _loaddata_csv: pd.DataFrame | pathlib.Path
+        :param _sc_feature: The path to the single cell feature parquet file, csv file or Datafarme
+        :type _sc_feature: pd.DataFrame | pathlib.Path
+        :param candidate_x: User specified column to access cell x coords
+        :type candidate_x: str
+        :param candidate_y: User specified column to access cell y coords
+        :type candidate_y: str
+        :param kwargs: Additional keyword arguments.
+        :type kwargs: dict
+        :raises ValueError: If no loaddata CSV is supplied or if the file type is not supported.
+        :raises FileNotFoundError: If the specified file does not exist.
+        :return: The loaded data as a DataFrame.
+        :rtype: pd.DataFrame
         """
 
         ## First calls the parent class to get the full loaddata df
@@ -379,13 +426,16 @@ class PatchDataset(ImageDataset):
                   "cell coordinates (if applicable) from loaddata csv")
         
         n_cells = 0
+        ## Group by identifier of site/view
         grouped = self._loaddata_df.groupby(self._merge_fields)
-        for _, group in grouped:            
-
+        for _, group in grouped:
+            ## Retrieve image file paths for each channel from the first row 
+            ## (any row within group should have the same filenames)
             _, row = next(group.iterrows())
             multi_channel_paths, missing = get_channel_paths(row)
             if not missing:
                 image_paths.append(multi_channel_paths)
+                # Get cell coords associated with each site/view
                 coords = get_associated_coords(group)
                 n_cells += len(coords)
                 cell_coords.append(coords)        
@@ -393,8 +443,10 @@ class PatchDataset(ImageDataset):
         self.logger.debug("Extracted images of all input and target channels for " \
                           f"{len(image_paths)} unique sites/view and {n_cells} cells")
         
+        ## Save cell coords (a list of np 2d array) as attribute
         self.__cell_coords = cell_coords
 
+        ## Image paths will be saved as attribute by parent class init
         return image_paths
 
     """
@@ -411,6 +463,7 @@ class PatchDataset(ImageDataset):
                           )->None:
         """
         Generate patches for each image in the dataset
+
         :param patch_generation_method: The method to use for generating patches
         :type patch_generation_method: str
         :param patch_generation_random_seed: The random seed to use for patch generation
@@ -494,6 +547,7 @@ class PatchDataset(ImageDataset):
         max_attempts=1_000):
         """
         Static helper function to generate patches that contain the cell coordinates
+
         :param image_size: The size of the image (square)
         :type image_size: int
         :param patch_size: The size of the square patches to generate
@@ -545,6 +599,7 @@ class PatchDataset(ImageDataset):
         max_attempts=1_000):
             """
             Static helper function to generate random patches
+            
             :param image_size: The size of the image (square)
             :type image_size: int
             :param patch_size: The size of the square patches to generate

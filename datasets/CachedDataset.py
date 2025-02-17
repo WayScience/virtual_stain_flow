@@ -1,6 +1,5 @@
 from typing import Optional
 
-import torch
 from torch.utils.data import Dataset
 from collections import OrderedDict
 

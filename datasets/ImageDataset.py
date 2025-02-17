@@ -1,7 +1,5 @@
 import logging
-import math
 import pathlib
-import random
 from random import randint
 from typing import List, Optional, Pattern, Tuple
 
@@ -230,7 +228,16 @@ class ImageDataset(Dataset):
             **kwargs
             ) -> pd.DataFrame:
         """
-        Read loaddata csv file
+        Read loaddata csv file, also does type checking
+        
+        :param _loaddata_csv: The path to the loaddata CSV file or a DataFrame.
+        :type _loaddata_csv: pd.DataFrame | pathlib.Path
+        :param kwargs: Additional keyword arguments.
+        :type kwargs: dict
+        :raises ValueError: If no loaddata CSV is supplied or if the file type is not supported.
+        :raises FileNotFoundError: If the specified file does not exist.
+        :return: The loaded data as a DataFrame.
+        :rtype: pd.DataFrame
         """
         
         if _loaddata_csv is None:
@@ -265,7 +272,20 @@ class ImageDataset(Dataset):
             path_column_prefix: str
                              ) -> set[str]:
         """
-        Infer channel names from the columns of loaddata csv
+        Infer channel names from the columns of loaddata csv.
+        This method identifies and returns the set of channel keys by comparing
+        the columns in the dataframe that start with the specified file and path
+        column prefixes. The channel keys are the suffixes of these columns after
+        removing the prefixes.
+        
+        :param file_column_prefix: The prefix for columns that indicate filenames.
+        :type file_column_prefix: str
+        :param path_column_prefix: The prefix for columns that indicate paths.
+        :type path_column_prefix: str
+        :return: A set of channel keys inferred from the loaddata csv.
+        :rtype: set[str]
+        :raises ValueError: If no path or file columns are found, or if no matching
+                            channel keys are found between file and path columns.
         """
 
         self.logger.debug("Inferring channel keys from loaddata csv")
@@ -294,6 +314,9 @@ class ImageDataset(Dataset):
     ) -> List[str]:
         """
         Checks user supplied channel key against the inferred ones from the file
+
+        :param channel_keys: user supplied list or single object of string channel keys
+        :type channel_keys: string or list of strings
         """
         if channel_keys is None:
             self.logger.debug("No channel keys specified, skip")
@@ -327,6 +350,11 @@ class ImageDataset(Dataset):
     ) -> bool:
         """
         Checks if supplied iamge only transform is of valid type, if so, return True
+
+        :param transforms: Transform
+        :type transforms: ImageOnlyTransform or Compose of ImageOnlyTransforms
+        :return: Boolean indicator of success
+        :rtype: bool
         """
         if transforms is None:
             pass
@@ -392,6 +420,7 @@ class ImageDataset(Dataset):
     def _read_convert_image(self, _image_path: pathlib.Path)->np.ndarray:
         """
         Read and convert the image to a numpy array
+        
         :param _image_path: The path to the image
         :type _image_path: pathlib.Path
         :return: The image as a numpy array
