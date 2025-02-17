@@ -9,11 +9,16 @@ class ZScoreNormalize(ImageOnlyTransform):
 
     def __init__(self, _mean=None, _std=None, _always_apply=False, _p=0.5):
         """
-        Args:
-            _mean (float): Precomputed mean for normalization (optional). If None, compute per-image mean.
-            _std (float): Precomputed standard deviation for normalization (optional). If None, compute per-image std.
-            _always_apply (bool): If True, always apply this transformation.
-            _p (float): Probability of applying this transformation.
+        Initializes the ZScoreNormalize transform.
+
+        :param _mean: Precomputed mean for normalization (optional). If None, compute per-image mean.
+        :type _mean: float, optional
+        :param _std: Precomputed standard deviation for normalization (optional). If None, compute per-image std.
+        :type _std: float, optional
+        :param _always_apply: If True, always apply this transformation.
+        :type _always_apply: bool
+        :param _p: Probability of applying this transformation.
+        :type _p: float
         """
         super(ZScoreNormalize, self).__init__(_always_apply, _p)
         self.__mean = _mean
@@ -30,10 +35,13 @@ class ZScoreNormalize(ImageOnlyTransform):
     def apply(self, _img, **params):
         """
         Apply z-score normalization to the image.
-        Args:
-            _img (np.ndarray): Input image as a numpy array.
-        Returns:
-            np.ndarray: Z-score normalized image.
+
+        :param _img: Input image as a numpy array.
+        :type _img: np.ndarray
+        :return: Z-score normalized image.
+        :rtype: np.ndarray
+        :raises TypeError: If the input image is not a numpy array.
+        :raises ValueError: If the standard deviation is zero.
         """
         if not isinstance(_img, np.ndarray):
             raise TypeError("Unsupported image type for transform (Should be a numpy array)")
@@ -49,10 +57,15 @@ class ZScoreNormalize(ImageOnlyTransform):
     def invert(self, _img, **kwargs):
         """
         Invert the z-score normalization.
-        Args:
-            _img (np.ndarray): Input image as a numpy array.
-        Returns:
-            np.ndarray: Inverted image.
+        If this transform is applied on image basis (without global mean and std)
+        Will simply return the z score transformed image back
+
+        :param _img: Input image as a numpy array.
+        :type _img: np.ndarray
+        :return: Inverted image.
+        :rtype: np.ndarray
+        :raises TypeError: If the input image is not a numpy array.
+        :raises ValueError: If the standard deviation is zero.
         """
         if not isinstance(_img, np.ndarray):
             raise TypeError("Unsupported image type for transform (Should be a numpy array)")
