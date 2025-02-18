@@ -24,6 +24,7 @@ class AbstractTrainer(ABC):
         callbacks: List[AbstractCallback] = None,
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
+        early_termination_metric: str = None,
         **kwargs,
     ):
         """
@@ -41,7 +42,11 @@ class AbstractTrainer(ABC):
         :param metrics: Dictionary of metrics to be logged.
         :type metrics: dict
         :param device: (optional) The device to be used for training.
-        :type device: torch.device        
+        :type device: torch.device
+        :param early_termination_metric: (optional) The metric to be tracked and used to update early 
+            termination count on the validation dataset. If not configured, will be using the value 
+            computed by the first validation loss function
+        :type early_termination_metric: str
         """
 
         self._batch_size = batch_size
@@ -58,6 +63,7 @@ class AbstractTrainer(ABC):
         self._best_model = None
         self._best_loss = float("inf")
         self._early_stop_counter = 0
+        self._early_termination_metric = early_termination_metric
 
         # Customize data splits
         self._train_ratio = kwargs.get("train", 0.7)
@@ -203,11 +209,24 @@ class AbstractTrainer(ABC):
                 callback.on_epoch_end()
 
             # Update early stopping
-            val_loss = next(iter(val_loss.values()))
-            self.update_early_stop(val_loss)
+            if self._early_termination_metric is None:
+                # use the first loss function value as early stopping metric
+                early_term_metric = next(iter(val_loss.values()))
+            else:
+                # First look for the metric in validation loss
+                if self._early_termination_metric in list(val_loss.keys()):
+                    early_term_metric = val_loss[self._early_termination_metric]
+                # Then look for the metric in validation metrics
+                elif self._early_termination_metric in list(self._val_metrics.keys()):
+                    early_term_metric = self._val_metrics[self._early_termination_metric][-1]
+                else:
+                    raise ValueError("Invalid early termination metric")                                                        
+                
+            self.update_early_stop(early_term_metric)
 
             # Check if early stopping is needed
             if self.early_stop_counter >= self.patience:
+                print(f"Early termination at epoch {epoch + 1} with best validation metric {self._best_loss}")
                 break
 
         for callback in self.callbacks:
