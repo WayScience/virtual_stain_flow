@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Optional, List
+from typing import Optional, List, Union
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -14,7 +14,7 @@ class Trainer(AbstractTrainer):
             self,
             model: torch.nn.Module,
             optimizer: torch.optim.Optimizer,
-            backprop_loss: torch.nn.Module | List[torch.nn.Module],
+            backprop_loss: Union[torch.nn.Module, List[torch.nn.Module]],
             # rest of the arguments are passed to and handled by the parent class
                 # - dataset
                 # - batch_size

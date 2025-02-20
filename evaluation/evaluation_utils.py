@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Callable
+from typing import List, Callable, Union
 
 import pandas as pd
 import torch
@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 def evaluate_metrics(
     _model: torch.nn.Module,
     _dataset: torch.utils.data.Dataset,
-    _metrics: List[Callable|torch.nn.Module],
+    _metrics: List[Union[Callable, torch.nn.Module]],
     _device:str='cpu'
 ):    
     metrics = defaultdict(list)

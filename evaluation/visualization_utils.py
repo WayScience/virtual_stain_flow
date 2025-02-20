@@ -1,5 +1,5 @@
 import pathlib
-from typing import Tuple, List
+from typing import Tuple, List, Union, Optional
 import random
 
 import numpy as np
@@ -13,7 +13,7 @@ from albumentations.core.composition import Compose
 
 def invert_transforms(
         numpy_img: np.ndarray,
-        transforms: ImageOnlyTransform | Compose = None
+        transforms: Union[ImageOnlyTransform, Compose] = None
     ) -> np.ndarray:
 
     if isinstance(transforms, ImageOnlyTransform):
@@ -44,8 +44,8 @@ def evaluate_and_format_imgs(
         _input: torch.Tensor, 
         _target: torch.Tensor, 
         model=None, 
-        _input_transform: ImageOnlyTransform | Compose=None,
-        _target_transform: ImageOnlyTransform | Compose=None,
+        _input_transform: Optional[Union[Compose, ImageOnlyTransform]]=None,
+        _target_transform: Optional[Union[Compose, ImageOnlyTransform]]=None,
         device: str='cpu'
         ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 

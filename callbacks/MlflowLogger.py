@@ -1,6 +1,7 @@
 import os
 import pathlib
 import tempfile
+from typing import Union
 
 import mlflow
 import torch 
@@ -16,7 +17,7 @@ class MlflowLogger(AbstractCallback):
                 
                  name: str,
                  artifact_name: str = 'best_model_weights.pth',
-                 mlflow_uri: pathlib.Path | str = 'mlruns',
+                 mlflow_uri: Union[pathlib.Path, str] = 'mlruns',
                  mlflow_experiment_name: str = 'Default',
                  mlflow_start_run_args: dict = {},
                  mlflow_log_params_args: dict = {},

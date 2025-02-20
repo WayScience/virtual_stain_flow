@@ -2,7 +2,7 @@ import math
 import pathlib
 import random
 from random import randint
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ class PatchDataset(ImageDataset):
     """
     def __init__(
             self,
-            _sc_feature: Optional[pd.DataFrame | pathlib.Path] = None,
+            _sc_feature: Optional[Union[pd.DataFrame, pathlib.Path]] = None,
             patch_size: int = 64,
             patch_generation_method: str = 'random',
             patch_generation_random_seed: Optional[int] = None,
@@ -33,7 +33,7 @@ class PatchDataset(ImageDataset):
         It also generates patches and initializes caches for input and target images.
 
         :param _sc_feature: Single-cell feature data or path to the data, by default None.
-        :type _sc_feature: Optional[pd.DataFrame | pathlib.Path], optional
+        :type _sc_feature: Optional[Union[pd.DataFrame, pathlib.Path]], optional
         :param patch_size: Size of the patches to generate, by default 64.
         :type patch_size: int, optional
         :param patch_generation_method: Method to generate patches ('random' or other methods), by default 'random'.
@@ -170,7 +170,7 @@ class PatchDataset(ImageDataset):
     """
 
     def __preload_sc_feature(self, 
-                             _sc_feature: pd.DataFrame | pathlib.Path | None) -> List[str]:
+                             _sc_feature: Optional[Union[pd.DataFrame, pathlib.Path]]=None) -> List[str]:
         """
         Preload the sc feature dataframe/parquet file limiting only to the column headers
         If a dataframe is supplied, use as is and return the column names
@@ -216,7 +216,7 @@ class PatchDataset(ImageDataset):
     def __infer_merge_fields(self,
                              _loaddata_df,
                              _sc_col_names: List[str]
-                             ) -> List[str] | None:
+                             ) -> Union[List[str], None]:
         """
         Find the columns that are common to both dataframes to use in an inner join
         Mean to be used to associate loaddata_csv with sc features
@@ -283,11 +283,11 @@ class PatchDataset(ImageDataset):
             return candidate_x, candidate_y
         
     def __load_sc_feature(self, 
-                          _sc_feature: pd.DataFrame | pathlib.Path | None,
+                          _sc_feature: Optional[Union[pd.DataFrame, pathlib.Path]],
                           _merge_fields: List[str],
                           _x_col: str,
                           _y_col: str
-                          ) -> pd.DataFrame | None:
+                          ) -> Union[pd.DataFrame, None]:
         """
         Load the actual sc feature as a dataframe, limiting the columns 
         to the merge fields and the x and y coordinates
@@ -327,8 +327,8 @@ class PatchDataset(ImageDataset):
     """
             
     def _load_loaddata(self, 
-                       _loaddata_csv: pd.DataFrame | pathlib.Path,
-                       _sc_feature: Optional[pd.DataFrame | pathlib.Path],
+                       _loaddata_csv: Union[pd.DataFrame, pathlib.Path],
+                       _sc_feature: Optional[Union[pd.DataFrame, pathlib.Path]],
                        candidate_x: str,
                        candidate_y: str,
                        ):
@@ -337,9 +337,9 @@ class PatchDataset(ImageDataset):
         Calls the parent class to get the loaddata df and then merges it with sc_feature
 
         :param _loaddata_csv: The path to the loaddata CSV file or a DataFrame.
-        :type _loaddata_csv: pd.DataFrame | pathlib.Path
+        :type _loaddata_csv: Union[pd.DataFrame, pathlib.Path]
         :param _sc_feature: The path to the single cell feature parquet file, csv file or Datafarme
-        :type _sc_feature: pd.DataFrame | pathlib.Path
+        :type _sc_feature: Optional[Union[pd.DataFrame, pathlib.Path]]
         :param candidate_x: User specified column to access cell x coords
         :type candidate_x: str
         :param candidate_y: User specified column to access cell y coords

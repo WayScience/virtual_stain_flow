@@ -1,7 +1,7 @@
 import logging
 import pathlib
 from random import randint
-from typing import List, Optional, Pattern, Tuple
+from typing import List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,10 +18,10 @@ class ImageDataset(Dataset):
     def __init__(
             self,
             _loaddata_csv,
-            _input_channel_keys: Optional[str | List[str]] = None, 
-            _target_channel_keys: Optional[str | List[str]] = None,
-            _input_transform: Optional[Compose | ImageOnlyTransform] = None,
-            _target_transform: Optional[Compose | ImageOnlyTransform] = None,
+            _input_channel_keys: Optional[Union[str, List[str]]] = None, 
+            _target_channel_keys: Optional[Union[str, List[str]]] = None,
+            _input_transform: Optional[Union[Compose, ImageOnlyTransform]] = None,
+            _target_transform: Optional[Union[Compose, ImageOnlyTransform]] = None,
             _PIL_image_mode: str = 'I;16',
             verbose: bool = False,
             file_column_prefix: str = 'FileName_',
@@ -157,7 +157,7 @@ class ImageDataset(Dataset):
     Setters
     """
 
-    def set_input_transform(self, _input_transform: Compose | ImageOnlyTransform | None):
+    def set_input_transform(self, _input_transform: Optional[Union[Compose, ImageOnlyTransform]]=None):
         """
         Set the input transform
 
@@ -170,7 +170,7 @@ class ImageDataset(Dataset):
             self._input_transform = _input_transform
         
 
-    def set_target_transform(self, _target_transform: Compose | ImageOnlyTransform | None):
+    def set_target_transform(self, _target_transform: Optional[Union[Compose, ImageOnlyTransform]]=None):
         """
         Set the target transform
 
@@ -182,7 +182,7 @@ class ImageDataset(Dataset):
         if self.__check_transforms(_target_transform):
             self._target_transform = _target_transform
 
-    def set_input_channel_keys(self, _input_channel_keys: str | List[str]):
+    def set_input_channel_keys(self, _input_channel_keys: Union[str, List[str]]):
         """
         Set the input channel keys
 
@@ -195,7 +195,7 @@ class ImageDataset(Dataset):
         # clear the cache
         self.__cache_image_id = None
 
-    def set_target_channel_keys(self, _target_channel_keys: str | List[str]):
+    def set_target_channel_keys(self, _target_channel_keys: Union[str, List[str]]):
         """
         Set the target channel keys
 
@@ -224,14 +224,14 @@ class ImageDataset(Dataset):
 
     def _load_loaddata(
             self,
-            _loaddata_csv: pd.DataFrame | pathlib.Path,
+            _loaddata_csv: Union[pd.DataFrame, pathlib.Path],
             **kwargs
             ) -> pd.DataFrame:
         """
         Read loaddata csv file, also does type checking
         
         :param _loaddata_csv: The path to the loaddata CSV file or a DataFrame.
-        :type _loaddata_csv: pd.DataFrame | pathlib.Path
+        :type _loaddata_csv: Union[pd.DataFrame, pathlib.Path]
         :param kwargs: Additional keyword arguments.
         :type kwargs: dict
         :raises ValueError: If no loaddata CSV is supplied or if the file type is not supported.
@@ -310,7 +310,7 @@ class ImageDataset(Dataset):
     
     def __check_channel_keys(
             self,
-            channel_keys: Optional[str | List[str]]
+            channel_keys: Optional[Union[str, List[str]]]
     ) -> List[str]:
         """
         Checks user supplied channel key against the inferred ones from the file
@@ -346,7 +346,7 @@ class ImageDataset(Dataset):
     
     def __check_transforms(
             self,
-            transforms: Optional[Compose | ImageOnlyTransform]
+            transforms: Optional[Union[Compose, ImageOnlyTransform]]
     ) -> bool:
         """
         Checks if supplied iamge only transform is of valid type, if so, return True
