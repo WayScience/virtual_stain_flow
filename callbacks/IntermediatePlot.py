@@ -57,7 +57,7 @@ class IntermediatePatchPlot(AbstractCallback):
         """
         Called at the end of each epoch to plot predictions if the epoch is a multiple of `every_n_epochs`.
         """
-        if (self.trainer.epoch + 1) % self.every_n_epochs == 0 or self.trainer.epoch + 1 == self.trainer.total_epochs:
+        if (self.trainer.epoch + 1) % self.every_n_epochs == 0 or self.trainer.epoch + 1 == self.trainer.epoch:
             self._plot()
     
     def on_train_end(self):
