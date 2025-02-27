@@ -10,8 +10,8 @@ from ..evaluation.visualization_utils import plot_patches
 
 class IntermediatePatchPlot(AbstractCallback):
     """
-    Callback to plot model generated outputs alongside ground 
-    truth and input at the end end of each epoch.
+    Callback to plot model generated outputs, ground 
+    truth, and input stained image patches at the end of each epoch.
     """
     
     def __init__(self,                
