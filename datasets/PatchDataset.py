@@ -97,7 +97,7 @@ class PatchDataset(ImageDataset):
     Overridden Iterator functions
     """
     def __len__(self):
-        return len(self.__patch_coords)
+        return len(self.__iter_patch_id)
     
     def __getitem__(self, _idx: int)->Tuple[torch.Tensor, torch.Tensor]:
         """
