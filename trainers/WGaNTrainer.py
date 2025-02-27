@@ -216,9 +216,7 @@ class WGaNTrainer(AbstractTrainer):
         return loss
 
     def train_epoch(self):
-
-        super().train_epoch()
-
+        
         self._generator.train()
         self._discriminator.train()
 

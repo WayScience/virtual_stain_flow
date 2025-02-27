@@ -119,9 +119,6 @@ class Trainer(AbstractTrainer):
         """
         Train the model for one epoch.
         """
-
-        super().train_epoch()
-
         self._model.train()
         losses = defaultdict(list)
         # Iterate over the train_loader
