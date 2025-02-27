@@ -42,9 +42,6 @@ class Trainer(AbstractTrainer):
         self._backprop_loss = backprop_loss \
             if isinstance(backprop_loss, list) else [backprop_loss]
 
-        # Make an initial copy of the model
-        self.best_model = self.model.state_dict().copy()
-
     """
     Overidden methods from the parent abstract class
     """

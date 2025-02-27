@@ -71,10 +71,6 @@ class WGaNTrainer(AbstractTrainer):
         if self._gradient_penalty_fn is not None:
             self._gradient_penalty_fn.trainer = self
 
-        # Make an initial copy of the generator and discriminator models
-        self.best_generator = self._generator.state_dict().copy()
-        self.best_discriminator = self._discriminator.state_dict().copy()
-
         # Global step counter and update frequencies
         self._discriminator_update_freq = discriminator_update_freq
         self._generator_update_freq = generator_update_freq
