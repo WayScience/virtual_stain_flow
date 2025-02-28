@@ -1,7 +1,7 @@
 import os
 import pathlib
 import tempfile
-from typing import Union
+from typing import Union, Dict
 
 import mlflow
 import torch 
@@ -19,8 +19,8 @@ class MlflowLogger(AbstractCallback):
                  artifact_name: str = 'best_model_weights.pth',
                  mlflow_uri: Union[pathlib.Path, str] = None,
                  mlflow_experiment_name: str = 'Default',
-                 mlflow_start_run_args: dict = {},
-                 mlflow_log_params_args: dict = {},
+                 mlflow_start_run_args: dict = None,
+                 mlflow_log_params_args: dict = None,
 
                  ):
         """
@@ -38,9 +38,9 @@ class MlflowLogger(AbstractCallback):
         :type mlflow_uri: pathlib.Path or str, optional
         :param mlflow_experiment_name: Name of the MLflow experiment, defaults to 'Default'.
         :type mlflow_experiment_name: str, optional
-        :param mlflow_start_run_args: Additional arguments for starting an MLflow run, defaults to {}.
+        :param mlflow_start_run_args: Additional arguments for starting an MLflow run, defaults to None.
         :type mlflow_start_run_args: dict, optional
-        :param mlflow_log_params_args: Additional arguments for logging parameters to MLflow, defaults to {}.
+        :param mlflow_log_params_args: Additional arguments for logging parameters to MLflow, defaults to None.
         :type mlflow_log_params_args: dict, optional
         """
         super().__init__(name)
@@ -66,12 +66,24 @@ class MlflowLogger(AbstractCallback):
 
         Calls mlflow start run and logs params if provided
         """
-        mlflow.start_run(
-            **self._mlflow_start_run_args
-        )
-        mlflow.log_params(
-            self._mlflow_log_params_args
-        )
+
+        if self._mlflow_start_run_args is None:
+            pass
+        elif isinstance(self._mlflow_start_run_args, Dict):
+            mlflow.start_run(
+                **self._mlflow_start_run_args
+            )
+        else:
+            raise TypeError("mlflow_start_run_args must be None or a dictionary.")
+        
+        if self._mlflow_log_params_args is None:
+            pass
+        elif isinstance(self._mlflow_log_params_args, Dict):
+            mlflow.log_params(
+                **self._mlflow_log_params_args
+            )
+        else:
+            raise TypeError("mlflow_log_params_args must be None or a dictionary.")
 
     def on_epoch_end(self):
         """
