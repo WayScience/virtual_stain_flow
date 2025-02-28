@@ -5,30 +5,32 @@ from .AbstractLoss import AbstractLoss
 class DiscriminatorLoss(AbstractLoss):
     """
     This class implements the loss function for the discriminator in a Generative Adversarial Network (GAN). 
-    The discriminator loss measures how well the discriminator is able to distinguish between real (ground truth) 
-    images and fake (generated) images produced by the generator.
+    The discriminator loss measures how well the discriminator is able to distinguish between real (ground expected_truth) 
+    images and fake (expected_generated) images produced by the generator.
     """
     def __init__(self, _metric_name):
         super().__init__(_metric_name)
 
-    def forward(self, truth, generated):
+    def forward(self, expected_truth, expected_generated):
         """
-        Computes the GaN discriminator loss given ground truth image and generated image
+        Computes the Wasserstein Discriminator Loss loss given ground expected_truth image and expected_generated image
 
-        :param truth: The tensor containing the ground truth image, 
-            should be of shape [batch_size, channel_number, img_height, img_width].
-        :type truth: torch.Tensor
-        :param generated: The tensor containing model generated image, 
-            should be of shape [batch_size, channel_number, img_height, img_width].
-        :type generated: torch.Tensor
+        :param expected_truth: The tensor containing the ground expected_truth 
+        probability score predicted by the discriminator over a batch of real images (input target pair),
+        should be of shape [batch_size, 1].
+        :type expected_truth: torch.Tensor
+        :param expected_generated: The tensor containing model expected_generated 
+        probability score predicted by the discriminator over a batch of generated images (input generated pair),
+        should be of shape [batch_size, 1].
+        :type expected_generated: torch.Tensor
         :return: The computed metric as a float value.
         :rtype: float
         """
         
         # If the probability output is more than Scalar, take the mean of the output
-        if truth.dim() >= 3:
-            truth = torch.mean(truth, tuple(range(2, truth.dim())))
-        if generated.dim() >= 3:
-            generated = torch.mean(generated, tuple(range(2, generated.dim())))
+        if expected_truth.dim() >= 3:
+            expected_truth = torch.mean(expected_truth, tuple(range(2, expected_truth.dim())))
+        if expected_generated.dim() >= 3:
+            expected_generated = torch.mean(expected_generated, tuple(range(2, expected_generated.dim())))
 
-        return (generated - truth).mean()
+        return (expected_generated - expected_truth).mean()
