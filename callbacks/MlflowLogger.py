@@ -17,7 +17,7 @@ class MlflowLogger(AbstractCallback):
                 
                  name: str,
                  artifact_name: str = 'best_model_weights.pth',
-                 mlflow_uri: Union[pathlib.Path, str] = 'mlruns',
+                 mlflow_uri: Union[pathlib.Path, str] = None,
                  mlflow_experiment_name: str = 'Default',
                  mlflow_start_run_args: dict = {},
                  mlflow_log_params_args: dict = {},
@@ -30,7 +30,11 @@ class MlflowLogger(AbstractCallback):
         :type name: str
         :param artifact_name: Name of the artifact file to log, defaults to 'best_model_weights.pth'.
         :type artifact_name: str, optional
-        :param mlflow_uri: URI for the MLflow tracking server, defaults to 'mlruns' under current wd.
+        :param mlflow_uri: URI for the MLflow tracking server, defaults to None.
+        If a path is specified, the logger class will call set_tracking_uri to that supplied path 
+        thereby initiating a new tracking server. 
+        If None (default), the logger class will not tamper with mlflow server to enable logging to a global server
+        initialized outside of this class. 
         :type mlflow_uri: pathlib.Path or str, optional
         :param mlflow_experiment_name: Name of the MLflow experiment, defaults to 'Default'.
         :type mlflow_experiment_name: str, optional
@@ -41,11 +45,16 @@ class MlflowLogger(AbstractCallback):
         """
         super().__init__(name)
 
+        if mlflow_uri is not None:
+            try:
+                mlflow.set_tracking_uri(mlflow_uri)
+            except Exception as e:
+                raise RuntimeError(f"Error setting MLflow tracking URI: {e}")                
+        
         try:
-            mlflow.set_tracking_uri(mlflow_uri)
             mlflow.set_experiment(mlflow_experiment_name)
         except Exception as e:
-            print(f"Error setting MLflow tracking URI: {e}")
+            raise RuntimeError(f"Error setting MLflow experiment: {e}")
 
         self._artifact_name = artifact_name
         self._mlflow_start_run_args = mlflow_start_run_args
