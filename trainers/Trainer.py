@@ -149,16 +149,3 @@ class Trainer(AbstractTrainer):
         return {
             key: sum(value) / len(value) for key, value in losses.items()
         }
-    
-    # @property
-    # def log(self):
-    #     """
-    #     Returns the training and validation losses and metrics.
-    #     """
-    #     log ={
-    #         **{'epoch': list(range(1, self.epoch + 1))},
-    #         **self._train_metrics,
-    #         **{f'val_{key}': val for key, val in self._val_metrics.items()}
-    #     }
-
-    #     return log
