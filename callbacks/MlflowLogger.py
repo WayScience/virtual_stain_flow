@@ -1,7 +1,7 @@
 import os
 import pathlib
 import tempfile
-from typing import Union, Dict
+from typing import Union, Dict, Optional
 
 import mlflow
 import torch 
@@ -18,7 +18,7 @@ class MlflowLogger(AbstractCallback):
                  name: str,
                  artifact_name: str = 'best_model_weights.pth',
                  mlflow_uri: Union[pathlib.Path, str] = None,
-                 mlflow_experiment_name: str = 'Default',
+                 mlflow_experiment_name: Optional[str] = None,
                  mlflow_start_run_args: dict = None,
                  mlflow_log_params_args: dict = None,
 
@@ -36,7 +36,9 @@ class MlflowLogger(AbstractCallback):
         If None (default), the logger class will not tamper with mlflow server to enable logging to a global server
         initialized outside of this class. 
         :type mlflow_uri: pathlib.Path or str, optional
-        :param mlflow_experiment_name: Name of the MLflow experiment, defaults to 'Default'.
+        :param mlflow_experiment_name: Name of the MLflow experiment, defaults to None, which will not call the 
+        set_experiment method of mlflow and will use whichever experiment name that is globally configured. If a 
+        name is provided, the logger class will call set_experiment to that supplied name.
         :type mlflow_experiment_name: str, optional
         :param mlflow_start_run_args: Additional arguments for starting an MLflow run, defaults to None.
         :type mlflow_start_run_args: dict, optional
@@ -51,10 +53,11 @@ class MlflowLogger(AbstractCallback):
             except Exception as e:
                 raise RuntimeError(f"Error setting MLflow tracking URI: {e}")                
         
-        try:
-            mlflow.set_experiment(mlflow_experiment_name)
-        except Exception as e:
-            raise RuntimeError(f"Error setting MLflow experiment: {e}")
+        if mlflow_experiment_name is not None:
+            try:
+                mlflow.set_experiment(mlflow_experiment_name)
+            except Exception as e:
+                raise RuntimeError(f"Error setting MLflow experiment: {e}")
 
         self._artifact_name = artifact_name
         self._mlflow_start_run_args = mlflow_start_run_args
