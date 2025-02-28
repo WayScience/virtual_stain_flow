@@ -197,7 +197,8 @@ class WGaNTrainer(AbstractTrainer):
             # Compute losses
             discriminator_loss = self._discriminator_loss_fn(discriminator_real_score, discriminator_fake_score)
 
-            ## TODO: decide if gradient loss computation during eval mode is meaningful
+            ## Declare an empty tensor for the gradient penalty loss as 
+            # it is not useful during evaluation
             gp_loss = torch.tensor(0.0, device=self.device)
 
             generator_loss = self._generator_loss_fn(discriminator_fake_score, generated_images, real_images, self.epoch)
