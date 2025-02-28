@@ -66,7 +66,14 @@ class AbstractMetrics(nn.Module, ABC):
         return self.aggregate_metrics(**kwargs)
 
     def aggregate_metrics(self, aggregation: Optional[str] = 'mean'):
-        """Aggregates the metric value over batches"""
+        """
+        Aggregates the metric value over batches
+        
+        :param aggregation: The aggregation method to use, by default 'mean'
+        :type aggregation: Optional[str]
+        :return: The aggregated metric value for training and validation
+        :rtype: Tuple[torch.tensor, torch.tensor]
+        """
 
         if aggregation == 'mean':
             return \
