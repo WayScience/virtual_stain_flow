@@ -58,8 +58,15 @@ class AbstractMetrics(nn.Module, ABC):
         self.__train_metric_values = []
         self.__val_metric_values = []
 
-    def compute(self, aggregation: Optional[str] = 'mean'):
-        """Computes the final metric value."""
+    def compute(self, **kwargs):
+        """
+        Calls the aggregate_metrics method to compute the metric value for now
+        In future may be used for more complex computations
+        """
+        return self.aggregate_metrics(**kwargs)
+
+    def aggregate_metrics(self, aggregation: Optional[str] = 'mean'):
+        """Aggregates the metric value over batches"""
 
         if aggregation == 'mean':
             return \
