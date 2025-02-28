@@ -98,7 +98,6 @@ class CachedDataset(Dataset):
         Get the input names from the dataset object
         """
         if self._current_idx is not None:
-            ## TODO: need to think over if this is at all necessary
             if self._current_idx in self.__cache_input_names:
                 return self.__cache_input_names[self._current_idx]
             else:
