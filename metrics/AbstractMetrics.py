@@ -4,9 +4,6 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-"""
-Adapted from https://github.com/WayScience/nuclear_speckles_analysis
-"""
 class AbstractMetrics(nn.Module, ABC):
     """Abstract class for metrics"""
 
@@ -68,7 +65,7 @@ class AbstractMetrics(nn.Module, ABC):
     def aggregate_metrics(self, aggregation: Optional[str] = 'mean'):
         """
         Aggregates the metric value over batches
-        
+
         :param aggregation: The aggregation method to use, by default 'mean'
         :type aggregation: Optional[str]
         :return: The aggregated metric value for training and validation
