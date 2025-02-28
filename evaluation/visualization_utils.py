@@ -192,7 +192,7 @@ def plot_patches(
             vmax=vmax
         )
 
-        ## Compute metrics for single set of target output pairs and add to subplot title
+        ## Compute metrics for single set of (target, output) pairs and add to subplot title
         metric_str = ""
         if _metrics is not None:
             for _metric in _metrics:
