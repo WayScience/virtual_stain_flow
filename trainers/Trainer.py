@@ -8,20 +8,13 @@ from .AbstractTrainer import AbstractTrainer
 
 class Trainer(AbstractTrainer):
     """
-    Trainer class for single img2img convolutional models backpropagating on single loss items 
+    Trainer class for generator while backpropagating on single or multiple loss functions. 
     """
     def __init__(
             self,
             model: torch.nn.Module,
             optimizer: torch.optim.Optimizer,
             backprop_loss: Union[torch.nn.Module, List[torch.nn.Module]],
-            # rest of the arguments are passed to and handled by the parent class
-                # - dataset
-                # - batch_size
-                # - epochs
-                # - patience
-                # - callbacks
-                # - metrics
             **kwargs                    
     ):
         """
