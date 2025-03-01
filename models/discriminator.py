@@ -13,7 +13,8 @@ class PatchBasedDiscriminator(nn.Module):
             n_in_channels: int,
             n_in_filters: int,
             _conv_depth: int=4,
-            _leaky_relu_alpha: float=0.2        
+            _leaky_relu_alpha: float=0.2,
+            _batch_norm: bool=False
     ):
         """
         A patch-based discriminator for pix2pix GANs that outputs a feature map
@@ -29,6 +30,8 @@ class PatchBasedDiscriminator(nn.Module):
         :param _leaky_relu_alpha: (float) alpha value for leaky ReLU activation.
             Must be between 0 and 1
         :type _leaky_relu_alpha: float
+        :param _batch_norm: (bool) whether to use batch normalization, defaults to False
+        :type _batch_norm: bool
         """
 
         super().__init__()
@@ -55,7 +58,10 @@ class PatchBasedDiscriminator(nn.Module):
         conv_layers.append(
             nn.Conv2d(n_channels, n_channels * 2, kernel_size=4, stride=1, padding=1)
             )
-        conv_layers.append(nn.BatchNorm2d(n_channels * 2))
+        
+        if _batch_norm:
+            conv_layers.append(nn.BatchNorm2d(n_channels * 2))
+
         conv_layers.append(nn.LeakyReLU(_leaky_relu_alpha, inplace=True))
         n_channels *= 2
         self._conv_layers = nn.Sequential(*conv_layers)        
@@ -80,6 +86,7 @@ class GlobalDiscriminator(nn.Module):
             n_in_filters: int,
             _conv_depth: int=4,
             _leaky_relu_alpha: float=0.2,
+            _batch_norm: bool=False,
             _pool_before_fc: bool=False
             ):
         """
@@ -96,6 +103,8 @@ class GlobalDiscriminator(nn.Module):
         :param _leaky_relu_alpha: (float) alpha value for leaky ReLU activation. 
         Must be between 0 and 1
         :type _leaky_relu_alpha: float
+        :param _batch_norm: (bool) whether to use batch normalization, defaults to False
+        :type _batch_norm: bool
         :param _pool_before_fc: (bool) whether to pool before the fully connected network
         Pooling before the fully connected network can reduce the number of parameters
         :type _pool_before_fc: bool
@@ -116,7 +125,10 @@ class GlobalDiscriminator(nn.Module):
             conv_layers.append(
                 nn.Conv2d(n_channels, n_channels * 2, kernel_size=4, stride=2, padding=1)
                 )
-            conv_layers.append(nn.BatchNorm2d(n_channels * 2))
+            
+            if _batch_norm:
+                conv_layers.append(nn.BatchNorm2d(n_channels * 2))
+
             conv_layers.append(nn.LeakyReLU(_leaky_relu_alpha, inplace=True))
             n_channels *= 2
 
