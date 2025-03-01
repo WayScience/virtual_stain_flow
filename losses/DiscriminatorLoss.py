@@ -4,7 +4,7 @@ from .AbstractLoss import AbstractLoss
 
 class DiscriminatorLoss(AbstractLoss):
     """
-    This class implements the loss function for the discriminator in a Generative Adversarial Network (GAN). 
+    This class implements the loss function for the discriminator in a Wasserstein Generative Adversarial Network (wGAN). 
     The discriminator loss measures how well the discriminator is able to distinguish between real (ground expected_truth) 
     images and fake (expected_generated) images produced by the generator.
     """
@@ -13,7 +13,7 @@ class DiscriminatorLoss(AbstractLoss):
 
     def forward(self, expected_truth, expected_generated):
         """
-        Computes the Wasserstein Discriminator Loss loss given ground expected_truth image and expected_generated image
+        Computes the Wasserstein Discriminator Loss given probability scores expected_truth and expected_generated from the discriminator
 
         :param expected_truth: The tensor containing the ground expected_truth 
         probability score predicted by the discriminator over a batch of real images (input target pair),
@@ -28,6 +28,8 @@ class DiscriminatorLoss(AbstractLoss):
         """
         
         # If the probability output is more than Scalar, take the mean of the output
+        # For compatibility with both a Discriminator class that would output a scalar probability (currently implemented)
+        # and a Discriminator class that would output a 2d matrix of probabilities (currently not implemented) 
         if expected_truth.dim() >= 3:
             expected_truth = torch.mean(expected_truth, tuple(range(2, expected_truth.dim())))
         if expected_generated.dim() >= 3:
