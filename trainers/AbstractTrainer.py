@@ -62,6 +62,7 @@ class AbstractTrainer(ABC):
 
         self._best_model = None
         self._best_loss = float("inf")
+        self._early_termination = None # switch for early termination
         self._early_stop_counter = 0
         self._early_termination_metric = early_termination_metric
 
@@ -210,9 +211,10 @@ class AbstractTrainer(ABC):
 
             # Update early stopping
             if self._early_termination_metric is None:
-                # use the first loss function value as early stopping metric
-                early_term_metric = next(iter(val_loss.values()))
+                # Do not perform early stopping when no termination metric is specified
+                self._early_termination = False
             else:
+                self._early_termination = True
                 # First look for the metric in validation loss
                 if self._early_termination_metric in list(val_loss.keys()):
                     early_term_metric = val_loss[self._early_termination_metric]
@@ -225,7 +227,7 @@ class AbstractTrainer(ABC):
             self.update_early_stop(early_term_metric)
 
             # Check if early stopping is needed
-            if self.early_stop_counter >= self.patience:
+            if self._early_termination and self.early_stop_counter >= self.patience:
                 print(f"Early termination at epoch {epoch + 1} with best validation metric {self._best_loss}")
                 break
 
