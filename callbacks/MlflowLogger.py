@@ -83,7 +83,7 @@ class MlflowLogger(AbstractCallback):
             pass
         elif isinstance(self._mlflow_log_params_args, Dict):
             mlflow.log_params(
-                **self._mlflow_log_params_args
+                self._mlflow_log_params_args
             )
         else:
             raise TypeError("mlflow_log_params_args must be None or a dictionary.")
