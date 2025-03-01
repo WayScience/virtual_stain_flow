@@ -11,18 +11,25 @@ class GeneratorLoss(AbstractLoss):
     Combines an adversarial loss component with an image reconstruction loss.
     """
     def __init__(self, 
-                 _metric_name: str, 
-                reconstruction_loss: Optional[torch.tensor] = L1Loss()
+                 _metric_name: str,
+                reconstruction_loss: Optional[torch.tensor] = L1Loss(),
+                reconstruction_weight: float = 1.0
                 ):
         """
         :param reconstruction_loss: The image reconstruction loss, 
         defaults to L1Loss(reduce=False)
         :type reconstruction_loss: torch.tensor
+        :param reconstruction_weight: The weight for the image reconstruction loss, defaults to 1.0
+        :type reconstruction_weight: float
         """
         
         super().__init__(_metric_name)
 
         self._reconstruction_loss = reconstruction_loss
+        if isinstance(reconstruction_weight, float):
+            self._reconstruction_weight = reconstruction_weight
+        else:
+            raise ValueError("reconstruction_weight must be a float value")
 
     def forward(self, 
                 discriminator_probs: torch.tensor,
@@ -51,9 +58,8 @@ class GeneratorLoss(AbstractLoss):
 
         # Adversarial loss
         adversarial_loss = -torch.mean(discriminator_probs)
-        
         adversarial_loss = 0.01 * adversarial_loss/(epoch + 1)
 
         image_loss = self._reconstruction_loss(generated, truth)
         
-        return adversarial_loss + image_loss.mean()
+        return adversarial_loss + self._reconstruction_weight * image_loss.mean()
