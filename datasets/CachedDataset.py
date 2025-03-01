@@ -46,9 +46,7 @@ class CachedDataset(Dataset):
         if prefill_cache:
             self.cache()
 
-    """
-    Overriden methods for Dataset class
-    """
+    """Overriden methods for Dataset class"""
     def __len__(self):
         """
         Return the length of the dataset
@@ -73,9 +71,8 @@ class CachedDataset(Dataset):
             self._update_cache(_idx)
             return self.__cache[_idx]
         
-    """
-    Setters 
-    """
+    """Setters"""
+
     def set_cache_size(self, cache_size: int):
         """
         Set the cache size. Does not automatically repopulate the cache but 
@@ -89,9 +86,7 @@ class CachedDataset(Dataset):
         while len(self.__cache) > self.__cache_size:
             self._pop_cache()
         
-    """
-    Properties to remain accessible
-    """
+    """Properties to remain accessible"""
     @property
     def input_names(self):
         """
@@ -162,9 +157,7 @@ class CachedDataset(Dataset):
         """
         return self.__dataset
     
-    """
-    Cache method
-    """
+    """Cache method"""
     def cache(self):
         """
         Clears the current cache and re-populate cache with data from the dataset object
