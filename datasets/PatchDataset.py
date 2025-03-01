@@ -165,6 +165,42 @@ class PatchDataset(ImageDataset):
     def patch_coords(self):
         return self.__current_patch_coords
     
+    @property
+    def raw_input(self):
+        """
+        Returns a tuple of input, target raw images where the current patch is cropped
+        from. Relies on the parent class _ImageDataset__input_cache and _ImageDataset__target_cache.
+        Returns None when the cache is empty. Raises an error if the input channel keys are not set.
+
+        :return: Tuple of input, target raw images
+        :rtype: Tuple[np.ndarray, np
+        """
+
+        if self._input_channel_keys is None:
+            raise ValueError("Input channel keys not set")
+
+        return np.stack(
+            [self._ImageDataset__input_cache[key] for key in self._input_channel_keys], 
+            axis=0) if self._input_channel_keys is not None else None
+    
+    @property
+    def raw_target(self):
+        """
+        Returns a tuple of input, target raw images where the current patch is cropped
+        from. Relies on the parent class _ImageDataset__input_cache and _ImageDataset__target_cache.
+        Returns None when the cache is empty. Raises an error if the target channel keys are not set.
+
+        :return: Tuple of input, target raw images
+        :rtype: Tuple[np.ndarray, np.ndarray]
+        """
+
+        if self._target_channel_keys is None:
+            raise ValueError("Target channel keys not set")
+
+        return np.stack(
+            [self._ImageDataset__target_cache[key] for key in self._target_channel_keys],
+            axis=0) if self._target_channel_keys is not None else None
+    
     """
     Internal Helper functions
     """
