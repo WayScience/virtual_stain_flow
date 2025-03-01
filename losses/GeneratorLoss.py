@@ -28,29 +28,31 @@ class GeneratorLoss(AbstractLoss):
                 discriminator_probs: torch.tensor,
                 truth: torch.tensor, 
                 generated: torch.tensor,
-                epoch: Optional[int] = None                
+                epoch: int = 0                
                 ):
         """
         Computes the loss for the GaN generator.
 
         :param discriminator_probs: The probabilities of the discriminator for the fake images being real.
+        :type discriminator_probs: torch.tensor
         :param truth: The tensor containing the ground truth image, 
             should be of shape [batch_size, channel_number, img_height, img_width].
         :type truth: torch.Tensor
         :param generated: The tensor containing model generated image, 
             should be of shape [batch_size, channel_number, img_height, img_width].
-        :param epoch: The current epoch number. 
-        Used for a smoothing weight for the adversarial loss component 
-        :type epoch: int
         :type generated: torch.Tensor
+        :param epoch: The current epoch number. 
+        Used for a smoothing weight for the adversarial loss component
+        Defaults to 0.
+        :type epoch: int
         :return: The computed metric as a float value.
         :rtype: float
         """
 
         # Adversarial loss
         adversarial_loss = -torch.mean(discriminator_probs)
-        if epoch is not None:
-            adversarial_loss = 0.01 * adversarial_loss/(epoch + 1)
+        
+        adversarial_loss = 0.01 * adversarial_loss/(epoch + 1)
 
         image_loss = self._reconstruction_loss(generated, truth)
         
