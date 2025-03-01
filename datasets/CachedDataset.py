@@ -44,7 +44,7 @@ class CachedDataset(Dataset):
         self._current_idx = None
 
         if prefill_cache:
-            self.cache()
+            self.populate_cache()
 
     """Overriden methods for Dataset class"""
     def __len__(self):
@@ -68,7 +68,7 @@ class CachedDataset(Dataset):
             return self.__cache[_idx]
         else:
             # cache miss, load from parent class method dynamically
-            self._update_cache(_idx)
+            self._push_cache(_idx)
             return self.__cache[_idx]
         
     """Setters"""
@@ -158,22 +158,20 @@ class CachedDataset(Dataset):
         return self.__dataset
     
     """Cache method"""
-    def cache(self):
+    def populate_cache(self):
         """
-        Clears the current cache and re-populate cache with data from the dataset object
-        Iteratively calls the update cache method on a sequence of indices to fill the cache
+        Populates/clears the current cache and re-populate the cache with data from the dataset object
+        Iteratively calls the _push_cache method on a sequence of indices
         """
         self._clear_cache()
         for _idx in range(min(self.__cache_size, len(self.__dataset))):
-            self._update_cache(_idx)
+            self._push_cache(_idx)
     
-    """
-    Internal helper methods
-    """
+    """Internal helper methods"""
 
-    def _update_cache(self, _idx: int):
+    def _push_cache(self, _idx: int):
         """
-        Update the cache with data from the dataset object. 
+        Update the cache with a single item retrieved from the dataset object. 
         Calls the update cache metadata method as well to sync data and metadata
         Pops the cache if the cache size is exceeded on a first in, first out basis
 
@@ -184,7 +182,7 @@ class CachedDataset(Dataset):
         self.__cache[_idx] = self.__dataset[_idx]
         if len(self.__cache) >= self.__cache_size:
             self._pop_cache()
-        self._update_cache_metadata(_idx)
+        self._push_cache_metadata(_idx)
 
     def _pop_cache(self):
         """
@@ -192,10 +190,10 @@ class CachedDataset(Dataset):
         """
         self.__cache.popitem(last=False)
 
-    def _update_cache_metadata(self, _idx: int):
+    def _push_cache_metadata(self, _idx: int):
         """
         Update the cache metadata with data from the dataset object
-        Meant to be called by _update_cache method
+        Meant to be called by _push_cache method
 
         :param _idx: Index of the data to cache
         :type _idx: int
