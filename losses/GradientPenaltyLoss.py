@@ -38,7 +38,7 @@ class GradientPenaltyLoss(AbstractLoss):
             inputs=interpolated,
             grad_outputs=torch.ones_like(prob_interpolated),
             create_graph=True,
-            retain_graph=False,
+            retain_graph=True,
         )[0]
 
         gradients = gradients.view(batch_size, -1)
