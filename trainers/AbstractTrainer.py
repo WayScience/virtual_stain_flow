@@ -44,8 +44,8 @@ class AbstractTrainer(ABC):
         :param device: (optional) The device to be used for training.
         :type device: torch.device
         :param early_termination_metric: (optional) The metric to be tracked and used to update early 
-            termination count on the validation dataset. If not configured, will be using the value 
-            computed by the first validation loss function
+            termination count on the validation dataset. If None, early termination is disabled and the
+            training will run for the specified number of epochs.
         :type early_termination_metric: str
         """
 
@@ -62,9 +62,9 @@ class AbstractTrainer(ABC):
 
         self._best_model = None
         self._best_loss = float("inf")
-        self._early_termination = None # switch for early termination
         self._early_stop_counter = 0
         self._early_termination_metric = early_termination_metric
+        self._early_termination = True if early_termination_metric else False
 
         # Customize data splits
         self._train_ratio = kwargs.get("train", 0.7)
@@ -212,9 +212,8 @@ class AbstractTrainer(ABC):
             # Update early stopping
             if self._early_termination_metric is None:
                 # Do not perform early stopping when no termination metric is specified
-                self._early_termination = False
+                early_term_metric = None
             else:
-                self._early_termination = True
                 # First look for the metric in validation loss
                 if self._early_termination_metric in list(val_loss.keys()):
                     early_term_metric = val_loss[self._early_termination_metric]
@@ -234,7 +233,7 @@ class AbstractTrainer(ABC):
         for callback in self.callbacks:
             callback.on_train_end()
 
-    def update_early_stop(self, val_loss: torch.Tensor):
+    def update_early_stop(self, val_loss: Optional[torch.Tensor]):
         """
         Method to update the early stopping criterion
 
@@ -242,6 +241,10 @@ class AbstractTrainer(ABC):
         :type val_loss: torch.Tensor
         """
         
+        # When early termination is disabled, the best model is updated with the current model
+        if not self._early_termination and val_loss is None:
+            self.best_model = self.model.state_dict().copy()
+
         if val_loss < self.best_loss:
             self.best_loss = val_loss
             self.early_stop_counter = 0
