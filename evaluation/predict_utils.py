@@ -90,10 +90,11 @@ def process_tensor_image(
     if dtype is not None:
         output_images = output_images.astype(dtype)
 
-    # Apply inverse invert function when supplied or transformation if dataset supplied and target_transform is valid
+    # Apply invert function when supplied or transformation if invert function is supplied
     if invert_function is not None and isinstance(invert_function, Callable):
         output_images = np.array([invert_function(img) for img in output_images])
     elif dataset is not None and hasattr(dataset, "target_transform"):
+        # Apply inverted target transformation if available
         target_transform = dataset.target_transform
         if isinstance(target_transform, (ImageOnlyTransform, Compose)):
             # Apply the transformation on each image
