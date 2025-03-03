@@ -1,4 +1,4 @@
-from typing import Optional, List, Union, Callable
+from typing import Optional, List, Tuple, Callable
 
 import torch
 import numpy as np
@@ -12,7 +12,7 @@ def predict_image(
     device: str = "cpu",
     num_workers: int = 0,
     indices: Optional[List[int]] = None
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Runs a model on a dataset, performing a forward pass on all (or a subset of) input images 
     in evaluation mode and returning a stacked tensor of predictions.
