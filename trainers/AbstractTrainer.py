@@ -244,6 +244,7 @@ class AbstractTrainer(ABC):
         # When early termination is disabled, the best model is updated with the current model
         if not self._early_termination and val_loss is None:
             self.best_model = self.model.state_dict().copy()
+            return
 
         if val_loss < self.best_loss:
             self.best_loss = val_loss
