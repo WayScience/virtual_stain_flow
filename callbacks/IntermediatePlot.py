@@ -8,9 +8,8 @@ from torch.utils.data import Dataset
 from .AbstractCallback import AbstractCallback
 from ..datasets.PatchDataset import PatchDataset
 from ..evaluation.visualization_utils import plot_predictions_grid_from_model
-from ..evaluation.visualization_utils import plot_patches
 
-class IntermediatePatchPlot(AbstractCallback):
+class IntermediatePlot(AbstractCallback):
     """
     Callback to plot model generated outputs, ground 
     truth, and input stained image patches at the end of each epoch.
@@ -27,7 +26,9 @@ class IntermediatePatchPlot(AbstractCallback):
                  random_seed: int=42,
                  **kwargs):
         """
-        Initialize the IntermediatePlot callback. 
+        Initialize the IntermediatePlot callback.
+        Allows plots of predictions to be generated during training for monitoring of training progress.
+        Supports both PatchDataset and Dataset classes for plotting.
         This callback, when passed into the trainer, will plot the model predictions on a subset of the provided dataset at the end of each epoch.
 
         :param name: Name of the callback.
@@ -55,8 +56,13 @@ class IntermediatePatchPlot(AbstractCallback):
         """
         super().__init__(name)
         self._path = path
-        if not isinstance(dataset, PatchDataset):
+        if isinstance(dataset, Dataset):
+            pass
+        if isinstance(dataset, PatchDataset):
+            pass
+        else:
             raise TypeError(f"Expected PatchDataset, got {type(dataset)}")
+        
         self._dataset = dataset
 
         # Additional kwargs passed to plot_patches
