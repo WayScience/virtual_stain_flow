@@ -202,7 +202,7 @@ def plot_patches(
     targets = torch.stack(targets)
 
     # Run model predictions (if provided)
-    predictions = predict_image(dataset, model, device=device, indices=patch_index) if model else None
+    _, predictions = predict_image(dataset, model, device=device, indices=patch_index) if model else None
 
     # Convert tensors to NumPy arrays
     inputs_numpy = process_tensor_image(inputs, invert_function=dataset.input_transform.invert)
