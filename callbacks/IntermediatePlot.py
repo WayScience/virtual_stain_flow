@@ -58,7 +58,7 @@ class IntermediatePlot(AbstractCallback):
         self._path = path
         if isinstance(dataset, Dataset):
             pass
-        if isinstance(dataset, PatchDataset):
+        elif isinstance(dataset, PatchDataset):
             pass
         else:
             raise TypeError(f"Expected PatchDataset, got {type(dataset)}")
