@@ -32,8 +32,8 @@ def predict_image(
     :param indices: Optional list of dataset indices to subset the dataset before inference.
     :type indices: Optional[List[int]], optional
 
-    :return: A stacked tensor of model predictions with shape (N, C, H, W), where N is the dataset size or subset size.
-    :rtype: torch.Tensor
+    :return: Tuple of stacked target and prediction tensors.
+    :rtype: Tuple[torch.Tensor, torch.Tensor]
     """
     # Subset the dataset if indices are provided
     if indices is not None:
@@ -45,20 +45,20 @@ def predict_image(
     model.to(device)
     model.eval()
 
-    predictions = []  # List to store predictions
+    predictions, targets = [], []
 
     with torch.no_grad():
-        for inputs, _ in dataloader:  # Unpacking (input_tensor, target_tensor)
+        for inputs, target in dataloader:  # Unpacking (input_tensor, target_tensor)
             inputs = inputs.to(device)  # Move input data to the specified device
 
             # Forward pass
             outputs = model(inputs)
-
-            # Store predictions
+            
+            # output both target and prediction tensors for metric
+            targets.append(target.cpu())
             predictions.append(outputs.cpu())  # Move to CPU for stacking
 
-    # Stack all predictions into a single tensor
-    return torch.cat(predictions, dim=0) if predictions else torch.empty(0)
+    return torch.cat(targets, dim=0), torch.cat(predictions, dim=0) 
 
 def process_tensor_image(
     img_tensor: torch.Tensor,
