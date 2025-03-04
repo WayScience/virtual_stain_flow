@@ -2,6 +2,16 @@ import torch
 
 class FNet(torch.nn.Module):
     def __init__(self, depth=4, mult_chan=32, output_activation='sigmoid'):
+        """
+        Initialize the FNet model with a customizable depth.
+
+        :param depth: Depth of the F-Net model.
+        :type depth: int
+        :param mult_chan: Factor to determine number of output channels.
+        :type mult_chan: int
+        :param output_activation: Activation function for the output layer.
+        :type output_activation: str
+        """
         super().__init__()
         self._depth = depth
         self._multi_chan = mult_chan
@@ -12,12 +22,11 @@ class FNet(torch.nn.Module):
         self.conv_out = torch.nn.Conv2d(
             self._multi_chan, 1, kernel_size=3, padding=1)
         
-        self.output_activation = output_activation
-        if self.output_activation == 'sigmoid':
+        if output_activation == 'sigmoid':
             self.output_activation = torch.nn.Sigmoid()
-        elif self.output_activation == 'relu':
+        elif output_activation == 'relu':
             self.output_activation = torch.nn.ReLU()
-        elif self.output_activation == 'linear':
+        elif output_activation == 'linear':
             self.output_activation = torch.nn.Identity()
         else:
             raise ValueError('Invalid output_activation')

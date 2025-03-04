@@ -161,9 +161,27 @@ class OutConv(nn.Module):
     """
     Final output layer that applies a 1x1 convolution followed by a sigmoid activation.
     """
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, output_activation:str='sigmoid'):
+        """
+        Initialize the OutConv module.
+
+        :param in_channels: Number of input channels.
+        :type in_channels: int
+        :param out_channels: Number of output channels.
+        :type out_channels: int
+        :param output_activation: Activation function to apply to the output.
+        :type output_activation: str
+        """
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        if output_activation == 'sigmoid':
+            self.output_activation = torch.nn.Sigmoid()
+        elif output_activation == 'relu':
+            self.output_activation = torch.nn.ReLU()
+        elif output_activation == 'linear':
+            self.output_activation = torch.nn.Identity()
+        else:
+            raise ValueError('Invalid output_activation')
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -174,7 +192,7 @@ class OutConv(nn.Module):
         :return: Processed output tensor.
         :rtype: torch.Tensor
         """
-        return torch.sigmoid(self.conv(x))
+        return self.output_activation(self.conv(x))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

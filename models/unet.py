@@ -6,16 +6,28 @@ from matplotlib.patches import Rectangle
 from .unet_utils import *
 
 class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes, base_channels=64, depth=4, bilinear=False):
+    def __init__(self, 
+                 n_channels, 
+                 n_classes, 
+                 base_channels=64, 
+                 depth=4, 
+                 bilinear=False,
+                 output_activation='sigmoid'):
         """
         Initialize the U-Net model with a customizable depth.
 
-        Args:
-            n_channels (int): Number of input channels.
-            n_classes (int): Number of output classes.
-            base_channels (int): Number of channels for the first layer. Subsequent layers double this value.
-            depth (int): Number of downsampling steps (controls depth).
-            bilinear (bool): If True, use bilinear upsampling; otherwise, use transposed convolutions.
+        :param n_channels: Number of input channels.
+        :type n_channels: int
+        :param n_classes: Number of output classes.
+        :type n_classes: int
+        :param base_channels: Number of base channels to start with.
+        :type base_channels: int
+        :param depth: Depth of the U-Net model.
+        :type depth: int
+        :param bilinear: Use bilinear interpolation for ups
+        :type bilinear: bool
+        :param output_activation: Activation function for the output layer.
+        :type output_activation: str
         """
         super(UNet, self).__init__()
         self.n_channels = n_channels
@@ -77,7 +89,10 @@ class UNet(nn.Module):
         self.up = nn.ModuleList(expanding_path)
 
         # Output layer
-        self.outc = OutConv(base_channels, n_classes)
+        self.outc = OutConv(
+            base_channels, 
+            n_classes, 
+            output_activation=output_activation)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
