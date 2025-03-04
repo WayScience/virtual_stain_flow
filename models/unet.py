@@ -32,7 +32,6 @@ class UNet(nn.Module):
         super(UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
-        self.base_channels = base_channels
         self.depth = depth
         self.bilinear = bilinear
 
@@ -48,7 +47,7 @@ class UNet(nn.Module):
         
         # Contracting path
         contracting_path = []
-        for _ in range(depth):
+        for _ in range(self.depth):
             # set the number of input channels to the output channels of the previous layer
             in_channels = out_channels
             # double the number of output channels for the next layer
@@ -74,7 +73,7 @@ class UNet(nn.Module):
 
         # Expanding path
         expanding_path = []
-        for _ in range(depth):
+        for _ in range(self.depth):
             # input to expanding path has the same dimension as the output of the bottleneck layer  
             in_channels = out_channels
             # half the number of output channels for the next layer
