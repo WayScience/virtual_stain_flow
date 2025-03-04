@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from .AbstractTrainer import AbstractTrainer
 
-class WGaNTrainer(AbstractTrainer):
+class WGANTrainer(AbstractTrainer):
     def __init__(self, 
                  generator: torch.nn.Module, 
                  discriminator: torch.nn.Module, 
