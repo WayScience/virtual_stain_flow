@@ -193,14 +193,3 @@ class OutConv(nn.Module):
         :rtype: torch.Tensor
         """
         return self.output_activation(self.conv(x))
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the Upsample module.
-
-        :param x: Input tensor to be upsampled.
-        :type x: torch.Tensor
-        :return: Upsampled tensor.
-        :rtype: torch.Tensor
-        """
-        return self.up(x)
