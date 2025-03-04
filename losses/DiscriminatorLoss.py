@@ -2,7 +2,7 @@ import torch
 
 from .AbstractLoss import AbstractLoss
 
-class DiscriminatorLoss(AbstractLoss):
+class WassersteinLoss(AbstractLoss):
     """
     This class implements the loss function for the discriminator in a Wasserstein Generative Adversarial Network (wGAN). 
     The discriminator loss measures how well the discriminator is able to distinguish between real (ground expected_truth) 
