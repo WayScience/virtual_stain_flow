@@ -1,0 +1,1 @@
+Here lives the trainer class for FNet/UNet and wGaN GP. Shared components between trainers for different models are isolated into the asbstract trainer class
