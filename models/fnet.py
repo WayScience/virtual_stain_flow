@@ -1,8 +1,5 @@
 import torch
 
-"""
-Adapted from https://github.com/AllenCellModeling/pytorch_fnet
-"""
 class FNet(torch.nn.Module):
     def __init__(self, depth=4, mult_chan=32, output_activation='sigmoid'):
         super().__init__()
