@@ -75,8 +75,7 @@ class WGANTrainer(AbstractTrainer):
         self._discriminator_update_freq = discriminator_update_freq
         self._generator_update_freq = generator_update_freq
 
-        ## TODO: instead of memorizing the same loss, keep a running average of the losses
-        # Memory for discriminator and generator losses from the most recent update
+        # Initialize the last losses memory to zero
         self._last_discriminator_loss = torch.tensor(0.0, device=self.device).detach()
         self._last_gradient_penalty_loss = torch.tensor(0.0, device=self.device).detach()
         self._last_generator_loss = torch.tensor(0.0, device=self.device).detach()
