@@ -6,9 +6,7 @@ from .AbstractLoss import AbstractLoss
 class GradientPenaltyLoss(AbstractLoss):
     def __init__(self, _metric_name, discriminator, weight=10.0):
         super().__init__(_metric_name)
-
-        ## TODO: add a wrapper class for GaN loss functions to 
-        # dynamically access discriminator from the trainer class
+        
         self._discriminator = discriminator
         self._weight = weight
 
