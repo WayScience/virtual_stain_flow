@@ -68,7 +68,6 @@ class UNet(nn.Module):
             # half the number of output channels for the next layer
             out_channels = in_channels // 2
             expanding_path.append(
-                ## TODO: replace this with the Upsample and SkipConnection modules maybe
                 Up(
                     in_channels=in_channels,
                     out_channels=out_channels,
