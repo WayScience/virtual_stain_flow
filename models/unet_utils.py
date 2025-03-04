@@ -100,7 +100,6 @@ class Contract(nn.Module):
     
 class Up(nn.Module):
     """Upscaling then 2 * ConvBnRelu"""
-    ## TODO: replace this with the Upsample and SkipConnection modules
     def __init__(self, 
                  in_channels: int, 
                  out_channels: int, 
@@ -176,32 +175,6 @@ class OutConv(nn.Module):
         :rtype: torch.Tensor
         """
         return torch.sigmoid(self.conv(x))
-    
-class Expand(nn.Module):
-    """Handles upscaling of feature maps."""
-    def __init__(self, 
-                 in_channels: int, 
-                 out_channels: int, 
-                 bilinear: bool=True):
-        """
-        Initialize the Upsample module.
-
-        :param in_channels: Number of input channels.
-        :type in_channels: int
-        :param out_channels: Number of output channels.
-        :type out_channels: int
-        :param bilinear: If True, use bilinear upscaling
-        :type bilinear: bool
-        """
-        super().__init__()
-        if bilinear:
-            # Bilinear interpolation (non-trainable)
-            self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
-        else:
-            # Transposed convolution (trainable)
-            self.up = nn.ConvTranspose2d(
-                in_channels, out_channels, kernel_size=2, stride=2
-            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -213,50 +186,3 @@ class Expand(nn.Module):
         :rtype: torch.Tensor
         """
         return self.up(x)
-    
-class SkipConnection(nn.Module):
-    """Handles padding, concatenation, and DoubleConv refinement."""
-    def __init__(self, 
-                 in_channels: int, 
-                 out_channels: int):
-        """
-        Initialize the SkipConnection module.
-        Handles the dimension mismatch adjustment between a upsampled feature map and a skip connection,
-        plus refinement via a ConvBnRelu blocks.
-
-        :param in_channels: Number of input channels.
-        :type in_channels: int
-        :param out_channels: Number of output channels.
-        :type out_channels: int
-        """
-        super().__init__()
-        self.conv = ConvBnRelu(
-            in_channels=in_channels + out_channels, 
-            out_channels=out_channels, 
-            mid_channels=None, 
-            num_layers=2 # Refines features with 2 sequential convolutions
-        )
-
-    def forward(self, 
-                x1: torch.Tensor, 
-                x2: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the SkipConnection module.
-
-        :param x1: Upsampled feature map.
-        :type x1: torch.Tensor
-        :param x2: Skip connection feature map.
-        :type x2: torch.Tensor
-        :return: Refined concatenated feature map.
-        :rtype: torch.Tensor
-        """
-        # Align spatial dimensions via padding
-        diffY = x2.size()[2] - x1.size()[2]
-        diffX = x2.size()[3] - x1.size()[3]
-        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2])
-
-        # Concatenate along channel dimension
-        x = torch.cat([x2, x1], dim=1)
-
-        # Refine concatenated feature map
-        return self.conv(x)
