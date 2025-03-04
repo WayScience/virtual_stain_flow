@@ -13,7 +13,6 @@ class SSIM(AbstractMetrics):
         Initializes the SSIM metric.
 
         :param _metric_name: The name of the metric.
-        :type _metric_name: str
         :param _max_pixel_value: The maximum possible pixel value of the images, by default 1.
         :type _max_pixel_value: int, optional
         """

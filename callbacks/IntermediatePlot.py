@@ -1,3 +1,4 @@
+import pathlib
 from typing import List, Union
 import random
 
@@ -17,7 +18,7 @@ class IntermediatePlot(AbstractCallback):
     
     def __init__(self,                
                  name: str, 
-                 path: str, 
+                 path: Union[pathlib.Path, str], 
                  dataset: Union[Dataset, PatchDataset], 
                  plot_n_patches: int=5,
                  indices: Union[List[int], None]=None,
@@ -32,9 +33,8 @@ class IntermediatePlot(AbstractCallback):
         This callback, when passed into the trainer, will plot the model predictions on a subset of the provided dataset at the end of each epoch.
 
         :param name: Name of the callback.
-        :type name: str
         :param path: Path to save the model weights.
-        :type path: str
+        :type path: Union[pathlib.Path, str]
         :param dataset: Dataset to be used for plotting intermediate results.
         :type dataset: Union[Dataset, PatchDataset]
         :param plot_n_patches: Number of patches to randomly select and plot, defaults to 5.

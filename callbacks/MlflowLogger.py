@@ -27,9 +27,7 @@ class MlflowLogger(AbstractCallback):
         Initialize the MlflowLogger callback.
 
         :param name: Name of the callback.
-        :type name: str
         :param artifact_name: Name of the artifact file to log, defaults to 'best_model_weights.pth'.
-        :type artifact_name: str, optional
         :param mlflow_uri: URI for the MLflow tracking server, defaults to None.
         If a path is specified, the logger class will call set_tracking_uri to that supplied path 
         thereby initiating a new tracking server. 
