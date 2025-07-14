@@ -30,9 +30,18 @@ with the following design changes:
 - Has exposed `log_artifact`, `log_metric`, and `log_param` methods for manual logging artifacts, metrics, and parameters
 - Has some access point of trainer attributes for use by logger callbacks, but subject to optimization/change
 """
-class MlflowLoggerV2: # TODO rename this after prototyping
+class MlflowLogger:
     """
-    MLflow Logger for logging training runs, metrics, artifacts, and parameters.
+    MLflow Logger for logging training runs, metrics, artifacts, and parameters, intended to be
+        used with the AbstractLoggingTrainer subclasses.
+    
+    This class is distinct and independent from the `virtual_stain_flow.callback` classes,
+        in that it is no longer an optional callback to be supplied during trainer initialization 
+        but a required parameter for the `train` function of the AbstractLoggingTrainer subclasses,
+        bound to a single train session.
+    
+    This class can accept a list of `AbstractLoggerCallback` subclasses so callback products are
+        centrally logged appropriately as artifacts/parameters/metrics to MLflow. 
     """
     def __init__(
         self,

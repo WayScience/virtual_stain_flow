@@ -23,8 +23,6 @@ Prototype Notes: This class is nearly identical to the old AbstractTrainer class
 class AbstractLoggingTrainer(AbstractTrainer):
     """
     Abstract class for trainers that support mlflow logging functionality.
-    The new mlflow logger is no longer a callback but a separate class that can take
-    its own callbacks to faciliate centralized logging of artifacts. 
 
     The callback support of the Trainer classes in general is still retained for potential
     functionality that is independent from the mlflow logging system. 
