@@ -56,7 +56,7 @@ class AbstractLoggingTrainer(AbstractTrainer):
             raise ValueError("early_termination_mode must be either 'min' or 'max'")
         self._early_termination_mode = early_termination_mode
 
-    def update_early_stop(self, val_loss: Optional[torch.Tensor]):
+    def update_early_stop_counter(self, val_loss: Optional[torch.Tensor]):
         """
         Method to update the early stopping criterion
 
@@ -190,7 +190,7 @@ class AbstractLoggingTrainer(AbstractTrainer):
                 else:
                     raise ValueError("Invalid early termination metric")
 
-            self.update_early_stop(early_term_metric_value)
+            self.update_early_stop_counter(early_term_metric_value)
 
             # 8) Check if early stopping is needed
             if self._early_termination and self.early_stop_counter >= self.patience:
