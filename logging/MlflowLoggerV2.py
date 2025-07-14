@@ -431,14 +431,31 @@ class MlflowLogger:
     """
     Access point for callback to model
     """
+
+    def __check_trainer_bound(
+            self
+        ) -> None:
+        """
+        Internal method for centralized check of trainer binding.
+        Raises RuntimeError if no trainer is bound to the logger.
+        """
+
+        if self.trainer is None:
+            raise RuntimeError("No trainer bound to logger. Cannot access trainer attributes.")
+
+
     def get_epoch(
             self
         ) -> int:
 
-        if self.trainer is None:
-            # TODO consider if we want error out or return None
-            return 0
-            # raise RuntimeError("No trainer bound to this logger. Cannot access epoch.")
+        try:
+            self.__check_trainer_bound()
+        except RuntimeError as e:
+            raise RuntimeError(
+                # some context for the error
+                "Cannot access epoch. No trainer bound to logger."
+            ) from e
+        
         return self.trainer.epoch
 
     def get_model(
@@ -453,10 +470,13 @@ class MlflowLogger:
         :return: The model instance bound to the trainer.
         """
         
-        if self.trainer is None:
-            # TODO consider if we want error out or return None
-            return None
-            # raise RuntimeError("No trainer bound to this logger. Cannot access model.")
+        try:
+            self.__check_trainer_bound()
+        except RuntimeError as e:
+            raise RuntimeError(
+                # some context for the error
+                "Cannot access model. No trainer bound to logger."
+            ) from e
         
         if best_model:
             return self.trainer.best_model
