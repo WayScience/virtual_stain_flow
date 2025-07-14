@@ -141,13 +141,16 @@ class MlflowLogger:
         """
 
         if self._mlflow_start_run_args is None:
-            pass
+            self._mlflow_start_run_args = {}
         elif isinstance(self._mlflow_start_run_args, Dict):
-            mlflow.start_run(
-                **self._mlflow_start_run_args
-            )
+            pass
         else:
-            raise TypeError("mlflow_start_run_args must be None or a dictionary.")
+            raise TypeError("mlflow_start_run_args must be None or a dictionary.")        
+
+        mlflow.start_run(
+            run_name=self.run_name,
+            **self._mlflow_start_run_args
+        )
         
         if self._mlflow_log_params_args is None:
             pass
