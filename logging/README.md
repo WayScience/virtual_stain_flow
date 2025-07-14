@@ -18,7 +18,7 @@ virtual_stain_flow/
     ├── MlflowLoggerV2.py        # Central logging controller class
     └──  callbacks/
         ├── LoggerCallback.py    # Abstract base class for logger-aware callbacks
-        └── PlotCallback.py      # Example implementation to generate and prediction plots that the logger logs as artifactrs
+        └── PlotCallback.py      # Example implementation to generate and prediction plots that the logger logs as artifacts
 ```
 
 ---
