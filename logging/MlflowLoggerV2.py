@@ -102,7 +102,16 @@ class MlflowLogger:
         }
 
         self.trainer: Optional[AbstractLoggingTrainer] = None
-        self.tags = tags or {}
+
+        if isinstance(tags, dict):
+            for key, value in tags.items():
+
+                # do not overwrite existing tags
+                if value is not None and self.tags.get(key) is None:
+                    self.tags[key] = value
+
+        elif tags is not None:
+            raise TypeError("tags must be a dictionary or None.")
 
         self._mlflow_start_run_args = mlflow_start_run_args
         self._mlflow_log_params_args = mlflow_log_params_args
