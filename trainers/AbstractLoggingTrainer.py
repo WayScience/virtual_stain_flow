@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, random_split
 from .AbstractTrainer import AbstractTrainer
 from ..metrics.AbstractMetrics import AbstractMetrics
 from ..callbacks.AbstractCallback import AbstractCallback
-from ..logging.MlflowLoggerV2 import MlflowLoggerV2
+from ..logging import MlflowLogger
 
 path_type = Union[pathlib.Path, str]
 
@@ -88,7 +88,7 @@ class AbstractLoggingTrainer(AbstractTrainer):
         # TODO if we absolutely will do logging with mlflow no matter what
         # we might want to just construct the logger automatically for every trainer
         # and have it exposed
-        logger: MlflowLoggerV2, 
+        logger: MlflowLogger, 
     ):
         """
         Train the model with the provided logger.
@@ -100,7 +100,7 @@ class AbstractLoggingTrainer(AbstractTrainer):
         :raises TypeError: If the logger is not an instance of MlflowLoggerV2.
         """
 
-        if not isinstance(logger, MlflowLoggerV2):
+        if not isinstance(logger, MlflowLogger):
             raise TypeError("logger must be an instance of MlflowLoggerV2")
         
         self.model.to(self.device)
