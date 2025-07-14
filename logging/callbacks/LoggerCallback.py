@@ -32,7 +32,7 @@ Prototype Notes: Completely new abstract class for special logger callbacks that
 class AbstractLoggerCallback(ABC):
     """
     Abstract class for logger callbacks that defines the 
-    behavior/signature/interaction with MlflowLoggerV2.
+    behavior/signature/interaction with MlflowLogger.
 
     The subclasses of this class should do some external computation 
     granted access to the logger instance and the model, produce
