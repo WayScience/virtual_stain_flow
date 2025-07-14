@@ -88,6 +88,10 @@ class MlflowLogger:
                 mlflow.set_tracking_uri(tracking_uri)
             except Exception as e:
                 raise RuntimeError(f"Error setting MLflow tracking URI: {e}")
+            
+        # keep track of the run so we precisely terminate 
+        # this one when the user explicitly calls end_run
+        self.__run_id: Optional[str] = None
 
         # logged as experiment name
         if experiment_name is None:
@@ -166,11 +170,13 @@ class MlflowLogger:
             pass
         else:
             raise TypeError("mlflow_start_run_args must be None or a dictionary.")        
-
-        mlflow.start_run(
+        
+        _run = mlflow.start_run(
             run_name=self.run_name,
             **self._mlflow_start_run_args
         )
+        # keep track of the run id
+        self.__run_id = _run.info.run_id
         
         for key, value in self.tags.items():
             if value is not None:
@@ -280,9 +286,15 @@ class MlflowLogger:
         """
         End the current MLflow run.
         """
+        if self._run_id is None:
+            raise RuntimeError("No mlflow run has been initiated with this logger.")
 
-        if mlflow.active_run() is not None:
-            mlflow.end_run()
+        active_run = mlflow.active_run()
+        if active_run is not None:
+            if active_run.info.run_id == self.__run_id:
+                mlflow.end_run()
+            else:
+                print(f"Active run ({active_run.info.run_id}) does not match logger's run ({self.run_id}). Not ending.")
         else:
             print("No active MLflow run to end.")
 
