@@ -125,7 +125,7 @@ class TrainerV2(AbstractLoggingTrainer): # TODO rename this after prototyping
         """
         Train the model for one epoch.
         """
-        self._model.train()
+        self.model.train()
         losses = defaultdict(list)
         # Iterate over the train_loader
         for inputs, targets in self._train_loader:
@@ -143,7 +143,7 @@ class TrainerV2(AbstractLoggingTrainer): # TODO rename this after prototyping
         Evaluate the model for one epoch.
         """
 
-        self._model.eval()
+        self.model.eval()
         losses = defaultdict(list)
         # Iterate over the val_loader
         for inputs, targets in self._val_loader:
