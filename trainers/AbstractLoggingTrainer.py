@@ -194,7 +194,7 @@ class AbstractLoggingTrainer(AbstractTrainer):
 
             # 8) Check if early stopping is needed
             if self._early_termination and self.early_stop_counter >= self.patience:
-                print(f"Early termination at epoch {epoch + 1} with best validation metric {self._best_loss}")
+                print(f"Early termination at epoch {epoch + 1} with best validation metric {self.best_loss}")
                 break
 
         # 9A) Invoke the on_train_end method of the logger
