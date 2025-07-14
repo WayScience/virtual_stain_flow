@@ -51,6 +51,7 @@ class MlflowLogger:
         run_name: Optional[str] = None,
         experiment_type: Optional[str] = None,
         model_architecture: Optional[str] = None,
+        description: Optional[str] = None,
         target_channel_name: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
         mlflow_start_run_args: dict = None,
@@ -66,6 +67,7 @@ class MlflowLogger:
         :param run_name: Name of the MLflow run, defaults to None.
         :param experiment_type: Type of the experiment, defaults to None.
         :param model_architecture: Model architecture used in the experiment, defaults to None.
+        :param description: Description of the experiment, defaults to None.
         :param target_channel_name: Name of the target channel, defaults to None.
         :param tags: Additional tags to be logged with the run, defaults to None.
         :param mlflow_start_run_args: Additional arguments for starting an MLflow run, defaults to None.
@@ -98,7 +100,8 @@ class MlflowLogger:
         self.tags = {
             "experiment_type": experiment_type,
             "model_architecture": model_architecture,
-            "target_channel_name": target_channel_name
+            "target_channel_name": target_channel_name,
+            "description": description
         }
 
         self.trainer: Optional[AbstractLoggingTrainer] = None
