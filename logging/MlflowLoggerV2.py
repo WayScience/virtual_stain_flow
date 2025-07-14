@@ -87,11 +87,19 @@ class MlflowLogger:
             except Exception as e:
                 raise RuntimeError(f"Error setting MLflow tracking URI: {e}")
 
-        self.experiment_name = experiment_name
+        # logged as experiment name
+        if experiment_name is None:
+            mlflow.set_experiment(experiment_name)
+
+        # logged at run start
         self.run_name = run_name
-        self.analysis_type = experiment_type
-        self.model_architecture = model_architecture
-        self.target_channel_name = target_channel_name
+
+        # logged as tags
+        self.tags = {
+            "experiment_type": experiment_type,
+            "model_architecture": model_architecture,
+            "target_channel_name": target_channel_name
+        }
 
         self.trainer: Optional[AbstractLoggingTrainer] = None
         self.tags = tags or {}
@@ -151,6 +159,10 @@ class MlflowLogger:
             run_name=self.run_name,
             **self._mlflow_start_run_args
         )
+        
+        for key, value in self.tags.items():
+            if value is not None:
+                mlflow.set_tag(key, value)
         
         if self._mlflow_log_params_args is None:
             pass
