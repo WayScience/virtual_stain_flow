@@ -14,7 +14,7 @@ Prototype Notes: This class is nearly identical to the old Trainer class, except
 - It inherits from the new AbstractLoggingTrainer class.
 - It has a new save_model method that defines saving the model weight
 """
-class TrainerV2(AbstractLoggingTrainer): # TODO rename this after prototyping
+class LoggingTrainer(AbstractLoggingTrainer):
     """
     Trainer class for single network CNN image-image models 
     Prototyping for the new mlflow logger
