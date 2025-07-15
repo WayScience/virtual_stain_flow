@@ -7,7 +7,7 @@ import mlflow
 import torch
 from torch import nn
 
-from ..trainers import (
+from ..trainers.logging_trainers import (
     AbstractLoggingTrainer)
 from .callbacks.LoggerCallback import (
     AbstractLoggerCallback,
