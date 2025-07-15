@@ -11,11 +11,6 @@ from .LoggerCallback import (
 from ...evaluation.visualization_utils import plot_predictions_grid_from_model
 from ...datasets.PatchDataset import PatchDataset
 
-"""
-Prototype Notes: This is an example implementation of a logger callback that plot predictions of the model on a subset of the dataset.
-Mostly similar to the `virtual_stain_flow.callbacks.IntermediatePlotCallback`, except interfaces with the MlflowLoggerV2 to have the 
- plots logged as artifacts
-"""
 class PlotPredictionCallback(AbstractLoggerCallback):
     def __init__(
         self,

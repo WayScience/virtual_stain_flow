@@ -19,17 +19,6 @@ from .callbacks.LoggerCallback import (
 
 path_type = Union[pathlib.Path, str]
 
-"""
-Prototype Notes: This class is simiar to the old `virtual_stain_flow.callback.MlflowLogger` class, 
-with the following design changes:
-- Promoted to an independent logger class, with ability to accept logger callbacks, 
-- Files/metrics/parameters produced by Logger callbacks gets automatically logged to MLflow 
-- With some more pre-defined fine grained run logging tags such as `experiment_type`, `model_architecture`, `target_channel_name`
-- Has a `bind_trainer` and `unbind_trainer` methods to bind and unbind with the trainer instance during train step
-- User controlled mlflow run cycle, no longer autoamtically ends with the train loop, so user can perform additional logging operation before explicity ending the run
-- Has exposed `log_artifact`, `log_metric`, and `log_param` methods for manual logging artifacts, metrics, and parameters
-- Has some access point of trainer attributes for use by logger callbacks, but subject to optimization/change
-"""
 class MlflowLogger:
     """
     MLflow Logger for logging training runs, metrics, artifacts, and parameters, intended to be

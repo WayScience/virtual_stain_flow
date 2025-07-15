@@ -13,13 +13,6 @@ from ...logging import MlflowLogger
 
 path_type = Union[pathlib.Path, str]
 
-"""
-Prototype Notes: This class is nearly identical to the old AbstractTrainer class, except for the following points:
-- Binding of logger class moved to train method
-- Early termination mode is now a parameter of the class
-- The train method now also includes invocation of the logger.on_train_start(), ...,  logger.on_train_end() methods
-- Requires child classes to implement the save_model method
-"""
 class AbstractLoggingTrainer(AbstractTrainer):
     """
     Abstract class for trainers that support mlflow logging functionality.

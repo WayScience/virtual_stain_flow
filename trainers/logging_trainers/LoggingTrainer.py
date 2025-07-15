@@ -9,11 +9,6 @@ from .AbstractLoggingTrainer import AbstractLoggingTrainer
 
 path_type = Union[pathlib.Path, str]
 
-"""
-Prototype Notes: This class is nearly identical to the old Trainer class, except that:
-- It inherits from the new AbstractLoggingTrainer class.
-- It has a new save_model method that defines saving the model weight
-"""
 class LoggingTrainer(AbstractLoggingTrainer):
     """
     Trainer class for single network CNN image-image models 

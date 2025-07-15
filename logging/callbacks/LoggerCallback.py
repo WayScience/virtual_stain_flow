@@ -25,10 +25,6 @@ log_metric_type = Union[
     Tuple[str, Any],
     None]
 
-"""
-Prototype Notes: Completely new abstract class for special logger callbacks that 
- works with MlflowLoggerV2 to have their outputs logged. 
-"""
 class AbstractLoggerCallback(ABC):
     """
     Abstract class for logger callbacks that defines the 
