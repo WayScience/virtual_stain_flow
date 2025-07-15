@@ -1,4 +1,4 @@
-from .MlflowLoggerV2 import MlflowLogger
+from .MlflowLogger import MlflowLogger
 
 __all__ = [
     "MlflowLogger",
