@@ -3,7 +3,7 @@ from typing import List, Tuple, Optional, Union, Dict, Any, TYPE_CHECKING
 import pathlib
 
 if TYPE_CHECKING:
-    from ..MlflowLoggerV2 import MlflowLoggerV2
+    from ..MlflowLogger import MlflowLogger
 
 # TODO is this good enough e.g. do we want richer callback return class
 # that has more metadata/tags associated with them
