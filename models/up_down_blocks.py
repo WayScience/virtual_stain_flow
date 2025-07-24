@@ -29,6 +29,35 @@ from torch import Tensor
 from .blocks import AbstractBlock
 
 """
+Abstract base class for downsampling and upsampling blocks with
+predefined output spatial dimensions by a factor of 2.
+Added to avoid duplicated implementation of the same methods.
+"""
+class AbstractDownBlock(AbstractBlock):
+    def __init__(self, in_channels, out_channels, num_units, **kwargs):
+        super().__init__(in_channels, out_channels, num_units, **kwargs)
+
+    @property
+    def out_h(self, in_h: int) -> int:
+        return in_h // 2
+
+    @property
+    def out_w(self, in_w: int) -> int:
+        return in_w // 2
+
+class AbstractUpBlock(AbstractBlock):
+    def __init__(self, in_channels, out_channels, num_units, **kwargs):
+        super().__init__(in_channels, out_channels, num_units, **kwargs)
+
+    @property
+    def out_h(self, in_h: int) -> int:
+        return in_h * 2
+    
+    @property
+    def out_w(self, in_w: int) -> int:
+        return in_w * 2
+
+"""
 Identity block that does nothing to the input. Imagine it as a placeholder
 for a actual spatial dimension altering block only used at the first sampling
 stage of the UNet-like architectures, so we don't down-sample the input too
@@ -72,7 +101,7 @@ Simple downsampling block that applies a Conv2D with kernel size 2 and stride 2.
 This block is commonly used in UNet like architectures. 
 No normalization or activation are added around the Conv2D backbone. 
 """
-class Conv2DDownBlock(AbstractBlock):
+class Conv2DDownBlock(AbstractDownBlock):
     def __init__(
         self,
         in_channels: int,
@@ -114,24 +143,6 @@ class Conv2DDownBlock(AbstractBlock):
             H' and W' are half of the input height and width respectively.
         """
         return self.network(x)
-    
-    def out_h(self, in_h: int) -> int:
-        """
-        Computes the output height after downsampling.
-        
-        :param in_h: Input height.
-        :return: Output height after downsampling.
-        """
-        return in_h // 2
-    
-    def out_w(self, in_w: int) -> int:
-        """
-        Computes the output width after downsampling.
-        
-        :param in_w: Input width.
-        :return: Output width after downsampling.
-        """
-        return in_w // 2    
 
 """
 A MaxPoolDownBlock that applies a MaxPool2D operation with fixed 
@@ -140,7 +151,7 @@ kernel size 2 and stride 2. Halves the spatial dimensions of the input tensor.
 Lightweight alternative to Conv2DDownBlock due to the non-learnable nature.
 Unlike Conv2D, the block does not change the number of channels. 
 """
-class MaxPool2DDownBlock(AbstractBlock):
+class MaxPool2DDownBlock(AbstractDownBlock):
     def __init__(
         self,
         in_channels: int,
@@ -178,23 +189,6 @@ class MaxPool2DDownBlock(AbstractBlock):
         """
         return self.network(x)
     
-    def out_h(self, in_h: int) -> int:
-        """
-        Computes the output height after downsampling.
-        
-        :param in_h: Input height.
-        :return: Output height after downsampling.
-        """
-        return in_h // 2
-    
-    def out_w(self, in_w: int) -> int:
-        """
-        Computes the output width after downsampling.
-        :param in_w: Input width.
-        :return: Output width after downsampling.
-        """
-        return in_w // 2
-    
 """
 Simple upsampling block that applies a ConvTranspose2D with 
 kernel size 2 and stride 2.
@@ -202,7 +196,7 @@ kernel size 2 and stride 2.
 This block is commonly used in UNet like architectures.
 No normalization or activation are added around the ConvTranspose2D backbone.
 """
-class ConvTrans2DUpBlock(AbstractBlock):
+class ConvTrans2DUpBlock(AbstractUpBlock):
     def __init__(
         self,
         in_channels,
@@ -241,24 +235,6 @@ class ConvTrans2DUpBlock(AbstractBlock):
         """
         return self.network(x)
     
-    def out_h(self, in_h: int) -> int:
-        """
-        Computes the output height after upsampling.
-        
-        :param in_h: Input height.
-        :return: Output height after upsampling.
-        """
-        return in_h * 2
-    
-    def out_w(self, in_w: int) -> int:
-        """
-        Computes the output width after upsampling.
-        
-        :param in_w: Input width.
-        :return: Output width after upsampling.
-        """
-        return in_w * 2
-    
 """
 A PixelShuffle2DUpsampleBlock that applies a PixelShuffle operation
 with a fixed scale factor of 2 (doubles spatial dimension).
@@ -268,7 +244,7 @@ pixel shuffle upsampling depends on the previous convolutional layer(s) at
 learning the correct way to organize channels. Most likely will not work well
 with shallow blocks or small number of channels in input featuremaps. 
 """
-class PixelShuffle2DUpBlock(AbstractBlock):
+class PixelShuffle2DUpBlock(AbstractUpBlock):
     def __init__(
         self,
         in_channels: int,
@@ -320,21 +296,3 @@ class PixelShuffle2DUpBlock(AbstractBlock):
             H' and W' are double the input height and width respectively.
         """
         return self.network(x)
-    
-    def out_h(self, in_h: int) -> int:
-        """
-        Computes the output height after upsampling.
-        
-        :param in_h: Input height.
-        :return: Output height after upsampling.
-        """
-
-        return in_h * 2
-    
-    def out_w(self, in_w: int) -> int:
-        """
-        Computes the output width after upsampling.
-        :param in_w: Input width.
-        :return: Output width after upsampling.
-        """
-        return in_w * 2
