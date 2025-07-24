@@ -14,8 +14,13 @@ behavior of a "block", as well as centralizing type check for Type[AbstractBlock
 during runtime.
 """
 from abc import ABC
+from typing import Optional
 
+import timm
 import torch.nn as nn
+from torch import Tensor
+
+from .utils import get_norm, NormType
 
 def _is_block_handle(
     obj
@@ -88,4 +93,123 @@ class AbstractBlock(ABC, nn.Module):
         return in_h
     @property
     def out_w(self, in_w: int) -> int:
-        return in_w
+        return in_w    
+
+"""
+A ConvNeXt block that applies a sequence of ConvNeXt units
+with inital 2D convolution to adjust the number of channels if needed.
+Mimics the design of timm.models.convnext.ConvNeXtStage but less sophisticated
+in implementation. 
+"""
+class Conv2DConvNeXtBlock(AbstractBlock):
+    
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: Optional[int] = None,
+        num_units: int = 1,
+        norm_type: NormType = 'layer',
+        conv_kernel_size: int = 1,
+        convnext_kernel_size: int = 7
+    ):
+        """
+        Initializes a ConvNeXt block with the specified parameters.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Number of output channels. If
+            None, defaults to in_channels.
+        :param num_units: Number of ConvNeXt units in the block.
+        :param norm_type: Type of normalization to apply.
+            Default is 'layer' (GroupNorm with 1 group).
+        :param conv_kernel_size: Kernel size for the initial 2d convolution
+            that adjusts the number of channels if in_channels != out_channels.
+            Default is 1 (identity convolution, fastest). 
+            Though one may want to use larger kernel sizes (3) to allow for 
+            some spatial feature extraction prior to the ConvNeXtBlocks. 
+        :param convnext_kernel_size: Kernel size for the depth-wise convolution
+            layers inside the ConvNeXtBlock. Default is 7, 
+            as recommended by Liu et al. (2022), for large receptive fields.
+        """
+        
+        out_channels = out_channels or in_channels
+
+        super().__init__(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            num_units=num_units
+        )
+
+        layers = []
+
+        if in_channels != out_channels:
+            # insert a spatial dimension preserving convolution
+            # operation to adjust the number of channels because
+            # ConvNeXtBlock expects same input and output channels
+            # if the in/out channels are matched, this won't be added. 
+            layers.append(
+                nn.Conv2d(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=conv_kernel_size,
+                    stride=1, # fixed
+                    padding='same' # ensure spatial dimensions are preserved
+                )
+            )
+            # timm.models.convnext.ConvNeXtStage adds a normalization
+            # BEFORE the initial 2D convolution, which in practice has 
+            # made models with ConvNeXtStage blocks in decoder hard to train.
+            # Here we add the normalization AFTER the initial 2D convolution
+            # right before the ConvNeXtBlock units.
+            layers.append(
+                get_norm(
+                    num_features=in_channels,
+                    norm_type=norm_type
+                )
+            )
+
+        for _ in range(num_units):
+            # Add ConvNeXtBlock in sequence.
+            # Under the hood a single ConvNeXtBlock is defined by:
+            # Depthwise Conv -> LayerNorm -> 1x1 Conv -> GELU -> 1x1 Conv
+            # note that the Depthwise Conv is intended to capture the 
+            # channel-wise spatial features with large kernel_size/receptive
+            # field recommended by Liu et al. (2022). The 1x1 convs are 
+            # responsbile for channel mixing and non-linearity following
+            # spatial feature extraction. This effectively separates the
+            # spatial and channel-wise feature extraction computations, 
+            # contrasting with the standard Conv2D whose kernel does both
+            # simultaneously. 
+            layers.append(
+                timm.models.convnext.ConvNeXtBlock(
+                    in_chs=out_channels, # same input/output channels
+                    out_chs=out_channels, 
+                    kernel_size=convnext_kernel_size,
+                    stride=1, # fixed
+                    ls_init_value=None,
+                    # this is a switch between 2 equivalent implementations
+                    # but with contrasting speed <-> model size tradeoffs.
+                    # here by setting conv_mlp=True we use the faster but 
+                    # larger model implementation 
+                    conv_mlp=True, 
+                    use_grn=True, # GlobalResponseNorm for mlp layers
+                    norm_layer=timm.layers.LayerNorm2d, 
+                )
+            )
+
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the block.
+        
+        :param x: Input tensor. Should have shape (B, C, H, W)
+        :return: Output tensor after passing through the block. 
+            Should have shape (B, C', H, W) where C' is the output channels,
+            and H and W are unchanged input spatial dimensions.
+        """
+        return self.network(x)    
+    
+    
+    #this is a spatial preserving block, we don't override the out_h and out_w
+    #def out_h(self, in_h: int) -> int:
+    #def out_w(self, in_w: int) -> int:
