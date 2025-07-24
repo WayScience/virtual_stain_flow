@@ -194,3 +194,147 @@ class MaxPool2DDownBlock(AbstractBlock):
         :return: Output width after downsampling.
         """
         return in_w // 2
+    
+"""
+Simple upsampling block that applies a ConvTranspose2D with 
+kernel size 2 and stride 2.
+
+This block is commonly used in UNet like architectures.
+No normalization or activation are added around the ConvTranspose2D backbone.
+"""
+class ConvTrans2DUpBlock(AbstractBlock):
+    def __init__(
+        self,
+        in_channels,
+        out_channels: Optional[int] = None
+    ):
+        """
+        Initializes the ConvTrans2DUpBlock.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Number of output channels. If not specified,
+            defaults to the number of input channels.
+            This is a common practice in UNet architectures.
+        """
+        super().__init__(
+            in_channels=in_channels,
+            out_channels=out_channels or in_channels,
+            num_units=1
+        )
+
+        # we fix the behavior of this block to
+        # upsample the spatial dimensions by a factor of 2
+        self.network = nn.ConvTranspose2d(
+            in_channels=in_channels,
+            out_channels=self.out_channels,
+            kernel_size=2,
+            stride=2,
+            padding=0 # spatial upsampling
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the block.
+        :param x: Input tensor. Should have shape (B, C, H, W)
+        :return: Output tensor, shape (B, C', H', W') where C' is out_channels,
+            H' and W' are double the input height and width respectively.
+        """
+        return self.network(x)
+    
+    def out_h(self, in_h: int) -> int:
+        """
+        Computes the output height after upsampling.
+        
+        :param in_h: Input height.
+        :return: Output height after upsampling.
+        """
+        return in_h * 2
+    
+    def out_w(self, in_w: int) -> int:
+        """
+        Computes the output width after upsampling.
+        
+        :param in_w: Input width.
+        :return: Output width after upsampling.
+        """
+        return in_w * 2
+    
+"""
+A PixelShuffle2DUpsampleBlock that applies a PixelShuffle operation
+with a fixed scale factor of 2 (doubles spatial dimension).
+
+The pixel shuffle operation itself is non-learnable, hence the success of
+pixel shuffle upsampling depends on the previous convolutional layer(s) at
+learning the correct way to organize channels. Most likely will not work well
+with shallow blocks or small number of channels in input featuremaps. 
+"""
+class PixelShuffle2DUpBlock(AbstractBlock):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: Optional[int] = None
+    ):
+        """
+        Initializes the PixelShuffleUpsampleBlock.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Not used, kept for consistent block class signature.
+        """
+        
+        spatial_dims = 2
+        scale_factor = 2
+        # out_channel is determined by the number of input channels
+        # as the pixel shuffle operation merely rearranges the channels
+        # to the spatial dimensions
+        out_channels = in_channels // (scale_factor ** spatial_dims)
+
+        super().__init__(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            num_units=1
+        )
+
+        # dynamic import here because only this class uses SubpixelUpsample
+        from monai.networks.blocks import SubpixelUpsample
+        # this initializes a deterministic pixel shuffle upsampling block,
+        # adds a leading Conv2D layer to the network to handle mis-aligned
+        # channel counts, and peforms the necessary icnr initization to avoid
+        # checkerboard artifacts as described in Aitken et al. (2017). 
+        # Convenient!
+        self.network = SubpixelUpsample(
+            spatial_dims=spatial_dims,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            scale_factor=scale_factor,
+            conv_block='default', # this forces having a icnr initialized conv2d layer
+            apply_pad_pool=True,
+            bias=True
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the block.
+        
+        :param x: Input tensor. Should have shape (B, C, H, W)
+        :return: Output tensor, shape (B, C', H', W') where C' is out_channels,
+            H' and W' are double the input height and width respectively.
+        """
+        return self.network(x)
+    
+    def out_h(self, in_h: int) -> int:
+        """
+        Computes the output height after upsampling.
+        
+        :param in_h: Input height.
+        :return: Output height after upsampling.
+        """
+
+        return in_h * 2
+    
+    def out_w(self, in_w: int) -> int:
+        """
+        Computes the output width after upsampling.
+        :param in_w: Input width.
+        :return: Output width after upsampling.
+        """
+        return in_w * 2
