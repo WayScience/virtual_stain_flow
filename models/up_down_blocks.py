@@ -64,3 +64,133 @@ class IdentityBlock(AbstractBlock):
         :return: Output tensor, same shape as input and completely unchanged. 
         """
         return self.network(x)
+    
+
+"""
+Simple downsampling block that applies a Conv2D with kernel size 2 and stride 2.
+
+This block is commonly used in UNet like architectures. 
+No normalization or activation are added around the Conv2D backbone. 
+"""
+class Conv2DDownBlock(AbstractBlock):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: Optional[int] = None
+    ):
+        """
+        Initializes the Conv2DDownBlock.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Number of output channels. If not specified,
+            defaults to double the number of input channels.
+            This is a common practice in UNet architectures.
+        """
+        
+        out_channels = out_channels or (in_channels * 2)
+
+        super().__init__(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            num_units=1
+        )
+
+        # we fix the behavior of this block to 
+        # downsample the spatial dimensions by a factor of 2
+        self.network = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=2, # fixed
+            stride=2, # fixed
+            padding=0 # spatial downsampling
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the block.
+        
+        :param x: Input tensor. Should have shape (B, C, H, W)
+        :return: Output tensor, shape (B, C', H', W') where C' is out_channels,
+            H' and W' are half of the input height and width respectively.
+        """
+        return self.network(x)
+    
+    def out_h(self, in_h: int) -> int:
+        """
+        Computes the output height after downsampling.
+        
+        :param in_h: Input height.
+        :return: Output height after downsampling.
+        """
+        return in_h // 2
+    
+    def out_w(self, in_w: int) -> int:
+        """
+        Computes the output width after downsampling.
+        
+        :param in_w: Input width.
+        :return: Output width after downsampling.
+        """
+        return in_w // 2    
+
+"""
+A MaxPoolDownBlock that applies a MaxPool2D operation with fixed 
+kernel size 2 and stride 2. Halves the spatial dimensions of the input tensor.
+
+Lightweight alternative to Conv2DDownBlock due to the non-learnable nature.
+Unlike Conv2D, the block does not change the number of channels. 
+"""
+class MaxPool2DDownBlock(AbstractBlock):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: Optional[int] = None
+    ):
+        """
+        Initializes the MaxPoolDownBlock.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Number of output channels. 
+            Not used, kept for consistent block class signature.
+        """
+        
+        super().__init__(
+            in_channels=in_channels,
+            out_channels=in_channels,
+            num_units=1
+        )
+
+        # we fix the behavior of this block to 
+        # downsample the spatial dimensions by a factor of 2
+        self.network = nn.MaxPool2d(
+            kernel_size=2, # fixed
+            stride=2, # fixed
+            padding=0 # spatial downsampling
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the block.
+        
+        :param x: Input tensor. Should have shape (B, C, H, W)
+        :return: Output tensor, shape (B, C, H', W') where H' and W' are 
+            half of the input height and width respectively. C remains unchanged.
+        """
+        return self.network(x)
+    
+    def out_h(self, in_h: int) -> int:
+        """
+        Computes the output height after downsampling.
+        
+        :param in_h: Input height.
+        :return: Output height after downsampling.
+        """
+        return in_h // 2
+    
+    def out_w(self, in_w: int) -> int:
+        """
+        Computes the output width after downsampling.
+        :param in_w: Input width.
+        :return: Output width after downsampling.
+        """
+        return in_w // 2
