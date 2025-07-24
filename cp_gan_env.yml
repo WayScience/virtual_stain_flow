@@ -34,6 +34,9 @@ dependencies:
   - conda-forge::inflect
   - conda-forge::wxpython
   - conda-forge::sentry-sdk
+  - conda-forge::timm
+  - conda-forge::monai
+  - conda-forge::pytorch-lightning
   - pip:
       - mlflow
       - cellprofiler==4.2.8
