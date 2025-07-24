@@ -20,7 +20,12 @@ import timm
 import torch.nn as nn
 from torch import Tensor
 
-from .utils import get_norm, NormType
+from .utils import (
+    get_norm, 
+    NormType,
+    get_activation,
+    ActivationType
+)
 
 def _is_block_handle(
     obj
@@ -209,6 +214,86 @@ class Conv2DConvNeXtBlock(AbstractBlock):
         """
         return self.network(x)    
     
+    
+    #this is a spatial preserving block, we don't override the out_h and out_w
+    #def out_h(self, in_h: int) -> int:
+    #def out_w(self, in_w: int) -> int:
+
+
+"""
+A Conv2D block that applies a sequence of Conv2D -> Norm -> Activation
+layers, commonly used in UNet architectures.
+"""
+class Conv2DNormActBlock(AbstractBlock):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: Optional[int] = None,
+        num_units: int = 1,
+        norm_type: NormType = 'batch',
+        act_type: ActivationType = 'relu'
+    ):
+        """
+        Initializes a Conv2D block with the specified parameters.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Number of output channels. If None, defaults to
+            in_channels.
+        :param num_units: Number of Conv2D>Norm>Activation units in the block.
+        :param norm_type: Type of normalization to apply. Default is 'batch'
+            (GroupNorm with 1 group).
+        :param act_type: Type of activation function to apply. Default is 'relu'.
+        """
+
+        out_channels = out_channels or in_channels
+
+        super().__init__(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            num_units=num_units
+        )
+
+        mid_channels = [out_channels] * (num_units - 1)
+
+        layers = []
+
+        for _in, _out in zip(
+            [in_channels] + mid_channels, 
+            mid_channels + [out_channels]
+        ):
+            # standard Conv2D -> Norm -> Activation sequence
+            # used widely in UNets (with BatchNorm and ReLU).
+            layers.append(
+                nn.Conv2d(
+                    in_channels=_in,
+                    out_channels=_out,
+                    kernel_size=3, # fixed for now
+                    stride=1, # fixed
+                    padding='same' # indicate spatial preserving unit
+                )
+            )
+            layers.append(
+                get_norm(
+                    num_features=_out,
+                    norm_type=norm_type
+                )
+            )
+            layers.append(
+                get_activation(act_type)
+            )
+
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the block.
+        
+        :param x: Input tensor. Should have shape (B, C, H, W)
+        :return: Output tensor after passing through the block. 
+            Should have shape (B, C', H, W) where C' is the output channels,
+            and H and W are unchanged input spatial dimensions.
+        """
+        return self.network(x) 
     
     #this is a spatial preserving block, we don't override the out_h and out_w
     #def out_h(self, in_h: int) -> int:
