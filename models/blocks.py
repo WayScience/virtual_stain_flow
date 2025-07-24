@@ -9,9 +9,19 @@ feature map tensor of shape (B, C', H', W') where the number of
 channels C' and spatial dimensions (H', W') is determined by the block's
 implementation.
 
+Here we further make the distinction between "computational blocks"  (this file) 
+and "spatial dimension altering blocks", where the former does not change
+the spatial dimensions of the input tensor, but may change the number of channels,
+while the latter does change the spatial dimensions.
+
 This file Contains the definition of the AbstractBlock class defining the 
-behavior of a "block", as well as centralizing type check for Type[AbstractBlock]
+behavior of a "block" and centralizing type check for Type[AbstractBlock]
 during runtime.
+Also contains the implementation of the spatial dimension preserving 
+"computational blocks" that learns from feature map tensors at a specific
+resolution to capture the context and local features of the images. This is
+commonly achieved by applying dimension preserving convolutional layers
+with kernel > 1 (usually 3), as in F/UNet architectures.  
 """
 from abc import ABC
 from typing import Optional
