@@ -70,11 +70,13 @@ def _check_block_kwargs_sequence(
 def validate_block_configurations(
     in_block_handles: Any,
     comp_block_handles: Any,
+    in_block_kwargs: Optional[Any] = None,
     comp_block_kwargs: Optional[Any] = None,
     depth: Optional[int] = None,
 ) -> Tuple[
             List[Type[AbstractBlock]],  # in_block_handles
             List[Type[AbstractBlock]],  # comp_block_handles
+            List[dict],                 # in_block_kwargs
             List[dict],                 # comp_block_kwargs
             int                         # inferred_depth  
     ]:
@@ -87,6 +89,9 @@ def validate_block_configurations(
         for the input blocks.
     :param comp_block_handles: A single block handle or a sequence of block handles
         for the computation blocks.
+    :param in_block_kwargs: Optional sequence of dictionaries with additional
+        keyword arguments for the input blocks. If not provided, defaults to a
+        sequence of empty dictionaries.
     :param comp_block_kwargs: Optional sequence of dictionaries with additional
         keyword arguments for the computation blocks. If not provided, defaults
         to a sequence of empty dictionaries.
@@ -98,6 +103,7 @@ def validate_block_configurations(
 
     in_block_handles = _check_block_handle_sequence(in_block_handles)
     comp_block_handles = _check_block_handle_sequence(comp_block_handles)
+    in_block_kwargs = _check_block_kwargs_sequence(in_block_kwargs)
     comp_block_kwargs = _check_block_kwargs_sequence(comp_block_kwargs)
 
     # Expand if needed
@@ -145,9 +151,20 @@ def validate_block_configurations(
         # inferred_depth is also overridden irrespective of the input depth
         inferred_depth = len(in_block_handles)
 
+    # in_block_kwargs is only checked against the post validation
+    # in_block_handles and need to either be a singleton or a match
+    # length sequence of dictionaries.
+    if len(in_block_kwargs) == 1:
+        in_block_kwargs *= inferred_depth
+    elif len(in_block_kwargs) != inferred_depth:
+        raise ValueError(
+            "Expected in_block_kwargs to match depth or be a singleton. "
+            f"Got {len(in_block_kwargs)} and depth {inferred_depth}"
+        )
+
     # comp_block_kwargs is only checked against the post validation
     # comp_block_handles and need to either be a singleton or a match
-    # length one. 
+    # length sequence of dictionaries.
     if len(comp_block_kwargs) == 1:
         comp_block_kwargs *= inferred_depth
     elif len(comp_block_kwargs) != inferred_depth:
@@ -156,5 +173,11 @@ def validate_block_configurations(
             f"Got {len(comp_block_kwargs)} and depth {inferred_depth}"
         )
 
-    return in_block_handles, comp_block_handles, comp_block_kwargs, inferred_depth
+    return (
+        in_block_handles, 
+        comp_block_handles, 
+        in_block_kwargs,
+        comp_block_kwargs, 
+        inferred_depth
+    )
         
