@@ -138,6 +138,6 @@ class UNet(nn.Module):
         x = self.in_conv(x)
         encoder_feature_maps = self.encoder(x)
         decoder_output = self.decoder(encoder_feature_maps)
-        logits = self.out_conv(decoder_output)
+        x = self.out_conv(decoder_output)
 
-        return self.out_activation(logits)
+        return self.out_activation(x)
