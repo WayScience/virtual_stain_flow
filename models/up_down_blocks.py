@@ -26,6 +26,10 @@ from typing import Optional
 import torch.nn as nn
 from torch import Tensor
 
+from .utils import (
+    get_norm,
+    NormType
+)
 from .blocks import AbstractBlock
 
 """
@@ -68,13 +72,15 @@ class IdentityBlock(AbstractBlock):
     def __init__(
         self,
         in_channels: int,
-        out_channels: Optional[int] = None
+        out_channels: Optional[int] = None,
+        norm_type: NormType = 'none'
     ):
         """
         Initializes the IdentityBlock.
 
         :param in_channels: Number of input channels.
         :param out_channels: Not used, kept for consistent block class signature.
+        :param norm_type: Type of normalization to apply. Default is 'none'.
         """
         
         super().__init__(
@@ -84,6 +90,10 @@ class IdentityBlock(AbstractBlock):
         )
 
         self.network = nn.Identity()
+        self.activation = get_norm(
+            num_features=in_channels,
+            norm_type=norm_type
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -92,8 +102,9 @@ class IdentityBlock(AbstractBlock):
         :param x: Input tensor. Should have shape (B, C, H, W)
         :return: Output tensor, same shape as input and completely unchanged. 
         """
-        return self.network(x)
-    
+        return self.activation(
+            self.network(x)
+        )    
 
 """
 Simple downsampling block that applies a Conv2D with kernel size 2 and stride 2.
@@ -105,7 +116,8 @@ class Conv2DDownBlock(AbstractDownBlock):
     def __init__(
         self,
         in_channels: int,
-        out_channels: Optional[int] = None
+        out_channels: Optional[int] = None,
+        norm_type: NormType = 'none'
     ):
         """
         Initializes the Conv2DDownBlock.
@@ -114,6 +126,7 @@ class Conv2DDownBlock(AbstractDownBlock):
         :param out_channels: Number of output channels. If not specified,
             defaults to double the number of input channels.
             This is a common practice in UNet architectures.
+        :param norm_type: Type of normalization to apply. Default is 'none'.
         """
         
         out_channels = out_channels or (in_channels * 2)
@@ -133,6 +146,11 @@ class Conv2DDownBlock(AbstractDownBlock):
             stride=2, # fixed
             padding=0 # spatial downsampling
         )
+        
+        self.activation = get_norm(
+            num_features=out_channels,
+            norm_type=norm_type
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -142,7 +160,9 @@ class Conv2DDownBlock(AbstractDownBlock):
         :return: Output tensor, shape (B, C', H', W') where C' is out_channels,
             H' and W' are half of the input height and width respectively.
         """
-        return self.network(x)
+        return self.activation(
+            self.network(x)
+        )
 
 """
 A MaxPoolDownBlock that applies a MaxPool2D operation with fixed 
@@ -200,7 +220,8 @@ class ConvTrans2DUpBlock(AbstractUpBlock):
     def __init__(
         self,
         in_channels,
-        out_channels: Optional[int] = None
+        out_channels: Optional[int] = None,
+        norm_type: NormType = 'none',
     ):
         """
         Initializes the ConvTrans2DUpBlock.
@@ -209,6 +230,7 @@ class ConvTrans2DUpBlock(AbstractUpBlock):
         :param out_channels: Number of output channels. If not specified,
             defaults to half the number of input channels.
             This is a common practice in UNet architectures.
+        :param norm_type: Type of normalization to apply. Default is 'none'.
         """
         super().__init__(
             in_channels=in_channels,
@@ -226,6 +248,11 @@ class ConvTrans2DUpBlock(AbstractUpBlock):
             padding=0 # spatial upsampling
         )
 
+        self.activation = get_norm(
+            num_features=self.out_channels,
+            norm_type=norm_type
+        )
+
     def forward(self, x: Tensor) -> Tensor:
         """
         Forward pass of the block.
@@ -233,7 +260,9 @@ class ConvTrans2DUpBlock(AbstractUpBlock):
         :return: Output tensor, shape (B, C', H', W') where C' is out_channels,
             H' and W' are double the input height and width respectively.
         """
-        return self.network(x)
+        return self.activation(
+            self.network(x)
+        )
     
 """
 A PixelShuffle2DUpsampleBlock that applies a PixelShuffle operation
