@@ -112,6 +112,8 @@ def validate_block_configurations(
         if not isinstance(depth, int) or depth < 1:
             raise ValueError(f"`depth` must be a positive integer, got {depth}")
         
+        # this is the only case where the input depth is used
+        # to control the handle expansion
         in_block_handles *= depth
         comp_block_handles *= depth
         inferred_depth = depth
@@ -123,7 +125,7 @@ def validate_block_configurations(
         if len(in_block_handles) == 1:
             # one is a singleton, the other is a sequence
             # expand the singleton to match the length of the other
-            # in this case we also overwrite the depth
+            # in this case we override the depth
             in_block_handles *= len(comp_block_handles)
             inferred_depth = len(comp_block_handles)
         elif len(comp_block_handles) == 1:
@@ -137,6 +139,11 @@ def validate_block_configurations(
                 "Mismatch in lengths: in_block_handles and comp_block_handles "
                 f"must match or be broadcastable (got {len(in_block_handles)} and {len(comp_block_handles)})"
             )
+    else:
+        # when both in_block_handles and comp_block_handles are sequences
+        # and they match in length,
+        # inferred_depth is also overridden irrespective of the input depth
+        inferred_depth = len(in_block_handles)
 
     # comp_block_kwargs is only checked against the post validation
     # comp_block_handles and need to either be a singleton or a match
