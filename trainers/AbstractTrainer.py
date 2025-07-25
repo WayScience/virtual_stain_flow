@@ -223,7 +223,7 @@ class AbstractTrainer(ABC):
                 else:
                     raise ValueError("Invalid early termination metric")                                                        
                 
-            self.update_early_stop(early_term_metric)
+            self.update_early_stop_counter(early_term_metric)
 
             # Check if early stopping is needed
             if self._early_termination and self.early_stop_counter >= self.patience:
@@ -233,7 +233,7 @@ class AbstractTrainer(ABC):
         for callback in self.callbacks:
             callback.on_train_end()
 
-    def update_early_stop(self, val_loss: Optional[torch.Tensor]):
+    def update_early_stop_counter(self, val_loss: Optional[torch.Tensor]):
         """
         Method to update the early stopping criterion
 
