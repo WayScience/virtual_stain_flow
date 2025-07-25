@@ -28,6 +28,7 @@ class Encoder(nn.Module):
         in_channels: int,
         in_block_handles: BlockHandleSequence,
         comp_block_handles: BlockHandleSequence,
+        in_block_kwargs: Optional[Sequence[dict]] = None,
         comp_block_kwargs: Optional[Sequence[dict]] = None,
         depth: Optional[int] = None,
     ):
@@ -43,6 +44,8 @@ class Encoder(nn.Module):
             should be a subclass of AbstractBlock. If a sequence is supplied,
             overrides the depth parameter and the encoder will be of depth
             len(comp_block_handles).
+        :param in_block_kwargs: Optional sequence of dictionaries with
+            additional keyword arguments for the input blocks.
         :param comp_block_kwargs: Optional sequence of dictionaries with
             additional keyword arguments for the computation blocks.
             If not provided, defaults to a sequence of empty dictionaries.
@@ -65,11 +68,13 @@ class Encoder(nn.Module):
         (
             in_block_handles,
             comp_block_handles,
+            in_block_kwargs,
             comp_block_kwargs,
             inferred_depth
         ) = validate_block_configurations(
             in_block_handles,
             comp_block_handles,
+            in_block_kwargs,
             comp_block_kwargs,
             depth
         )
@@ -79,9 +84,10 @@ class Encoder(nn.Module):
         # initialize stages
         self.stages = nn.ModuleList()
         stage_in_channels = in_channels
-        for _in_handle, _comp_handle, _comp_kwargs in zip(
+        for _in_handle, _comp_handle, _in_kwargs, _comp_kwargs in zip(
             in_block_handles,
             comp_block_handles,
+            in_block_kwargs,
             comp_block_kwargs
         ):
             self.stages.append(
@@ -90,6 +96,7 @@ class Encoder(nn.Module):
                     # default behavior of DownStage is doubling channels
                     in_block_handle=_in_handle,
                     comp_block_handle=_comp_handle,
+                    in_block_kwargs=_in_kwargs,
                     comp_block_kwargs=_comp_kwargs
                 )
             )

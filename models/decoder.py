@@ -27,6 +27,7 @@ class Decoder(nn.Module):
         encoder_feature_map_channels: Sequence[int],
         in_block_handles: BlockHandleSequence,
         comp_block_handles: BlockHandleSequence,
+        in_block_kwargs: Optional[Sequence[dict]] = None,
         comp_block_kwargs: Optional[Sequence[dict]] = None,
     ):
         super().__init__()
@@ -46,11 +47,13 @@ class Decoder(nn.Module):
         (
             in_block_handles,
             comp_block_handles,
+            in_block_kwargs,
             comp_block_kwargs,
             _
         ) = validate_block_configurations(
             in_block_handles,
             comp_block_handles,
+            in_block_kwargs,
             comp_block_kwargs,
             # we only need depth-1 upsampling stages to pair with depth
             # down sampling stages of the encoder
@@ -66,11 +69,12 @@ class Decoder(nn.Module):
         # as the corresponding encoder stage skip connections for convenience
         stage_in_channels = encoder_feature_map_channels[::-1][:-1]
         stage_skip_channels = encoder_feature_map_channels[::-1][1:]
-        for _in_ch, _skip_ch, _in_handle, _comp_handle, _comp_kwargs in zip(
+        for _in_ch, _skip_ch, _in_handle, _comp_handle, _in_kwargs, _comp_kwargs in zip(
             stage_in_channels, 
             stage_skip_channels, 
             in_block_handles, 
             comp_block_handles,
+            in_block_kwargs,
             comp_block_kwargs
         ):
             self.stages.append(UpStage(
@@ -79,6 +83,7 @@ class Decoder(nn.Module):
                 out_channels=_skip_ch,
                 in_block_handle=_in_handle,
                 comp_block_handle=_comp_handle,
+                in_block_kwargs=_in_kwargs,
                 comp_block_kwargs=_comp_kwargs
             ))
 
