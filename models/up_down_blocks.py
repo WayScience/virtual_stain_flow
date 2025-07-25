@@ -207,12 +207,12 @@ class ConvTrans2DUpBlock(AbstractUpBlock):
 
         :param in_channels: Number of input channels.
         :param out_channels: Number of output channels. If not specified,
-            defaults to the number of input channels.
+            defaults to half the number of input channels.
             This is a common practice in UNet architectures.
         """
         super().__init__(
             in_channels=in_channels,
-            out_channels=out_channels or in_channels,
+            out_channels=out_channels or in_channels // 2,
             num_units=1
         )
 
