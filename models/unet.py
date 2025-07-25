@@ -50,6 +50,20 @@ class UNet(nn.Module):
         _num_units: Union[List[int], int] = 2
     ):
         """
+        Initializes the UNet model.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Number of output channels.
+        :param base_channels: Number of channels in the first layer.
+        :param depth: Depth of the UNet, i.e., number of down-sampling and
+            up-sampling stages. Must be >= 1.
+        :param max_pool_down: If True, use MaxPool2DDownBlock for down-sampling,
+            otherwise use Conv2DDownBlock. Default is False.
+        :param act_type: Type of activation function to use in the output layer.
+            Default is 'sigmoid'.
+        :param _num_units: Number of computation units in each stage.
+            Can be an integer for uniform number of units in all stages,
+            or a list of integers specifying the number of units for each stage.
         """
 
         super().__init__()
