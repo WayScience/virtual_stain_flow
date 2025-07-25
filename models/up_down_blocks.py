@@ -175,7 +175,8 @@ class MaxPool2DDownBlock(AbstractDownBlock):
     def __init__(
         self,
         in_channels: int,
-        out_channels: Optional[int] = None
+        out_channels: Optional[int] = None,
+        **kwargs 
     ):
         """
         Initializes the MaxPoolDownBlock.
@@ -183,6 +184,8 @@ class MaxPool2DDownBlock(AbstractDownBlock):
         :param in_channels: Number of input channels.
         :param out_channels: Number of output channels. 
             Not used, kept for consistent block class signature.
+        :param kwargs: Additional keyword arguments. Not used, ensures
+            compatibility with expanded kwargs for other blocks.
         """
         
         super().__init__(
@@ -277,13 +280,16 @@ class PixelShuffle2DUpBlock(AbstractUpBlock):
     def __init__(
         self,
         in_channels: int,
-        out_channels: Optional[int] = None
+        out_channels: Optional[int] = None,
+        **kwargs
     ):
         """
         Initializes the PixelShuffleUpsampleBlock.
 
         :param in_channels: Number of input channels.
         :param out_channels: Not used, kept for consistent block class signature.
+        :param kwargs: Additional keyword arguments. Not used, ensures
+            compatibility with expanded kwargs for other blocks.
         """
         
         spatial_dims = 2
