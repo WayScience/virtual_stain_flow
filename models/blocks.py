@@ -164,7 +164,7 @@ class Conv2DConvNeXtBlock(AbstractBlock):
             # right before the ConvNeXtBlock units.
             layers.append(
                 get_norm(
-                    num_features=in_channels,
+                    num_features=out_channels,
                     norm_type=norm_type
                 )
             )
