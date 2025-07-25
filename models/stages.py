@@ -202,6 +202,7 @@ class DownStage(Stage):
         out_channels: Optional[int] = None,
         in_block_handle: Type[AbstractBlock] = Conv2DDownBlock,
         comp_block_handle: Optional[Type[AbstractBlock]] = None,
+        in_block_kwargs: Optional[dict] = None,
         comp_block_kwargs: Optional[dict] = {'num_units': 2}
     ):
         """
@@ -214,6 +215,7 @@ class DownStage(Stage):
             out_channels=out_channels or (in_channels * 2),
             in_block_handle=in_block_handle,
             comp_block_handle=comp_block_handle or Conv2DNormActBlock,
+            in_block_kwargs=in_block_kwargs,
             comp_block_kwargs=comp_block_kwargs
         )
 
@@ -231,6 +233,7 @@ class UpStage(Stage):
         out_channels: Optional[int] = None,
         in_block_handle: Type[AbstractBlock] = ConvTrans2DUpBlock,
         comp_block_handle: Optional[Type[AbstractBlock]] = None,
+        in_block_kwargs: Optional[dict] = None,
         comp_block_kwargs: Optional[dict] = {'num_units': 2}
     ):
         """
@@ -245,5 +248,6 @@ class UpStage(Stage):
             out_channels=out_channels or (in_channels // 2),
             in_block_handle=in_block_handle,
             comp_block_handle=comp_block_handle or Conv2DNormActBlock,
+            in_block_kwargs=in_block_kwargs,
             comp_block_kwargs=comp_block_kwargs
         )
