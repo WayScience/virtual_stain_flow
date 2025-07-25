@@ -37,19 +37,6 @@ from .utils import (
     ActivationType
 )
 
-def _is_block_handle(
-    obj
-) -> bool:
-    """
-    Check if the object is a block handle (a subclass of AbstractBlock).
-    
-    :param obj: The object to check.
-    :return: True if obj is a block handle, False otherwise.
-    """
-    import inspect
-    
-    return inspect.isclass(obj) and issubclass(obj, AbstractBlock)
-
 """
 
 """
