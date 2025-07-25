@@ -49,6 +49,7 @@ class Stage(nn.Module):
         in_block_handle: Type[AbstractBlock],
         comp_block_handle: Type[AbstractBlock],
         skip_channels: Optional[int] = None,
+        in_block_kwargs: Optional[dict] = None,
         comp_block_kwargs: Optional[dict] = None
     ):
         """
@@ -62,6 +63,8 @@ class Stage(nn.Module):
             Should be a subclass of AbstractBlock.
         :param skip_channels: Number of channels in the skip connection.
             If None, defaults to 0 (no skip connection).
+        :param in_block_kwargs: Additional keyword arguments for the
+            in_block_handle. 
         :param comp_block_kwargs: Additional keyword arguments for the
             comp_block_handle.
         """
@@ -103,7 +106,8 @@ class Stage(nn.Module):
                             f"got {in_block_handle.__name__}")
         self.in_block = in_block_handle(
             in_channels=in_channels,
-            out_channels=None
+            out_channels=None,
+            **(in_block_kwargs or {})
         )
 
         # Type checking and instantiation of the comp_block.
