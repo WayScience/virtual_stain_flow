@@ -41,22 +41,27 @@ class Decoder(nn.Module):
                 "Expected encoder_feature_map_channels to be a sequence "
                 f"of positive ints, got {encoder_feature_map_channels}")
         
+        depth = len(encoder_feature_map_channels)
         # block handle type checking        
         (
             in_block_handles,
             comp_block_handles,
             comp_block_kwargs,
-            inferred_depth
+            _
         ) = validate_block_configurations(
             in_block_handles,
             comp_block_handles,
-            comp_block_kwargs
+            comp_block_kwargs,
+            # we only need depth-1 upsampling stages to pair with depth
+            # down sampling stages of the encoder
+            depth=depth - 1, 
         )
 
-        self._depth = inferred_depth
+        self._depth = depth
         
         # initialize decoder (upsampling) stages
         self.stages = nn.ModuleList()
+        self._feature_map_channels = []
         # the upsampling stages will just have the same number of channels
         # as the corresponding encoder stage skip connections for convenience
         stage_in_channels = encoder_feature_map_channels[::-1][:-1]
@@ -76,6 +81,8 @@ class Decoder(nn.Module):
                 comp_block_handle=_comp_handle,
                 comp_block_kwargs=_comp_kwargs
             ))
+
+            self._feature_map_channels.append(_skip_ch)
 
     def forward(self, encoder_feature_maps: Sequence[Tensor]) -> Tensor:
         """
@@ -97,3 +104,12 @@ class Decoder(nn.Module):
             x = stage(x, skip)
         
         return x
+    
+    @property
+    def feature_map_channels(self) -> Sequence[int]:
+        """
+        Get the number of channels in the feature maps produced by each stage.
+        
+        :return: Sequence of integers representing the number of channels.
+        """
+        return self._feature_map_channels
