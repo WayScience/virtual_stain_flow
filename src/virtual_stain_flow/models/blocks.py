@@ -172,34 +172,33 @@ class Conv2DConvNeXtBlock(AbstractBlock):
                 )
             )
 
-        for _ in range(num_units):
-            # Add ConvNeXtBlock in sequence.
-            # Under the hood a single ConvNeXtBlock is defined by:
-            # Depthwise Conv -> LayerNorm -> 1x1 Conv -> GELU -> 1x1 Conv
-            # note that the Depthwise Conv is intended to capture the 
-            # channel-wise spatial features with large kernel_size/receptive
-            # field recommended by Liu et al. (2022). The 1x1 convs are 
-            # responsbile for channel mixing and non-linearity following
-            # spatial feature extraction. This effectively separates the
-            # spatial and channel-wise feature extraction computations, 
-            # contrasting with the standard Conv2D whose kernel does both
-            # simultaneously. 
-            layers.append(
-                timm.models.convnext.ConvNeXtBlock(
-                    in_chs=out_channels, # same input/output channels
-                    out_chs=out_channels, 
-                    kernel_size=convnext_kernel_size,
-                    stride=1, # fixed
-                    ls_init_value=None,
-                    # this is a switch between 2 equivalent implementations
-                    # but with contrasting speed <-> model size tradeoffs.
-                    # here by setting conv_mlp=True we use the faster but 
-                    # larger model implementation 
-                    conv_mlp=True, 
-                    use_grn=True, # GlobalResponseNorm for mlp layers
-                    norm_layer=timm.layers.LayerNorm2d, 
-                )
-            )
+        # Add ConvNeXtBlock in sequence.
+        # Under the hood a single ConvNeXtBlock is defined by:
+        # Depthwise Conv -> LayerNorm -> 1x1 Conv -> GELU -> 1x1 Conv
+        # note that the Depthwise Conv is intended to capture the 
+        # channel-wise spatial features with large kernel_size/receptive
+        # field recommended by Liu et al. (2022). The 1x1 convs are 
+        # responsbile for channel mixing and non-linearity following
+        # spatial feature extraction. This effectively separates the
+        # spatial and channel-wise feature extraction computations, 
+        # contrasting with the standard Conv2D whose kernel does both
+        # simultaneously.
+        layers = [
+            timm.models.convnext.ConvNeXtBlock(
+                in_chs=out_channels, # same input/output channels
+                out_chs=out_channels, 
+                kernel_size=convnext_kernel_size,
+                stride=1, # fixed
+                ls_init_value=None,
+                # this is a switch between 2 equivalent implementations
+                # but with contrasting speed <-> model size tradeoffs.
+                # here by setting conv_mlp=True we use the faster but 
+                # larger model implementation 
+                conv_mlp=True, 
+                use_grn=True, # GlobalResponseNorm for mlp layers
+                norm_layer=timm.layers.LayerNorm2d, 
+            ) for _ in range(num_units)
+        ]
 
         self.network = nn.Sequential(*layers)
 
