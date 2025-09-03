@@ -1,9 +1,10 @@
 """
-utils.py
+/models/utils.py
 
 Utility functions for model normalization and activation layers retrieval,
 also centralizing input type checking and property definitions for blocks.
 """
+
 from typing import Literal
 
 import torch.nn as nn

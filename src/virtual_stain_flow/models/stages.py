@@ -1,5 +1,5 @@
 """
-stages.py
+/models/stages.py
 
 Following the conventions of timm.model.convnext 
 (https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/convnext.py), 

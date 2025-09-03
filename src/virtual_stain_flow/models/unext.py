@@ -1,3 +1,15 @@
+"""
+/models/unext.py
+
+This module defines a read-to-use ConvNeXtUNet model, a more advanced 
+U-Net style architecture for image-to-image translation tasks. 
+
+Classes:
+    ConvNeXtUNet: Implements a U-Net style model with a ConvNeXtV2_tiny
+    encoder and a customizable decoder.
+"""
+
+
 from typing import List, Union, Literal
 
 import timm

@@ -1,5 +1,5 @@
 """
-blocks.py
+/models/blocks.py
 
 Following the conventions of timm.model.convnext 
 (https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/convnext.py), 
@@ -22,6 +22,13 @@ Also contains the implementation of the spatial dimension preserving
 resolution to capture the context and local features of the images. This is
 commonly achieved by applying dimension preserving convolutional layers
 with kernel > 1 (usually 3), as in F/UNet architectures.  
+
+Classes:
+    AbstractBlock: Abstract base class for all blocks.
+    Conv2DConvNeXtBlock: A block that applies a sequence of ConvNeXt units 
+        with inital 2D convolution to adjust the number of channels if needed.
+    Conv2DNormActBlock: A block that applies a sequence of Conv2D -> Norm ->
+        Activation layers, commonly used in UNet architectures.
 """
 from abc import ABC, abstractmethod
 from typing import Optional

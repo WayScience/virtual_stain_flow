@@ -1,4 +1,14 @@
-# encoder.py
+"""
+/models/encoder.py
+
+This module defines the generic Encoder branch for U-Net style architectures.
+The Encoder is responsible for the downsampling path, which extracts
+features from the input image at multiple scales. This Encoder branch allows for
+flexible stage/block configurations.
+
+Classes:
+    Encoder: Implements the downsampling path of a U-Net style model.
+"""
 
 from typing import Optional, Sequence
 

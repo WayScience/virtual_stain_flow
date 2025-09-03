@@ -1,3 +1,13 @@
+"""
+/models/unet.py
+
+This module defines a read-to-use UNet model, a popular architecture for 
+image-to-image translation tasks. 
+
+Classes:
+    UNet: Implements the U-Net style model for image-to-image translation.
+"""
+
 from typing import List, Union
 
 import torch

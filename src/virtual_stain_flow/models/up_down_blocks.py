@@ -1,5 +1,5 @@
 """
-up_down_blocks.py
+/models/up_down_blocks.py
 
 Following the conventions of timm.model.convnext 
 (https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/convnext.py), 
@@ -20,6 +20,15 @@ count number changes. These blocks are commonly used in UNet-like architectures
 to reduce and increase resolution of feature map tensors (images), in conjunction
 with the spatial dimension preserving blocks, implemented in blocks.py, to 
 capture the context and local features of hte images at differing resolutions.
+
+Classes:
+    AbstractDownBlock: Abstract base class for downsampling blocks.
+    AbstractUpBlock: Abstract base class for upsampling blocks.
+    IdentityBlock: A no-op block that returns the input as is.
+    Conv2DDownBlock: A downsampling block using Conv2D with kernel size 2 and stride 2.
+    MaxPool2DDownBlock: A downsampling block using MaxPool2D with kernel size 2 and stride 2.
+    ConvTrans2DUpBlock: An upsampling block using ConvTranspose2D with kernel size 2 and stride 2.
+    PixelShuffle2DUpBlock: An upsampling block using PixelShuffle with scale factor 2.
 """
 from typing import Optional
 

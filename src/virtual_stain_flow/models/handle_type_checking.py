@@ -1,3 +1,11 @@
+"""
+/models/handle_type_checking.py
+
+Type checking and validation utilities for block handles and their configurations.
+This module provides functions to validate and prepare block handles and their
+configurations for use in model architectures.
+"""
+
 from typing import Optional, Sequence, Type, Union, Any, List, Tuple
 
 from .blocks import AbstractBlock
