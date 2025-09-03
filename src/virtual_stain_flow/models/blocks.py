@@ -190,7 +190,7 @@ class Conv2DConvNeXtBlock(AbstractBlock):
         # spatial and channel-wise feature extraction computations, 
         # contrasting with the standard Conv2D whose kernel does both
         # simultaneously.
-        layers = [
+        layers = layers + [
             timm.models.convnext.ConvNeXtBlock(
                 in_chs=out_channels, # same input/output channels
                 out_chs=out_channels, 
