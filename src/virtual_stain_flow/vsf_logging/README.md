@@ -25,9 +25,9 @@ virtual_stain_flow/
 
 ## Key Concepts
 
-### 🔹 `MlflowLoggerV2`
+### `MlflowLogger`
 
-* The **core logger** that:
+* The **Core Logger** that:
 
   * Binds to a specific trainer instance only during training.
   * Automatically logs metrics and losses from the trainer.
@@ -35,7 +35,7 @@ virtual_stain_flow/
   * allowing for manual logging by user on parameters, model weights, and artifacts.
   * Accepts a list of `LoggerCallback` objects to extend automated logging behavior.
 
-### 🔹 `AbstractLoggerCallback`
+### `AbstractLoggerCallback`
 
 Abstract class for logger-bound callbacks with defined lifecycle hooks at these stages of training:
   * `on_train_start`
@@ -50,7 +50,7 @@ and return signature:
   * Parameters (e.g., dataset config)
   * Artifacts (e.g., images, `.pth` files, YAML/JSON configs)
 
-### 🔹 `PlotPredictionCallback`
+### `PlotPredictionCallback`
 
 * A concrete example of `LoggerCallback` that:
 

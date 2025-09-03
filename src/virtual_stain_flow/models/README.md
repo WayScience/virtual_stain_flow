@@ -9,7 +9,7 @@ with a hierarchy of abstractions, including blocks, stages, encoders, decoders.
 The subpackage also includes some ready to use image-to-image tranlation models,
 including fully convolutional or maxpooling/bilinear `UNet` and the `ConvNeXt` blocks based `ConvNeXtUNet` with tunable number of compute blocks. 
 
-## Key Components/building blocks of the Framework
+## Key Components/Building-blocks of the Framework
 
 ![UML Diagram](assets/ModelsModuleUML.png)
 > Figure 1. The UML diagram describes the aggregation of the 3 levels of abstraction into image-image translation models, 
@@ -64,7 +64,7 @@ The `UNet` class is a pre-defined model class , supports two architectural varia
 1. Fully convolutional U-Net with `Conv2DDownBlock` and `ConvTrans2DUpBlock`.
 2. More coventional U-Net with `MaxPool2DDownBlock` and `ConvTrans2DUpBlock`.
 
-## Utilities/Handle type checking
+## Utilities/Handle Type-checking
 Includes utility functions for retrieving normalization layers (`get_norm`), 
 activation functions (`get_activation`), and type checking of block handles and configurations, centralizing shared operations.
 
