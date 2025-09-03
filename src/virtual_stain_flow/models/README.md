@@ -2,10 +2,14 @@
 
 ## Overview
 
-The model module defines a modular and extensible framework for building 
+The `models` subpackage defines a modular and extensible framework for building 
 image-to-image translation models. For now most of its functionality is built
 around enabling a "declarative" style creation of U-Net-like architectures, with
 a hierarchy of abstractions, including blocks, stages, encoders, decoders.
+
+The subpackage also includes some ready to use image-to-image tranlation models,
+including fully convolutional or maxpooling/bilinear `UNet` and the `COnvNeXt`
+module based `ConvNeXtUNet` with tunable number of compute blocks. 
 
 ## Key Components/building blocks of the Framework
 
@@ -54,7 +58,7 @@ sizes. Although the `Stage` class does not enforce a specific checks for this,
 it is recommended to initialize a `Stage` class with a 
 **Spatial Dimension Altering** `in_block` and a **Computational** `comp_block`.
 
-The module provides additional Stage classes, that still can be flexibly 
+The subpackage provides additional Stage classes, that still can be flexibly 
 initialized with custom combination of `in_block` and `comp_block`, and with 
 predefined behavior:
 - `DownStage`: Handles downsampling operations from a input feature map tensor.
