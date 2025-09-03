@@ -23,7 +23,7 @@ resolution to capture the context and local features of the images. This is
 commonly achieved by applying dimension preserving convolutional layers
 with kernel > 1 (usually 3), as in F/UNet architectures.  
 """
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Optional
 
 import timm
@@ -37,9 +37,6 @@ from .utils import (
     ActivationType
 )
 
-"""
-
-"""
 class AbstractBlock(ABC, nn.Module):
 
     def __init__(
@@ -74,7 +71,14 @@ class AbstractBlock(ABC, nn.Module):
 
         self._in_channels = in_channels
         self._out_channels = out_channels
-        self._num_units = num_units    
+        self._num_units = num_units
+
+    @abstractmethod
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the block.
+        """
+        raise NotImplementedError
     
     # Centralizing property definitions for blocks
     @property
