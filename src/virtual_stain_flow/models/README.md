@@ -13,7 +13,7 @@ including fully convolutional or maxpooling/bilinear `UNet` and the `ConvNeXt` b
 
 ![UML Diagram](assets/ModelsModuleUML.png)
 > Figure 1. The UML diagram describes the aggregation of the 3 levels of abstraction into image-image translation models, 
-with details provided for key function implementations. 
+with details provided for key function implementations. Diagram is generated manually.
 
 ### Blocks
 Blocks are the smallest modular units in the model, responsible for directly processing feature map tensors. They can be categorized into:
