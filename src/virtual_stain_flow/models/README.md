@@ -12,8 +12,12 @@ including fully convolutional or maxpooling/bilinear `UNet` and the `ConvNeXt` b
 ## Key Components/Building-blocks of the Framework
 
 ![UML Diagram](assets/ModelsModuleUML.png)
-> Figure 1. The UML diagram describes the aggregation of the 3 levels of abstraction into image-image translation models, 
-with details provided for key function implementations. Diagram is generated manually.
+> Figure 1. The UML diagram describes the aggregation into image-image translation models of the 3 levels of abstractions:
+1. Block: the smallest modular component, performs spatial dimension preserving (computing) or changing (up/down-sampling) operations.
+2. Stage: Collection of up/down sampling Blocks with repetitions compute blocks, manages the channel dimension matching between these blocks. 
+3. Encoder/Decoder Branch: Collection of Stages in sequence. Collects and returns skip-connection outputs if applicable.
+
+Diagram is generated manually.
 
 ### Blocks
 Blocks are the smallest modular units in the model, responsible for directly processing feature map tensors. They can be categorized into:
