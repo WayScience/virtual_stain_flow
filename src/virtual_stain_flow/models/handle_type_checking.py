@@ -25,6 +25,7 @@ def _is_block_handle(
 ) -> bool:
     """
     Check if the object is a block handle (a subclass of AbstractBlock).
+    Private helper function intended to be used by _check_block_handle_sequence.
     
     :param obj: The object to check.
     :return: True if obj is a block handle, False otherwise.
@@ -42,6 +43,7 @@ def _check_block_handle_sequence(
 
     """
     Check if the object is a sequence of block handles or a single block handle.
+    Private helper function intended to be used by validate_block_configurations.
     
     :param obj: The object to check.
     :return: True if obj is a sequence of block handles or a single block handle, 
@@ -96,6 +98,7 @@ def validate_block_configurations(
     Validate and prepare block handles and their configurations for a model.
     This function checks if the provided block handles and their configurations
     are valid, expands them if necessary, and returns them in a consistent format.
+    Public helper function intended to be used by model implementations.    
 
     :param in_block_handles: A single block handle or a sequence of block handles
         for the input blocks.
