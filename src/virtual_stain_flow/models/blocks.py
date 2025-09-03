@@ -214,11 +214,11 @@ class Conv2DConvNeXtBlock(AbstractBlock):
         return self.network(x)
 
 
-"""
-A Conv2D block that applies a sequence of Conv2D -> Norm -> Activation
-layers, commonly used in UNet architectures.
-"""
 class Conv2DNormActBlock(AbstractBlock):
+    """
+    A Conv2D block that applies a sequence of Conv2D -> Norm -> Activation
+    layers, commonly used in UNet architectures.
+    """
     def __init__(
         self,
         in_channels: int,
