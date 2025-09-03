@@ -21,17 +21,17 @@ from .handle_type_checking import (
     validate_block_configurations
 )
 
-"""
-The Decoder class implements the upsampling path of a U-Net style
-image-image translation model. It is designed to work with feature maps
-from an encoder, allowing for flexible configurations of the input and
-computation blocks at each stage.
-
-The decoder stages are constructed based on the channels of the encoder's
-feature maps, with each stage performing upsampling and concatenation
-with skip connections from the corresponding encoder stage.
-"""
 class Decoder(nn.Module):
+    """
+    The Decoder class implements the upsampling path of a U-Net style
+    image-image translation model. It is designed to work with feature maps
+    from an encoder, allowing for flexible configurations of the input and
+    computation blocks at each stage.
+
+    The decoder stages are constructed based on the channels of the encoder's
+    feature maps, with each stage performing upsampling and concatenation
+    with skip connections from the corresponding encoder stage.
+    """
     def __init__(
         self,
         encoder_feature_map_channels: Sequence[int],
