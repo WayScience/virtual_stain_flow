@@ -1,40 +1,46 @@
-import torch
-from torch import nn
-import torch.nn.functional as F
-
 """
+/models/discriminator.py
+
 Implementation of GaN discriminators to use along with UNet or FNet generator.
 """
 
-class PatchBasedDiscriminator(nn.Module):
-    
+from typing import Dict, Any
+
+import torch
+from torch import nn
+
+from .factory import qualname
+from .model import BaseModel
+
+class PatchBasedDiscriminator(BaseModel):    
     def __init__(
-            self,
-            n_in_channels: int,
-            n_in_filters: int,
-            _conv_depth: int=4,
-            _leaky_relu_alpha: float=0.2,
-            _batch_norm: bool=False
+        self,
+        n_in_channels: int,
+        n_in_filters: int,
+        _conv_depth: int=4,
+        _leaky_relu_alpha: float=0.2,
+        _batch_norm: bool=False
     ):
         """
         A patch-based discriminator for pix2pix GANs that outputs a feature map
           of probabilities
 
         :param n_in_channels: (int) number of input channels
-        :type n_in_channels: int
         :param n_in_filters: (int) number of filters in the first convolutional layer.
             Every subsequent layer will double the number of filters
-        :type n_in_filters: int
         :param _conv_depth: (int) depth of the convolutional network
-        :type _conv_depth: int
         :param _leaky_relu_alpha: (float) alpha value for leaky ReLU activation.
             Must be between 0 and 1
-        :type _leaky_relu_alpha: float
         :param _batch_norm: (bool) whether to use batch normalization, defaults to False
-        :type _batch_norm: bool
         """
 
         super().__init__()
+
+        self._n_in_channels = n_in_channels
+        self._n_in_filters = n_in_filters
+        self._conv_depth = _conv_depth
+        self._leaky_relu_alpha = _leaky_relu_alpha
+        self._batch_norm = _batch_norm
 
         conv_layers = []
 
@@ -77,40 +83,58 @@ class PatchBasedDiscriminator(nn.Module):
         x = self.out(x)
 
         return x
+    
+    def to_config(self) -> Dict[str, Any]:
+        return {
+            "class_path": qualname(self.__class__),
+            "module_versions": {
+                "torch": torch.__version__,
+            },
+            "init": {
+                "n_in_channels": self._n_in_channels,
+                "n_in_filters": self._n_in_filters,
+                "_conv_depth": self._conv_depth,
+                "_leaky_relu_alpha": self._leaky_relu_alpha,
+                "_batch_norm": self._batch_norm,
+            },
+        }
 
-class GlobalDiscriminator(nn.Module):
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> "PatchBasedDiscriminator":
+        init_cfg = config.get("init", config)
+        return cls(**init_cfg)
 
+class GlobalDiscriminator(BaseModel):
     def __init__(
-            self,
-            n_in_channels: int,
-            n_in_filters: int,
-            _conv_depth: int=4,
-            _leaky_relu_alpha: float=0.2,
-            _batch_norm: bool=False,
-            _pool_before_fc: bool=False
-            ):
+        self,
+        n_in_channels: int,
+        n_in_filters: int,
+        _conv_depth: int=4,
+        _leaky_relu_alpha: float=0.2,
+        _batch_norm: bool=False,
+        _pool_before_fc: bool=False
+    ):
         """
         A global discriminator for pix2pix GANs that outputs a single scalar value as the global probability
 
-        Parameters:
         :param n_in_channels: (int) number of input channels
-        :type n_in_channels: int
         :param n_in_filters: (int) number of filters in the first convolutional layer. 
-        Every subsequent layer will double the number of filters
-        :type n_in_filters: int
+            Every subsequent layer will double the number of filters
         :param _conv_depth: (int) depth of the convolutional network
-        :type _conv_depth: int
         :param _leaky_relu_alpha: (float) alpha value for leaky ReLU activation. 
-        Must be between 0 and 1
-        :type _leaky_relu_alpha: float
+            ust be between 0 and 1
         :param _batch_norm: (bool) whether to use batch normalization, defaults to False
-        :type _batch_norm: bool
         :param _pool_before_fc: (bool) whether to pool before the fully connected network
-        Pooling before the fully connected network can reduce the number of parameters
-        :type _pool_before_fc: bool
+            Pooling before the fully connected network can reduce the number of parameters
         """       
         
         super().__init__()
+
+        self._n_in_channels = n_in_channels
+        self._n_in_filters = n_in_filters
+        self._conv_depth = _conv_depth
+        self._leaky_relu_alpha = _leaky_relu_alpha
+        self._batch_norm = _batch_norm
         
         conv_layers = []
         
@@ -152,3 +176,24 @@ class GlobalDiscriminator(nn.Module):
         x = self.fc(x)
 
         return x
+    
+    def to_config(self) -> Dict[str, Any]:
+        return {
+            "class_path": qualname(self.__class__),
+            "module_versions": {
+                "torch": torch.__version__,
+            },
+            "init": {
+                "n_in_channels": self._n_in_channels,
+                "n_in_filters": self._n_in_filters,
+                "_conv_depth": self._conv_depth,
+                "_leaky_relu_alpha": self._leaky_relu_alpha,
+                "_batch_norm": self._batch_norm,
+                "_pool_before_fc": self._pool_before_fc,
+            },
+        }
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> "GlobalDiscriminator":
+        init_cfg = config.get("init", config)
+        return cls(**init_cfg)
