@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Overhaul Phase 1/? - Logging Framework Overhaul
 A minimal rework of the logging framework as the first step to a complete overhual of the `virtual_stain_flow` software. 
 
-This version defines a new logging module that better integrates MLflow into the virtual staining model training process for a more comprehensive logging framework.
+This version defines a new logging subpackage that better integrates MLflow into the virtual staining model training process for a more comprehensive logging framework.
 
 #### Introduced `logging.MlflowLogger` class
 Notes: This class is simiar to the old `virtual_stain_flow.callback.MlflowLogger` class, but promoted to be an independent logger class, with ability to accept logger callbacks. Key design/functionality:
@@ -89,17 +89,20 @@ Notes: This class is nearly identical to the old Trainer class, except that:
 - It is the realization of the new `AbstractLoggingTrainer` class instead of the `AbstractTrainer` class.
 - It overrides the parent class `save_model` method that defines saving of the model weight.
 
-#### Introduced `logging.callbacks` module
-Notes: This is a new module that is distinct from the existing `virtual_stain_flow.callbacks` module in that classes under this module are passed to `logging.MlflowLogger` instances as opposed to a `trainers.*` instances.     
+#### Introduced `logging.callbacks` subpackage
+Notes: This is a new subpackage that is distinct from the existing `virtual_stain_flow.callbacks` 
+subpackage in that classes under this subpackage are passed to `logging.MlflowLogger` instances as 
+opposed to a `trainers.*` instances.     
 
-##### The module currently contains:
-- `AbstractLoggerCallback` class: A newly introduced abstract class that defines behavior for logger callbacks interacting with the `logging.MlflowLogger` class so product of callback gets logged appropriately as artifacts/metrics/parameters.
+##### The subpackage currently contains:
+- `AbstractLoggerCallback` class: A newly introduced abstract class that defines behavior for logger
+callbacks interacting with the `logging.MlflowLogger` class so product of callback gets logged appropriately as artifacts/metrics/parameters.
 - `PlotPredictionCallback` class: A newly introduced class that is a realization of the `AbstractLoggerCallback` class. Serves as an example implementation of a logger callback. Similar to the `virtual_stain_flow.callbacks.intermediatePlotCallback`, plots predictions of the model on a subset of the dataset, but the additional interface with the `MlflowLogger` class ensures the 
 plots produced are logged as mlflow artifacts.
 
 ### Refactored
 - Internal function renames for clarity.
 - Consistent attribute/property usage.
-- Updated `__init__.py` directly exposing classes under modules.
+- Updated `__init__.py` directly exposing classes under subpackage.
 
 ---

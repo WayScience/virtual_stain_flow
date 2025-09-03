@@ -8,8 +8,8 @@ around enabling a "declarative" style creation of U-Net-like architectures, with
 a hierarchy of abstractions, including blocks, stages, encoders, decoders.
 
 The subpackage also includes some ready to use image-to-image tranlation models,
-including fully convolutional or maxpooling/bilinear `UNet` and the `COnvNeXt`
-module based `ConvNeXtUNet` with tunable number of compute blocks. 
+including fully convolutional or maxpooling/bilinear `UNet` and the `ConvNeXt`
+blocks based `ConvNeXtUNet` with tunable number of compute blocks. 
 
 ## Key Components/building blocks of the Framework
 

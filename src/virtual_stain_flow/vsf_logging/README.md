@@ -5,17 +5,19 @@
 
 ## Overview
 
-This module contains a refactored and **isolated** logger class. It's predecessor, `virtual_stain_flow.callback.MlflowLogger` class, is in parallel with other callback classes for producing prediction plotting and saving model weights during the training progress, which makes logging of their outputs as mlflow artifacts difficult. This renovated module is now its independent class that can accept additional `virtual_stain_flow.logging.callback.LoggerCallbacks` to produce artifacts to be logged. 
-* Note that the old `virtual_stain_flow.callback` classes are still retained for potential utility to allow for potential interactions with the training process without need for logging (though may be removed in the future).
+This subpackage contains a refactored and **isolated** logger that is its 
+independent class with the capacity to be registered withl 
+`virtual_stain_flow.vsf_logging.callback.LoggerCallbacks` that produces loggable
+artifacts.
 
 ---
 
-## Module Structure
+## Subpackage Structure
 
 ```bash
 virtual_stain_flow/
 └── logging/
-    ├── MlflowLoggerV2.py        # Central logging controller class
+    ├── MlflowLogger.py        # Central logging controller class
     └──  callbacks/
         ├── LoggerCallback.py    # Abstract base class for logger-aware callbacks
         └── PlotCallback.py      # Example implementation to generate and prediction plots that the logger logs as artifacts
@@ -58,35 +60,9 @@ and return signature:
   * Saves them to disk and returns paths for MLflow artifact logging
   * Configurable via sampling strategy, metrics, and plotting frequency
 
----
-## Functionality
-### Current 
-
-* [x] **MLflow run management** (start, end, tag, etc.)
-* [x] **Dynamic trainer binding** at training time
-* [x] **Artifact logging routing** based on file type (`.png`, `.pth`, etc.)
-* [x] **Flexible callback output handling** (`Path`, `dict`, `(metric_name, value)`)
-* [x] **Plotting callback** with configurable dataset and metrics
-* [x] **Trainer-agnostic weight saving** via `trainer.save_model()`
-
-### Planned / TODOs
-
-* [  ] Implement `log_param(...)` to support one of:
-  * [  ] Flattened logging of structured parameters
-  * [  ] Optional YAML/JSON serialization as artifacts
-* [  ] Add `log_dict_as_yaml()` and `log_dict_as_json()` utility methods
-* [  ] Define a log output exchange data class for richer logging (e.g. `LogEntry` dataclass)
-    * to define more complex artifact logging paths and tags
-* [  ] **`trainers`/`models` Module** Unify model weight saving across model architectures and trainer classes to faciliate weight logging as artifacts
-* [  ] **`datasets` Module** Define interaction of dataset classes with the logger to log data processing steps as parameters
-  * Perhaps something like `logger.log_dataset(dataset_obj)`
-* [  ] Integrate with optuna optimization experiments to log these as artifacts as well. 
-
----
-
 ## Example Usage
 ```python
-# ... import dataset/model/trainer modules
+# ... import dataset/model/trainer subpackage
 from virtual_stain_flow.vsf_logging import MlflowLogger
 from virtual_stain_flow.vsf_logging.callbacks import PlotPredictionCallback
 
