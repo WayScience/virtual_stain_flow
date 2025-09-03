@@ -126,6 +126,8 @@ class Encoder(nn.Module):
         feature_maps = []
 
         for stage in self.stages:
+            # list comprehensive cannot be used here as we update x
+            # in encoder feedforward
             x = stage(x)
             feature_maps.append(x)
 

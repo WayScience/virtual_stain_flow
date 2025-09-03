@@ -118,6 +118,8 @@ class Decoder(nn.Module):
         x = encoder_feature_maps[-1]
         skip_connections = encoder_feature_maps[::-1][1:]
         for stage, skip in zip(self.stages, skip_connections):
+            # list comprehensive cannot be used here as we update x
+            # in decoder feedforward
             x = stage(x, skip)
         
         return x
