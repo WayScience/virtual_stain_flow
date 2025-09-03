@@ -1,3 +1,18 @@
+"""
+/models/model.py
+
+This module defines the base classes for models, including a base model class
+and a base generator model class. These classes provide common functionality
+for saving weights, converting to/from configuration dictionaries, and defining
+the forward pass of the model.
+
+Classes:
+    BaseModel: Abstract base class for all models.
+    BaseGeneratorModel: Abstract base class for virtual staining generator 
+        models, extending BaseModel but defines more specific properties and
+        methods.
+"""
+
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Union
 import pathlib
