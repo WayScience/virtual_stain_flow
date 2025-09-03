@@ -1,0 +1,4 @@
+' Shared style/theme for all diagrams
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members

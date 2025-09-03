@@ -1,0 +1,25 @@
+' ----- encoder + decoder (consumes stages) -----
+
+package "encoder" {
+  class Encoder {
+    - _depth: int
+    - stages: ModuleList<DownStage>
+    - _feature_map_channels: Sequence<int>
+    + forward(x: Tensor): Sequence<Tensor>
+    + feature_map_channels(): Sequence<int>
+  }
+}
+
+package "decoder" {
+  class Decoder {
+    - _depth: int
+    - stages: ModuleList<UpStage>
+    - _feature_map_channels: Sequence<int>
+    + forward(encoder_feature_maps: Sequence<Tensor>): Tensor
+    + feature_map_channels(): Sequence<int>
+  }
+}
+
+' Composition over stages
+Encoder *-- "1..depth" DownStage : stages
+Decoder *-- "1..(depth-1)" UpStage : stages

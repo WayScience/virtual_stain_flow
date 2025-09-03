@@ -1,0 +1,54 @@
+' ----- blocks + up_down_blocks + stages -----
+
+package "blocks/up_down_blocks" {
+  interface AbstractBlock {
+    +in_channels: int
+    +out_channels: int
+    +num_units: int
+    +forward(x): Tensor
+    +out_h(in_h): int
+    +out_w(in_w): int
+  }
+
+  abstract class AbstractDownBlock extends AbstractBlock
+  abstract class AbstractUpBlock extends AbstractBlock
+
+  class Conv2DConvNeXtBlock extends AbstractBlock
+  class Conv2DNormActBlock extends AbstractBlock
+
+  class IdentityBlock extends AbstractBlock
+  class Conv2DDownBlock extends AbstractDownBlock
+  class MaxPool2DDownBlock extends AbstractDownBlock
+  class ConvTrans2DUpBlock extends AbstractUpBlock
+  class PixelShuffle2DUpBlock extends AbstractUpBlock
+}
+
+package "stages" {
+  class Stage {
+    - _in_channels: int
+    - _skip_channels: int
+    - _out_channels: int
+    - in_block: AbstractBlock
+    - comp_block: AbstractBlock
+    +forward(x, skip=None): Tensor
+    +in_channels: int
+    +skip_channels: int
+    +out_channels: int
+    +out_h(in_h): int
+    +out_w(in_w): int
+  }
+
+  class DownStage extends Stage
+  class UpStage extends Stage
+}
+
+' Generic composition
+Stage o-- "1" AbstractBlock : in_block
+Stage o-- "1" AbstractBlock : comp_block
+
+' Rules for specialized stages
+DownStage --> AbstractDownBlock : accepts as in_block
+DownStage --> AbstractBlock : accepts as comp_block
+
+UpStage --> AbstractUpBlock : accepts as in_block
+UpStage --> AbstractBlock : accepts as comp_block

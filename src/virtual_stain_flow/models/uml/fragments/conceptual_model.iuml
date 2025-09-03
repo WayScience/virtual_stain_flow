@@ -1,0 +1,37 @@
+' ----- conceptual model + realized UNet -----
+
+package "model (conceptual)" {
+  class ConceptualModel{
+    - encoder: Encoder
+    - decoder: Decoder
+    - out_activation
+    --
+    + forward(x: Tensor): Tensor
+  }
+}
+
+' Ownership/composition
+ConceptualModel *-- Encoder
+ConceptualModel *-- Decoder
+
+package "unet" {
+  class UNet {
+    - in_conv: Conv2d(1x1)
+    - encoder: Encoder
+    - decoder: Decoder
+    - out_conv: Conv2d(1x1)
+    - out_activation
+    --
+    + forward(x: Tensor): Tensor
+  }
+}
+
+' Configuration/use relationships
+UNet ..> Conv2DDownBlock : may use for down (if !max_pool_down)
+UNet ..> MaxPool2DDownBlock : may use for down (if max_pool_down)
+UNet ..> IdentityBlock : first down stage
+UNet ..> ConvTrans2DUpBlock : upsampling in decoder
+UNet ..> Conv2DNormActBlock : compute blocks (encoder & decoder)
+
+' Realization (UNet implements the conceptual model)
+UNet ..|> ConceptualModel
