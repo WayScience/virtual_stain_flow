@@ -20,7 +20,7 @@ including fully convolutional or maxpooling/bilinear `UNet` and the `ConvNeXt` b
 Diagram is generated manually.
 
 ### Blocks
-Blocks are the smallest modular units in the model, responsible for directly processing feature map tensors. They can be categorized into:
+Blocks are the smallest units in the framework, responsible for directly processing feature map tensors. They can be categorized into:
 
 1. **Computational Blocks**: Preserve spatial dimensions while potentially altering the number of channels. Inherits directly from `AbstractBlock`.
 
@@ -42,8 +42,7 @@ Inherits from `AbstractUpBlock` or `AbstractDownBlock`.
     - `PixelShuffle2DUpBlock`: Up-samples image by a factor of 2. 
 
 ### Stages
-Stages are packaged sequences of blocks that perform a specific operation, 
-such as downsampling or upsampling followed by compute. 
+Stages are collections of blocks, defining an ordered sequence of block operations, such as downsampling or upsampling followed by dimension preserving compute operation. 
 
 A `Stage` class accepts a `in_block` handle and a `comp_block` handle, 
 and dynamically creates a sequence of blocks with compatible input/output sizes. 
@@ -73,15 +72,4 @@ Includes utility functions for retrieving normalization layers (`get_norm`),
 activation functions (`get_activation`), and type checking of block handles and configurations, centralizing shared operations.
 
 ## Example Usage
-Refer to the `EXAMPLES/MODULAR_UNET_EXAMPLE.IPYNB` notebook for detailed examples of block/stage behavior, model definition. 
-
-## File Structure
-- `blocks.py`: Defines computational and spatial dimension altering blocks.
-- `up_down_blocks.py`: Implements downsampling and upsampling blocks.
-- `stages.py`: Defines stage objects for downsampling and upsampling.
-- `encoder.py`: Implements the encoder path.
-- `decoder.py`: Implements the decoder path.
-- `unet.py`: Wraps the encoder and decoder into a complete U-Net model.
-- `utils.py`: Provides utility functions for normalization and activation layers.
-- `handle_type_checking.py`: Centralizes type checking and validation for 
-block configurations.
+Refer to the `examples/modular_unet_example.ipynb` notebook for detailed examples of block/stage behavior, model definition. 
