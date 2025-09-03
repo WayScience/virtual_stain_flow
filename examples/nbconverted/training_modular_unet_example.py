@@ -175,4 +175,3 @@ for epoch in range(epochs):
     plt.suptitle(f'Epoch {epoch + 1} Predictions')
     plt.tight_layout()
     plt.show()
-
