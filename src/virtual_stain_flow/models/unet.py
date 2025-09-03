@@ -26,29 +26,30 @@ from .up_down_blocks import (
     MaxPool2DDownBlock,
     ConvTrans2DUpBlock
 )
-"""
-UNet model implementation leveraging the modular "block" and "stage", 
-and simply wraps a Encoder and Decoder initialization with pre-defined
-combination of blocks types and and block configurations.
 
-This model class allows for two different architecture of UNet:
-
-1. A fully convolutional UNet with Conv2D down-sampling and Conv2DTranspose 
-    up-sampling blocks. Both the down-sampling and up-sampling blocks are
-    immediately followed by a batch normalization. This is equivalent to 
-    the FNet architecture used in Ounkomol et. al, 2018.
-
-2. A UNet with MaxPool2D down-sampling and Conv2DTranspose up-sampling blocks.
-    This is a more traditional UNet architecture, where the down-sampling
-    is done using MaxPool2D blocks, and the up-sampling is done using
-    Conv2DTranspose blocks. The down-sampling blocks are not followed by
-    a normalization layer, but the up-sampling blocks are followed by a
-    batch normalization.
-
-Both architecture uses _num_units repetitions of the 
-    Conv2D>BatchNorm>ReLU computation block to follow the down/up-sampling. 
-"""
 class UNet(nn.Module):
+    """
+    UNet model implementation leveraging the modular "block" and "stage", 
+    and simply wraps a Encoder and Decoder initialization with pre-defined
+    combination of blocks types and and block configurations.
+
+    This model class allows for two different architecture of UNet:
+
+    1. A fully convolutional UNet with Conv2D down-sampling and Conv2DTranspose 
+        up-sampling blocks. Both the down-sampling and up-sampling blocks are
+        immediately followed by a batch normalization. This is equivalent to 
+        the FNet architecture used in Ounkomol et. al, 2018.
+
+    2. A UNet with MaxPool2D down-sampling and Conv2DTranspose up-sampling blocks.
+        This is a more traditional UNet architecture, where the down-sampling
+        is done using MaxPool2D blocks, and the up-sampling is done using
+        Conv2DTranspose blocks. The down-sampling blocks are not followed by
+        a normalization layer, but the up-sampling blocks are followed by a
+        batch normalization.
+
+    Both architecture uses _num_units repetitions of the 
+        Conv2D>BatchNorm>ReLU computation block to follow the down/up-sampling. 
+    """
     def __init__(
         self,
         in_channels: int,

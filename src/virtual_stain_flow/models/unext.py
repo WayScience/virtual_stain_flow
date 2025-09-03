@@ -27,20 +27,20 @@ from .up_down_blocks import (
     PixelShuffle2DUpBlock
 )
 
-"""
-ConvNeXtUNet model implementation leveraging the modular "block" and "stage",
-Simply initializes a un-pretrained ConvNeXtV2_tiny model from timm library,
-adapt it as a encoder for the UNet like architecture, and then initialize
-a appropriate Decoder. Depth of model is fixed to 4 as the ConvNeXtV2_tiny 
-encoder has 4 stages.
-
-This model class allows for 4 different decoder architectures:
-1. ConvTrans2DUpBlock with Conv2DNormActBlock
-2. ConvTrans2DUpBlock with Conv2DConvNeXtBlock
-3. PixelShuffle2DUpBlock with Conv2DNormActBlock
-4. PixelShuffle2DUpBlock with Conv2DConvNeXtBlock
-"""
 class ConvNeXtUNet(nn.Module):
+    """
+    ConvNeXtUNet model implementation leveraging the modular "block" and "stage",
+    Simply initializes a un-pretrained ConvNeXtV2_tiny model from timm library,
+    adapt it as a encoder for the UNet like architecture, and then initialize
+    a appropriate Decoder. Depth of model is fixed to 4 as the ConvNeXtV2_tiny 
+    encoder has 4 stages.
+
+    This model class allows for 4 different decoder architectures:
+    1. ConvTrans2DUpBlock with Conv2DNormActBlock
+    2. ConvTrans2DUpBlock with Conv2DConvNeXtBlock
+    3. PixelShuffle2DUpBlock with Conv2DNormActBlock
+    4. PixelShuffle2DUpBlock with Conv2DConvNeXtBlock
+    """
     def __init__(
         self,
         in_channels: int,
