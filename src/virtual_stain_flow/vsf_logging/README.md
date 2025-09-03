@@ -1,4 +1,4 @@
-# `virtual_stain_flow.logging`
+# `virtual_stain_flow.vsf_logging`
 (Prototype) Renovated Logger for Centralized MLflow Logging.
 
 ---
@@ -87,8 +87,8 @@ and return signature:
 ## Example Usage
 ```python
 # ... import dataset/model/trainer modules
-from virtual_stain_flow.logging import MlflowLoggerV2
-from virtual_stain_flow.logging.callbacks import PlotPredictionCallback
+from virtual_stain_flow.vsf_logging import MlflowLogger
+from virtual_stain_flow.vsf_logging.callbacks import PlotPredictionCallback
 
 """
 dataset = ...

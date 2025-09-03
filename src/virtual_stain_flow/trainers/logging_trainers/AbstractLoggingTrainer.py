@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, random_split
 from ..AbstractTrainer import AbstractTrainer
 from ...metrics.AbstractMetrics import AbstractMetrics
 from ...callbacks.AbstractCallback import AbstractCallback
-from ...logging import MlflowLogger
+from ...vsf_logging import MlflowLogger
 
 path_type = Union[pathlib.Path, str]
 
