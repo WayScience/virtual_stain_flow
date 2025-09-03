@@ -101,14 +101,13 @@ class AbstractBlock(ABC, nn.Module):
     def out_w(self, in_w: int) -> int:
         return in_w    
 
-"""
-A ConvNeXt block that applies a sequence of ConvNeXt units
-with inital 2D convolution to adjust the number of channels if needed.
-Mimics the design of timm.models.convnext.ConvNeXtStage but less sophisticated
-in implementation. 
-"""
-class Conv2DConvNeXtBlock(AbstractBlock):
-    
+class Conv2DConvNeXtBlock(AbstractBlock):    
+    """
+    A ConvNeXt block that applies a sequence of ConvNeXt units 
+    with inital 2D convolution to adjust the number of channels if needed.
+    Mimics the design of timm.models.convnext.ConvNeXtStage but less sophisticated
+    in implementation. 
+    """
     def __init__(
         self,
         in_channels: int,
