@@ -211,12 +211,7 @@ class Conv2DConvNeXtBlock(AbstractBlock):
             Should have shape (B, C', H, W) where C' is the output channels,
             and H and W are unchanged input spatial dimensions.
         """
-        return self.network(x)    
-    
-    
-    #this is a spatial preserving block, we don't override the out_h and out_w
-    #def out_h(self, in_h: int) -> int:
-    #def out_w(self, in_w: int) -> int:
+        return self.network(x)
 
 
 """
