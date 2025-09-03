@@ -5,10 +5,8 @@
 
 ## Overview
 
-This subpackage contains a refactored and **isolated** logger that is its 
-independent class with the capacity to be registered withl 
-`virtual_stain_flow.vsf_logging.callback.LoggerCallbacks` that produces loggable
-artifacts.
+This subpackage contains a refactored and **isolated** `MlflowLogger` logger that is its independent class. 
+The `MlflowLogger` works in conjunction with `virtual_stain_flow.vsf_logging.callback.LoggerCallbacks` to produce and log artifacts.
 
 ---
 
