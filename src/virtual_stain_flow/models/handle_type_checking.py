@@ -1,15 +1,19 @@
 """
 /models/handle_type_checking.py
 
-Type checking and validation utilities for block handles and their configurations.
+Type checking, expansion utilities for block handles and their configurations.
 This module provides functions to validate and prepare block handles and their
-configurations for use in model architectures.
+configurations for use in model architectures. Intend to be used by model
+implementations to ensure that the provided block handles and configurations
+are valid.
 """
 
 from typing import Optional, Sequence, Type, Union, Any, List, Tuple
 
 from .blocks import AbstractBlock
 
+# A BlockHandle can be a single block handle (a subclass of AbstractBlock)
+# or a sequence of such block handles. This type alias is used for type hinting.
 BlockHandleSequence = Union[
     Type[AbstractBlock],
     Sequence[Type[AbstractBlock]]
