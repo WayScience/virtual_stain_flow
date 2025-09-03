@@ -1,4 +1,14 @@
-# decoder.py
+"""
+models/decoder.py
+
+This module defines the Decoder class for U-Net style architectures.
+The Decoder is responsible for the upsampling path, which reconstructs
+the output image from the encoded feature maps while incorporating
+skip connections from the encoder.
+
+Classes:
+    Decoder: Implements the upsampling path of a U-Net style model.
+"""
 
 from typing import Optional, Sequence
 
