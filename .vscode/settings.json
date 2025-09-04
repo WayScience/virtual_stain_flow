@@ -1,0 +1,12 @@
+{
+  "python.envFile": "${workspaceFolder}/.env",
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+  "jupyter.changeDirToNotebookDir": false,
+  
+  "plantuml.diagramsRoot": "src/virtual_stain_flow/models/uml/diagrams",
+  "plantuml.exportOutDir": "src/virtual_stain_flow/models/assets/uml",
+  "plantuml.exportFormat": "svg",
+  "plantuml.fileExtensions": "puml,iuml,plantuml",
+  "plantuml.render": "PlantUMLServer",
+  "plantuml.server": "https://www.plantuml.com/plantuml"
+}

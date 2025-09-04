@@ -1,0 +1,7 @@
+@startuml
+!include ../theme.puml
+!include ../fragments/blocks_updown_stages.iuml
+!include ../fragments/encoder_decoder.iuml
+!include ../fragments/conceptual_model.iuml
+title Models overview (blocks/stages/encoder/decoder/unet)
+@enduml
