@@ -28,7 +28,7 @@ It supports lazy loading of images, caching, and efficient handling of input and
 - Provides methods to save and load dataset configurations as JSON files for reproducibility.
 
 ### Usage:
-See `/examples/dataset_example.ipynb` for details
+
 ```python
 import pandas as pd
 
@@ -47,3 +47,10 @@ dataset = BaseImageDataset(
     target_channel_keys="target_channel",
     cache_capacity=10
 )
+```
+### Serialization for logging
+```python
+dict = dataset.to_config()
+# or
+dataset.to_json_config('loggable_artifact.json')
+```
