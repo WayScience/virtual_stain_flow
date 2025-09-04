@@ -120,7 +120,8 @@ fully_conv_unet = UNet(
     in_channels=1,
     out_channels=1,
     depth=4,
-    max_pool_down=False, # makes the model use Conv2DDownBlock
+    encoder_down_block='conv', # convolutional 2d for down-sampling
+    decoder_up_block='convt', # transposed convolution for up-sampling
     act_type='sigmoid'
 )
 
@@ -175,3 +176,4 @@ for epoch in range(epochs):
     plt.suptitle(f'Epoch {epoch + 1} Predictions')
     plt.tight_layout()
     plt.show()
+

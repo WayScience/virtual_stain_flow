@@ -229,7 +229,6 @@ print(f"Architecture of a {num_units} unit Conv2DConvNeXt Block with leading Con
 
 
 print(f"Input tensor before Conv2DConvNeXt Block shape: {input_up_tensor.shape}")
-_ = convnext_block2(input_up_tensor)
 # note that the spatial dimensions remain the same, but the number of channels has doubled
 print(f"Input tensor after Conv2DConvNeXt Block shape: {_.shape}")
 
@@ -276,7 +275,7 @@ print(f"Input tensor after IdentityBlock shape: {_.shape}")
 # 
 # By default the spatial dimensions are halved, and the number of channels are doubled
 
-# In[9]:
+# In[ ]:
 
 
 conv_down_block = Conv2DDownBlock(
@@ -697,7 +696,8 @@ fully_conv_unet = UNet(
     in_channels=1,
     out_channels=1,
     depth=4,
-    max_pool_down=False, # makes the model use Conv2DDownBlock
+    encoder_down_block='conv', # convolutional 2d for down-sampling
+    decoder_up_block='convt', # transposed convolution for up-sampling
     act_type='sigmoid'
 )
 
@@ -714,7 +714,8 @@ max_pool_unet = UNet(
     in_channels=1,
     out_channels=1,
     depth=4,
-    max_pool_down=True, # makes the model use MaxPool2DDownBlock
+    encoder_down_block='maxpool', # max-pooling for down-sampling
+    decoder_up_block='bilinear', # bilinear interpolation for up-sampling
     act_type='sigmoid'
 )
 
@@ -738,3 +739,4 @@ unext = ConvNeXtUNet(
 
 pred = unext(input_tensor)
 print(f"ConvNeXtUNet prediction shape: {pred.shape}")
+
