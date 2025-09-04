@@ -113,19 +113,23 @@ plots produced are logged as mlflow artifacts.
 
 #### New modular backbone for `models` subpackage
 ##### Major changes:
-- Introduced a new modular and extensible `models` subpackage for building image-to-image translation models. The subpackage is designed around a declarative style for creating U-Net-like architectures, with a hierarchy of abstractions:
-  - **Blocks**: Smallest modular units, categorized into computational blocks (e.g., `Conv2DNormActBlock`, `Conv2DConvNeXtBlock`) and spatial dimension altering blocks (e.g., `Conv2DDownBlock`, `PixelShuffle2DUpBlock`).
-  - **Stages**: Sequences of blocks for downsampling or upsampling, such as `DownStage` and `UpStage`.
-  - **Encoder**: Implements the downsampling path of U-Net-like architectures using `DownStage` objects.
-  - **Decoder**: Implements the upsampling path with skip connections using `UpStage` objects.
-  - **U-Net**: Predefined model class supporting fully convolutional and maxpooling-based U-Net variants.
-##### Misc.
+- Introduced a new modular and extensible `models` subpackage for building image-to-image translation models. 
+The subpackage is designed around a declarative style for creating U-Net-like architectures, with a hierarchy of abstractions:
+  - **Blocks** (`blocks.py`, `up_down_blocks.py`): Smallest modular units, categorized into computational blocks (e.g., `Conv2DNormActBlock`, `Conv2DConvNeXtBlock`) and spatial dimension altering blocks (e.g., `Conv2DDownBlock`, `PixelShuffle2DUpBlock`).
+  - **Stages** (`stages.py`): Sequences of blocks for downsampling or upsampling, such as `DownStage` and `UpStage`.
+  - **Encoder** (`encoder.py`): Implements the downsampling path of U-Net-like architectures using `DownStage` objects.
+  - **Decoder** (`decoder.py`): Implements the upsampling path with skip connections using `UpStage` objects.
+  - **BaseModel** and **BaseGeneratorModel** (`model.py`): Added abstract base classes for models, including functionality for saving weights, configuration handling, and defining the forward pass.
+  - **UNet** (`unet.py`): Predefined model class supporting fully convolutional and maxpooling-based U-Net variants.
+  - **UNeXt** (`unext.py`): Predefined U-Net variant with a ConvNeXtV2_tiny encoder and customizable decoder.
 - Added utility functions for normalization layers, activation functions, and type checking of block handles and configurations.
 - Refer to the `models` README for detailed explanations of components and usage examples.
 
 ### Refactored 
 
 #### Repository Restructuring
-- Restructured the repository from a flat layout to the conventional `/src/package_name/` structure. This change improves module discoverability, aligns with modern Python packaging standards, and reduces potential import conflicts. All package-related code now resides under the `src/virtual_stain_flow/` directory.
+- Restructured the repository from a flat layout to the conventional `/src/package_name/` structure. 
+This change improves module discoverability, aligns with modern Python packaging standards, and reduces potential import conflicts. 
+All package-related code now resides under the `src/virtual_stain_flow/` directory.
 - Updated import paths throughout the codebase to reflect the new structure.
 - Adjusted setup scripts and documentation to accommodate the restructuring.
