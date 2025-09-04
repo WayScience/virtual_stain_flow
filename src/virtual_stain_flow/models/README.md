@@ -62,10 +62,31 @@ It consists of multiple `DownStage` objects, each reducing the spatial dimension
 The `Decoder` class implements the upsampling path of a U-Net-like architecture. 
 It consists of multiple `UpStage` objects, each increasing the spatial dimensions of the input tensor while incorporating skip connections from the encoder.
 
-### U-Net
-The `UNet` class is a pre-defined model class , supports two architectural variants:
-1. Fully convolutional U-Net with `Conv2DDownBlock` and `ConvTrans2DUpBlock`.
-2. More coventional U-Net with `MaxPool2DDownBlock` and `ConvTrans2DUpBlock`.
+### Model
+The `model.py` module provides the foundational classes for defining models within the framework. It includes the following key components:
+
+1. **BaseModel**: 
+    - An abstract base class that all models inherit from.
+    - Provides common functionality such as saving model weights, converting configurations to/from dictionaries, and defining the forward pass.
+    - Enforces implementation of `forward`, `to_config`, and `from_config` methods in subclasses.
+
+2. **BaseGeneratorModel**:
+    - Extends `BaseModel` and serves as a base class for image-to-image translation models.
+    - Includes properties for input/output channels, activation functions, and modular components like `Encoder` and `Decoder`.
+    - Implements a default forward pass that connects the input convolution, encoder, decoder, and output convolution layers.
+
+These classes establish a flexible and extensible structure for building custom models, ensuring consistency and reusability across the framework.
+
+### Model Realizations
+
+1. **UNet**: a pre-defined model class , supporting two architectural variants:
+    1. Fully convolutional U-Net with `Conv2DDownBlock` and `ConvTrans2DUpBlock`.
+    2. More coventional U-Net with `MaxPool2DDownBlock` and `ConvTrans2DUpBlock`.
+2. **ConvNeXtUNet**: A U-Net-like architecture that leverages the ConvNeXtV2_tiny model as its encoder. This model is designed for advanced image-to-image translation tasks and supports a modular decoder with customizable upsampling and computational blocks. 
+    - Utilizes a pre-defined ConvNeXtV2_tiny model from the `timm` library, adapted for hierarchical feature extraction with four stages.
+    - Offers flexibility with two types of upsampling blocks (`PixelShuffle2DUpBlock` and `ConvTrans2DUpBlock`) and two types of computational blocks (`Conv2DConvNeXtBlock` or `Conv2DNormActBlock`).
+
+This model demonstrates the extensibility of the framework by integrating state-of-the-art architectures with the modular design principles of the subpackage.
 
 ## Utilities/Handle Type-checking
 Includes utility functions for retrieving normalization layers (`get_norm`), 
