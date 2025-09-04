@@ -1,37 +1,67 @@
-' ----- conceptual model + realized UNet -----
+' ----- base model -----
+package "model (base)" {
+  abstract class BaseModel {
+    +forward(x: Tensor): Tensor
+    +to_config(): Dict
+    +from_config(config: Dict): BaseGeneratorModel
+    +save_weights(filename: str, dir: Path): Path
+  }
 
-package "model (conceptual)" {
-  class ConceptualModel{
-    - encoder: Encoder
-    - decoder: Decoder
-    - out_activation
-    --
-    + forward(x: Tensor): Tensor
+  abstract class BaseGeneratorModel extends BaseModel {
+    - _in_channels: int
+    - _out_channels: int
+    - _act_type
+    - _out_activation
+    - in_conv: Module?         ' optional
+    - encoder: Encoder         ' required
+    - decoder: Decoder         ' required
+    - out_conv: Module?        ' optional
+    +forward(x: Tensor): Tensor
+    +in_channels: int
+    +out_channels: int
+    +out_activation
   }
 }
 
-' Ownership/composition
-ConceptualModel *-- Encoder
-ConceptualModel *-- Decoder
+BaseGeneratorModel --|> BaseModel
 
+' ----- realized models -----
 package "unet" {
   class UNet {
     - in_conv: Conv2d(1x1)
     - encoder: Encoder
     - decoder: Decoder
     - out_conv: Conv2d(1x1)
-    - out_activation
-    --
-    + forward(x: Tensor): Tensor
+    - _base_channels: int
+    - _depth: int
+    - _encoder_down_block: "conv|maxpool"
+    - _decoder_up_block:   "convt|bilinear"
+    - _num_units_cfg
+    +forward(x: Tensor): Tensor
   }
 }
 
-' Configuration/use relationships
-UNet ..> Conv2DDownBlock : may use for down (if !max_pool_down)
-UNet ..> MaxPool2DDownBlock : may use for down (if max_pool_down)
-UNet ..> IdentityBlock : first down stage
-UNet ..> ConvTrans2DUpBlock : upsampling in decoder
-UNet ..> Conv2DNormActBlock : compute blocks (encoder & decoder)
+package "unext" {
+  class ConvNeXtUNet {
+    - encoder: ConvNeXtV2_tiny (features_only)
+    - decoder: Decoder
+    - out_conv: Conv2d(1x1)
+    - _decoder_up_block: "pixelshuffle|convt"
+    - _decoder_compute_block: "convnext|conv2d"
+    - _num_units_cfg
+    +forward(x: Tensor): Tensor
+  }
+}
 
-' Realization (UNet implements the conceptual model)
-UNet ..|> ConceptualModel
+UNet --|> BaseGeneratorModel
+ConvNeXtUNet --|> BaseGeneratorModel
+
+' Ownership/composition on concrete realizations
+UNet *-- Encoder
+UNet *-- Decoder
+UNet o-- "0..1" "in_conv"
+UNet o-- "0..1" "out_conv"
+
+ConvNeXtUNet *-- Decoder
+' ConvNeXtUNet holds a timm ConvNeXtV2_tiny encoder object (features_only)
+ConvNeXtUNet o-- "1" "ConvNeXtV2_tiny encoder"
