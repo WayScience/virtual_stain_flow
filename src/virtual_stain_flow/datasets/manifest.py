@@ -1,5 +1,5 @@
 """
-/datasets/dataset_view.py
+dataset_view.py
 
 Core Dataset Infrastructure for lazy, dynamic image loading from files.
 

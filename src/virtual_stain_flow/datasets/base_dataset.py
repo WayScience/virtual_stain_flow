@@ -1,5 +1,5 @@
 """
-/datasets/base_dataset.py
+base_dataset.py
 
 This file contains the `BaseImageDataset` class, meant to serve as the foundation
 infrastructure for all image datasets. 
