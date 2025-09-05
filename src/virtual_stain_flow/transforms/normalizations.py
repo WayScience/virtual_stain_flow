@@ -36,16 +36,6 @@ class MaxScaleNormalize(LoggableTransform):
             p=p, 
             **kwargs
         )
-
-        if not isinstance(normalization_factor, (int, float)):
-            raise TypeError(
-                "Expected normalization factor to be a number (int or float), "
-                f"got {type(normalization_factor).__name__} instead."
-            )
-        elif normalization_factor <= 0:
-            raise ValueError(
-                "Normalization factor must be greater than zero."
-            )
         
         if isinstance(normalization_factor, int):
             normalization_factor = float(normalization_factor)
@@ -135,7 +125,7 @@ class ZScoreNormalize(LoggableTransform):
     ):
         
         super().__init__(
-            name="ZScoreNormalize",
+            name=name,
             p=p
         )
 
