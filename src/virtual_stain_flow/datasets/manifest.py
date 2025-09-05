@@ -259,11 +259,11 @@ class FileState:
         if sample.ndim == 2:
             # (H, W) -> (C, H, W)
             return np.stack(arrays, axis=0)
-        elif sample.ndim == 3:
+        if sample.ndim == 3:
             # (H, W, K) -> (C, H, W, K)
             return np.stack(arrays, axis=0)
-        else:
-            raise ValueError(f"Unsupported per-channel array ndim={sample.ndim}")
+        
+        raise ValueError(f"Unsupported per-channel array ndim={sample.ndim}")
 
     # ---- public update API ----
     def update(
