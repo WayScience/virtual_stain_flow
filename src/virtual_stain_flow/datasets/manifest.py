@@ -134,12 +134,34 @@ class IndexState:
     last: Optional[int] = None
 
     def reset(self) -> None:
+        """
+        Resets the index state's single attribute.
+        Intended to be called by dataset class when the dataset length
+        is modified (e.g. subsetted).
+        """
         self.last = None
 
     def is_stale(self, idx: Optional[int]) -> bool:
+        """
+        Return True if the provided index is different 
+            from the last recorded index.
+        If idx is None, always return True.
+        If last is None, always return True.
+
+        Useful for the dataset class that keeps track of
+            metadata associated with the last retrieved 
+            images as updatable attributes.
+        """
         return self.last is None or idx is None or self.last != idx
 
     def update(self, idx: int) -> None:
+        """
+        Update the last index if the provided index is stale.
+
+        Intended to be called by dataset class after retrieving
+            images for a given index, to record that the
+            new index state. 
+        """
         if self.is_stale(idx):
             self.last = idx
 
