@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 from virtual_stain_flow.datasets.PatchDataset import PatchDataset
 
 ## Normalization
-from virtual_stain_flow.transforms.MinMaxNormalize import MinMaxNormalize
+from virtual_stain_flow.transforms.normalizations import MaxScaleNormalize
 
 from virtual_stain_flow.models.unet import UNet
 
@@ -69,21 +69,24 @@ TARGET_CHANNEL_NAMES = config['data']['target_channel_keys']
 TARGET_CHANNEL_NAMES = TARGET_CHANNEL_NAMES[0] if isinstance(TARGET_CHANNEL_NAMES, list) else TARGET_CHANNEL_NAMES
 PATCH_SIZE = 256
 
+# the signature of PatchDataset looks ugly with the
+# leading underscores, but we will soon get rid of it
+# with progression in dataset refactoring
 pds = PatchDataset(
-        _loaddata_csv=loaddata_df,
-        _sc_feature=sc_features,
-        _input_channel_keys=INPUT_CHANNEL_NAMES,
-        _target_channel_keys=TARGET_CHANNEL_NAMES,
-        _input_transform=MinMaxNormalize(
-            _normalization_factor=(2 ** 16) - 1, _always_apply=True),
-        _target_transform=MinMaxNormalize(
-            _normalization_factor=(2 ** 16) - 1, _always_apply=True),
-        patch_size=PATCH_SIZE,
-        verbose=False,
-        patch_generation_method="random_cell",
-        n_expected_patches_per_img=50,
-        patch_generation_random_seed=42
-    )
+    _loaddata_csv=loaddata_df,
+    _sc_feature=sc_features,
+    _input_channel_keys=INPUT_CHANNEL_NAMES,
+    _target_channel_keys=TARGET_CHANNEL_NAMES,
+    _input_transform=MaxScaleNormalize(
+        normalization_factor='16bit', p=1),
+    _target_transform=MaxScaleNormalize(
+        normalization_factor='16bit', p=1),
+    patch_size=PATCH_SIZE,
+    verbose=False,
+    patch_generation_method="random_cell",
+    n_expected_patches_per_img=50,
+    patch_generation_random_seed=42
+)
 
 panel_width = 3
 indices = [3, 5, 7]
