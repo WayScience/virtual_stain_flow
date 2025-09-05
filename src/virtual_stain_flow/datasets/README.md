@@ -1,14 +1,15 @@
-# Datasets Module Documentation
+# Datasets Subpackage Documentation
 
-This module provides the foundational infrastructure for managing and loading image datasets in a lazy and efficient manner. 
+This subpackage provides the infrastructure for managing and loading image datasets in a lazy-loaded and efficient manner, and  materialized dataset classes. 
 It is designed to handle datasets with multiple channels and fields of view (FOVs), supporting dynamic image loading and caching to optimize memory usage and access speed.
 
 ## Overview
 
-The module consists of two main components:
+The subpackage consists of three main components:
 
 1. **`DatasetManifest`**: Defines the immutable structure of a dataset, including file paths and image modes.
-2. **`BaseImageDataset`**: A PyTorch-compatible dataset class that uses `DatasetManifest` and `FileState` to manage image loading and caching.
+2. **`FileState`**: Defines the backend memory-efficient lazy loading infranstructure bridging the `DatasetManifest` and the image dataset class. 
+3. **`BaseImageDataset`**: A PyTorch-compatible dataset class that uses `DatasetManifest` and `FileState` to manage image loading and caching.
 
 ---
 
@@ -17,6 +18,10 @@ The module consists of two main components:
 The `DatasetManifest` class is responsible for defining the structure of a dataset. 
 It holds a file index (a `pandas.DataFrame`) where each row corresponds to a sample or FOV, and columns represent channels associated with that sample. 
 It also specifies the image mode to use when reading images.
+
+## `FileState`
+
+The `FileState` class wraps a constructred `DatasetManifest` object and handles the loading of images from filepaths on-demand. The dataset class should call the `FileState.update(idx, input_keys, target_keys)` method to request for the images corresponding to the `idx`th sample and the input/target keys to be loaded, stacked, and accessible from `FileState.input_image_raw` and `FileState.target_image_raw` attributes.  
 
 ---
 
@@ -50,7 +55,7 @@ dataset = BaseImageDataset(
 ```
 ### Serialization for logging
 ```python
-dict = dataset.to_config()
+ds_config = dataset.to_config()
 # or
 dataset.to_json_config('loggable_artifact.json')
 ```
