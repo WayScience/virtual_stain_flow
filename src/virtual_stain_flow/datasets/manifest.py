@@ -130,6 +130,8 @@ class IndexState:
     Intended to be utilized by dataset classes as internal memory
     for last loaded image index to allow for retrieval of relevant
     metadata.
+
+    Has a single attribute `last` for tracking the last index.
     """
     last: Optional[int] = None
 
