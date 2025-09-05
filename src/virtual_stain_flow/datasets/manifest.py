@@ -122,7 +122,6 @@ class DatasetManifest:
             raise ValueError(f"Unsupported image shape {arr.shape} from {path}")
         return arr
 
-## TODO: maybe a better name for these State classes would be Cursor/Tracker?
 @dataclass
 class IndexState:
     """
