@@ -281,14 +281,10 @@ class FileState:
         desired_target_paths = self.manifest.get_paths_for_keys(idx, target_keys)
 
         # Load/reuse inputs
-        input_arrays: List[np.ndarray] = []
-        for p in desired_input_paths:
-            input_arrays.append(self._get_or_load(p))
+        input_arrays = [self._get_or_load(p) for p in desired_input_paths]
 
         # Load/reuse targets
-        target_arrays: List[np.ndarray] = []
-        for p in desired_target_paths:
-            target_arrays.append(self._get_or_load(p))
+        target_arrays = [self._get_or_load(p) for p in desired_target_paths]
 
         # Validate shapes before stacking (safer)
         self._ensure_same_spatial_shape(input_arrays, desired_input_paths)
