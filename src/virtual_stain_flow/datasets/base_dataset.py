@@ -2,7 +2,7 @@
 /datasets/base_dataset.py
 
 This file contains the `BaseImageDataset` class, meant to serve as the foundation
-infranstructure for all image datasets. 
+infrastructure for all image datasets. 
 Uses a `DatasetManifest` and `FileState` backbone.
 """
 
