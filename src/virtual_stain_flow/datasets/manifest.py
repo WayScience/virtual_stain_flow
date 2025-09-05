@@ -240,11 +240,10 @@ class FileState:
     def _ensure_same_spatial_shape(self, arrays: List[np.ndarray], paths: List[Path]) -> None:
         if not arrays:
             return
-        ref_shape = arrays[0].shape[:2]  # H, W from (H,W) or (H,W,K)
         for a, p in zip(arrays, paths):
-            if a.shape[:2] != ref_shape:
+            if a.shape[:2] != arrays[0].shape[:2]:
                 raise ValueError(
-                    f"Spatial shape mismatch: {p} has {a.shape[:2]}, expected {ref_shape}"
+                    f"Spatial shape mismatch: {p} has {a.shape[:2]}, expected {arrays[0].shape[:2]}"
                 )
 
     def _stack_channels(self, arrays: List[np.ndarray]) -> np.ndarray:
