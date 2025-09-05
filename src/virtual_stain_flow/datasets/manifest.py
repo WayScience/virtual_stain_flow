@@ -33,6 +33,17 @@ class DatasetManifest:
     Simply holds a file index containing pathlike where each row corresponds to a
     view/fov/sample and columns corresponds to channels associated with that entry,
     and a PIL image mode to use when reading images.
+
+    The DatasetManifest keeps two attributes defining itself:
+    - file_index: pd.DataFrame
+        Each row corresponds to a view/fov/sample.
+        Each column corresponds to a channel associated with that entry.
+        Each entry is a path-like (str or Path) to an image file.
+        The DataFrame must be non-empty and contain only path-like entries.
+    - pil_image_mode: str
+        The PIL image mode to use when reading images.
+        Must be one of the valid PIL modes (see Image.MODES).
+        Default is "I;16" for 16-bit grayscale images.
     """
     file_index: pd.DataFrame
     pil_image_mode: str = "I;16"
