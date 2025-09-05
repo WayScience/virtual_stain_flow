@@ -213,8 +213,8 @@ class BaseImageDataset(Dataset):
         config = self.to_config()
         
         filepath = Path(filepath)
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
+        with open(filepath, 'w', encoding='utf-8') as json_config_file:
+            json.dump(config, json_config_file, indent=2, ensure_ascii=False)
 
     @classmethod
     def _deserialize_config_core(
