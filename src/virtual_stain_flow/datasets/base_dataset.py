@@ -94,10 +94,11 @@ class BaseImageDataset(Dataset):
         """
         Overridden Dataset `__getitem__` method so class works with torch DataLoader.
         """        
-        input, target = self.get_raw_item(idx)
+        input_image_raw, target_image_raw = self.get_raw_item(idx)
 
-        return torch.from_numpy(input).float(), torch.from_numpy(target).float()
-    
+        return (torch.from_numpy(input_image_raw).float(), 
+                torch.from_numpy(target_image_raw).float())
+
     @property
     def pil_image_mode(self) -> str:
         """
