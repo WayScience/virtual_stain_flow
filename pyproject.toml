@@ -1,0 +1,34 @@
+# pyproject.toml (repo root)
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "virtual_stain_flow"
+version = "0.4.0"
+description = "For developing virtual staining models"
+requires-python = ">=3.9"
+dependencies = [
+  "numpy",
+  "pandas",
+  "scikit-learn",
+  "matplotlib",
+  "seaborn",
+  "opencv-python",
+  "pyarrow",
+  "typing-extensions",
+  "albumentations",
+  "optuna",
+  "timm",
+  "monai",
+  "pytorch-lightning",
+  "torchmetrics",
+  "mlflow",
+  "ipython",
+  "jupyter",
+  "notebook",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["virtual_stain_flow"]
