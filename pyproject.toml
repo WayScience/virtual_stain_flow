@@ -1,4 +1,5 @@
-# pyproject.toml (repo root)
+# pyproject.toml
+
 [build-system]
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -9,13 +10,13 @@ version = "0.4.0"
 description = "For developing virtual staining models"
 requires-python = ">=3.9"
 dependencies = [
+  "pyarrow",
   "numpy",
   "pandas",
-  "scikit-learn",
-  "matplotlib",
   "seaborn",
+  "matplotlib",
+  "scikit-learn",
   "opencv-python",
-  "pyarrow",
   "typing-extensions",
   "albumentations",
   "optuna",
