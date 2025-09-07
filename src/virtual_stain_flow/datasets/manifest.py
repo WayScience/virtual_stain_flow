@@ -58,7 +58,7 @@ class DatasetManifest:
                              f"got {type(self.pil_image_mode)} instead.")
         if self.pil_image_mode not in Image.MODES:
             raise ValueError(f"Invalid pil_image_mode: {self.pil_image_mode}. "
-                             f"Must be one of {Image.MODES.keys()}.")
+                             f"Must be one of {Image.MODES}.")
         
         fi = self.file_index
         arr = fi.to_numpy(dtype=object).ravel()
