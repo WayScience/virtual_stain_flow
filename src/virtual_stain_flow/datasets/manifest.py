@@ -60,12 +60,13 @@ class DatasetManifest:
             raise ValueError(f"Invalid pil_image_mode: {self.pil_image_mode}. "
                              f"Must be one of {Image.MODES}.")
         
-        fi = self.file_index
-        arr = fi.to_numpy(dtype=object).ravel()
-        if not all(isinstance(x, (Path, PurePath, str)) for x in arr):
-                bad = [type(x).__name__ for x in arr \
-                       if not isinstance(x, (Path, PurePath, str))]
-                raise TypeError(f"file_index has non-path-like entries: {set(bad)}")
+        bad_types = set()
+        for _, row in self.file_index.iterrows():
+            for x in row:
+                if not isinstance(x, (Path, PurePath, str)):
+                    bad_types.add(type(x).__name__)
+        if bad_types:
+            raise TypeError(f"file_index has non-path-like entries: {bad_types}")
     
     def __len__(self) -> int:
         """
