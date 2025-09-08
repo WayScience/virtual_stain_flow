@@ -1,5 +1,5 @@
 """
-/transforms/transform_utils.py
+transform_utils.py
 
 This module defines type aliases and runtime type tuples for various image
 transforms used in the virtual_stain_flow package. 

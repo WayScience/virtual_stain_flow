@@ -1,5 +1,5 @@
 """
-/transforms/normalizations.py
+normalizations.py
 
 This module defines normalization transforms for image preprocessing using 
 Albumentations. 

@@ -1,5 +1,5 @@
 """
-/transforms/base_transform.py
+base_transform.py
 
 This module defines a base class for image transforms using Albumentations.
 It provides a serializable transform class for (albumentation based) image
