@@ -153,4 +153,3 @@ This change improves module discoverability, aligns with modern Python packaging
 All package-related code now resides under the `src/virtual_stain_flow/` directory.
 - Updated import paths throughout the codebase to reflect the new structure.
 - Adjusted setup scripts and documentation to accommodate the restructuring.
-
