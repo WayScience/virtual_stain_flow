@@ -8,5 +8,10 @@
   "plantuml.exportFormat": "svg",
   "plantuml.fileExtensions": "puml,iuml,plantuml",
   "plantuml.render": "PlantUMLServer",
-  "plantuml.server": "https://www.plantuml.com/plantuml"
+  "plantuml.server": "https://www.plantuml.com/plantuml",
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }

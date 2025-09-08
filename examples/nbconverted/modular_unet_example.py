@@ -739,4 +739,3 @@ unext = ConvNeXtUNet(
 
 pred = unext(input_tensor)
 print(f"ConvNeXtUNet prediction shape: {pred.shape}")
-

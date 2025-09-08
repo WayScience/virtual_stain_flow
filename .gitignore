@@ -4,3 +4,22 @@ examples/example_train*/*
 
 # pycache
 *.pyc
+
+# --- Python / build artifacts ---
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+.build/
+build/
+dist/
+*.egg
+*.egg-info/
+src/**/*.egg-info/
+
+# --- Test / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
