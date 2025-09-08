@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2025-09-07
+
+### Added
+
+#### Dataset Infrastructure Refactoring (`datasets`)
+- Introduced a comprehensive refactoring of the dataset infrastructure for improved modularity, lazy loading, and memory efficiency.
+
+##### Core Components:
+- **`DatasetManifest`** (`manifest.py`): Immutable manifest class that defines the structure of a dataset, holding a file index DataFrame where each row corresponds to a sample/FOV and columns represent channels. Validates file paths and PIL image modes during initialization.
+- **`IndexState`** (`manifest.py`): Lightweight tracker for maintaining the last accessed dataset index.
+- **`FileState`** (`manifest.py`): Lazy loading backend that manages image loading with configurable LRU caching. 
+- **`BaseImageDataset`** (`base_dataset.py`): PyTorch-compatible dataset class built on the manifest infrastructure. 
+
+### Refactored
+- Restructured dataset loading logic to use the new modular manifest-based architecture.
+- Improved error handling and validation throughout the dataset pipeline.
+- Enhanced type annotations and documentation for better developer experience.
+
+---
+
 ## [0.1.0] - 2025-03-03
 
 ### Added
@@ -133,3 +153,4 @@ This change improves module discoverability, aligns with modern Python packaging
 All package-related code now resides under the `src/virtual_stain_flow/` directory.
 - Updated import paths throughout the codebase to reflect the new structure.
 - Adjusted setup scripts and documentation to accommodate the restructuring.
+
