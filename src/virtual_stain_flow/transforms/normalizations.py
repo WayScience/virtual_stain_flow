@@ -6,7 +6,7 @@ Albumentations.
 
 Classes:
 - MaxScaleNormalize: Max Scale Normalization transform for converting
-  gray-scale images to a [0, 1] range based on a specified normalization factor.
+  gray-scale images based on a specified normalization factor.
 - ZScoreNormalize: Z-Score Normalization transform for normalizing images
   to have a mean of 0 and a standard deviation of 1 per image or with
   pre-specified mean and standard deviation values.
