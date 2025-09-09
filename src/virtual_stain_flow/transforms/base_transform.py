@@ -68,17 +68,41 @@ class LoggableTransform(ABC, ImageOnlyTransform):
             **kwargs
         ) -> dict:
         """
-        Serialize the transform to a dictionary exportable as JSON.
+        Abstract method to be overridden by subclasses.
+        Should return a JSON serializable dictionary that describes the transform
+        configuration, and, more importantly, contain sufficient information for 
+        recreation of the transform instance via the `from_config` class method. 
+        Depending on how the subclass implementation of the `from_config`
+        method is defined, the dictionary may or may not need to serve the purpose of kwargs.
 
         Should create a dictionary with:
         - 'class': The class name of the transform.
         - 'name': The name of the transform.
         - 'params': A dictionary of parameters specific to the transform.
         """
+
+        # Example implementation:
+        # return {
+        #     'class': self.__class__.__name__,
+        #     'name': self._name,
+        #     'params': self.get_params()
+        #     # add more parameters as needed
+        # } 
+
         raise NotImplementedError
 
     @classmethod
     def from_config(cls, config: dict) -> 'LoggableTransform':
+        """
+        Create an instance of the transform from a configuration dictionary.
+        The config dictionary should match the structure defined in the `to_config` method.
+        By default, this method assumes the config dictionary contains:
+        - 'name': The name of the transform.
+        - 'params': A dictionary of parameters specific to the transform.
+
+        Depending on the subclass implementation of the `to_config` method, this method
+        may need to be overridden to correctly instantiate the transform.
+        """
         return cls(
             name=config['name'],
             **config['params']
