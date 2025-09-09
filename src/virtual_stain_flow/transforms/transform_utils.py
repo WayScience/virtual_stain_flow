@@ -5,7 +5,7 @@ This module defines type aliases and runtime type tuples for various image
 transforms used in the virtual_stain_flow package. 
 One type alias checks for albumentations-based transforms that does not 
 integrate natively with the logging system, and needs to be treated differently.
-The other type alias chekcs for loggable transform classes inheriting from
+The other type alias checks for loggable transform classes inheriting from
 LoggableTransform (but still behaves like albumentations transforms).
 
 This module will also house any future transform utilities that should be
