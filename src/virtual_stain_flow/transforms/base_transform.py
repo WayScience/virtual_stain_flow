@@ -43,12 +43,14 @@ class LoggableTransform(ABC, ImageOnlyTransform):
     @abstractmethod
     def apply(self, img: np.ndarray, **params) -> np.ndarray:
         """
-        Apply the transformation to the input image.
+        Abstract method to be overridden by subclasses.
+        Needed for Albumentations transform __call__ method.
+        Apply the transformation to a given numpy array image. 
         
         :param img: Input image as a NumPy array.
         :return: Transformed image as a NumPy array.
         """
-        pass
+        raise NotImplementedError
 
     def __repr__(self) -> str:
         """
