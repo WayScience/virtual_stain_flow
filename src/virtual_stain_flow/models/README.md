@@ -1,0 +1,96 @@
+# `virtual_stain_flow.models`
+
+## Overview
+
+The `models` subpackage defines a modular and extensible framework for building image-to-image translation models. 
+For now most of its functionality is built around enabling a "declarative" style creation of U-Net-like architectures, 
+with a hierarchy of abstractions, including blocks, stages, encoders, decoders.
+
+The subpackage also includes some ready to use image-to-image tranlation models,
+including fully convolutional or maxpooling/bilinear `UNet` and the `ConvNeXt` blocks based `ConvNeXtUNet` with tunable number of compute blocks. 
+
+## Key Components/Building-blocks of the Framework
+
+![UML Diagram](assets/uml/all_models/all_models.svg)
+> Figure 1. The UML diagram describes the aggregation into image-image translation models of the 3 levels of abstractions:
+1. Block: the smallest modular component, performs spatial dimension preserving (computing) or changing (up/down-sampling) operations.
+2. Stage: Collection of up/down sampling Blocks with repetitions compute blocks, manages the channel dimension matching between these blocks. 
+3. Encoder/Decoder Branch: Collection of Stages in sequence. Collects and returns skip-connection outputs if applicable.
+
+Diagram is generated manually.
+
+### Blocks
+Blocks are the smallest units in the framework, responsible for directly processing feature map tensors. They can be categorized into:
+
+1. **Computational Blocks**: Preserve spatial dimensions while potentially altering the number of channels. Inherits directly from `AbstractBlock`.
+
+    Implementations include:
+    - `Conv2DNormActBlock`: A computational block that applies a 2D convolution followed by normalization and activation. 
+    This block is commonly used for feature extraction and transformation while preserving spatial dimensions.   
+    - `Conv2DConvNeXtBlock`: A computational block inspired by the ConvNeXt architecture. 
+    It applies a series of convolutions, normalization, and activation functions designed to enhance feature extraction and representation. 
+    This block is particularly useful for capturing complex patterns in image data while maintaining spatial dimensions.
+
+2. **Spatial Dimension Altering Blocks**: Change spatial dimensions, such as downsampling or upsampling. 
+Inherits from `AbstractUpBlock` or `AbstractDownBlock`.
+
+    Implementations include:
+    - `IdentityBlock`: No-op block for first layer of UNets.
+    - `Conv2DDownBlock`: Down-samples image by a factor of 2. Followed by an optional Normalization layer.
+    - `MaxPool2DDownBlock`: Down-samples image by a factor of 2.
+    - `ConvTrans2DUpBlock`: Up-samples image by a factor of 2. Followed by an optional Normalization layer.
+    - `PixelShuffle2DUpBlock`: Up-samples image by a factor of 2. 
+
+### Stages
+Stages are collections of blocks, defining an ordered sequence of block operations, such as downsampling or upsampling followed by dimension preserving compute operation. 
+
+A `Stage` class accepts a `in_block` handle and a `comp_block` handle, 
+and dynamically creates a sequence of blocks with compatible input/output sizes. 
+Although the `Stage` class does not enforce a specific checks for this,
+it is recommended to initialize a `Stage` class with a **Spatial Dimension Altering** `in_block` and a **Computational** `comp_block`.
+
+The subpackage provides additional Stage classes, that still can be flexibly initialized with custom combination of `in_block` and `comp_block`, and with predefined behavior:
+- `DownStage`: Handles downsampling operations from a input feature map tensor.
+- `UpStage`: Handles upsampling operations with skip connections support,
+processes the input feature map through a upsampling `in_block`, performs concatenation with skip connections if applicable, and finally compute with `comp_block`. 
+
+### Encoder
+The `Encoder` class implements the downsampling path of a U-Net-like architecture. 
+It consists of multiple `DownStage` objects, each reducing the spatial dimensions of the input tensor while capturing hierarchical features.
+
+### Decoder
+The `Decoder` class implements the upsampling path of a U-Net-like architecture. 
+It consists of multiple `UpStage` objects, each increasing the spatial dimensions of the input tensor while incorporating skip connections from the encoder.
+
+### Model
+The `model.py` module provides the foundational classes for defining models within the framework. It includes the following key components:
+
+1. **BaseModel**: 
+    - An abstract base class that all models inherit from.
+    - Provides common functionality such as saving model weights, converting configurations to/from dictionaries, and defining the forward pass.
+    - Enforces implementation of `forward`, `to_config`, and `from_config` methods in subclasses.
+
+2. **BaseGeneratorModel**:
+    - Extends `BaseModel` and serves as a base class for image-to-image translation models.
+    - Includes properties for input/output channels, activation functions, and modular components like `Encoder` and `Decoder`.
+    - Implements a default forward pass that connects the input convolution, encoder, decoder, and output convolution layers.
+
+These classes establish a flexible and extensible structure for building custom models, ensuring consistency and reusability across the framework.
+
+### Model Realizations
+
+1. **UNet**: a pre-defined model class , supporting two architectural variants:
+    1. Fully convolutional U-Net with `Conv2DDownBlock` and `ConvTrans2DUpBlock`.
+    2. More coventional U-Net with `MaxPool2DDownBlock` and `ConvTrans2DUpBlock`.
+2. **ConvNeXtUNet**: A U-Net-like architecture that leverages the ConvNeXtV2_tiny model as its encoder. This model is designed for advanced image-to-image translation tasks and supports a modular decoder with customizable upsampling and computational blocks. 
+    - Utilizes a pre-defined ConvNeXtV2_tiny model from the `timm` library, adapted for hierarchical feature extraction with four stages.
+    - Offers flexibility with two types of upsampling blocks (`PixelShuffle2DUpBlock` and `ConvTrans2DUpBlock`) and two types of computational blocks (`Conv2DConvNeXtBlock` or `Conv2DNormActBlock`).
+
+This model demonstrates the extensibility of the framework by integrating state-of-the-art architectures with the modular design principles of the subpackage.
+
+## Utilities/Handle Type-checking
+Includes utility functions for retrieving normalization layers (`get_norm`), 
+activation functions (`get_activation`), and type checking of block handles and configurations, centralizing shared operations.
+
+## Example Usage
+Refer to the `examples/modular_unet_example.ipynb` notebook for detailed examples of block/stage behavior, model definition. 

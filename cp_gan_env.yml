@@ -1,0 +1,42 @@
+name: cp_gan_env
+channels:
+  - anaconda
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - conda-forge::python=3.9
+  - conda-forge::pip
+  - pytorch::pytorch
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pytorch::pytorch-cuda=12.1
+  - conda-forge::seaborn
+  - conda-forge::matplotlib
+  - conda-forge::jupyter
+  - conda-forge::pre_commit
+  - conda-forge::pandas
+  - conda-forge::pillow
+  - conda-forge::numpy
+  - conda-forge::pathlib2
+  - conda-forge::scikit-learn
+  - conda-forge::opencv
+  - conda-forge::pyarrow
+  - conda-forge::ipython
+  - conda-forge::notebook
+  - conda-forge::albumentations
+  - conda-forge::optuna
+  - conda-forge::mysqlclient
+  - conda-forge::openjdk
+  - conda-forge::gtk2
+  - conda-forge::typing-extensions
+  - conda-forge::Jinja2
+  - conda-forge::inflect
+  - conda-forge::wxpython
+  - conda-forge::sentry-sdk
+  - conda-forge::timm
+  - conda-forge::monai
+  - conda-forge::pytorch-lightning
+  - pip:
+      - mlflow
+      - cellprofiler==4.2.8
