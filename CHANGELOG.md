@@ -5,7 +5,6 @@ All notable chagnes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ---
 
 ## [0.4.0] - 2025-09-07
@@ -28,49 +27,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.0] - 2025-03-03
+## [0.3.0] - 2025-08
 
 ### Added
 
-#### Core Framework
-- Introduced a minimal yet self-contained virtual staining framework structured around modular components for model training, dataset handling, transformations, metrics, and logging.
+#### New modular backbone for `models` subpackage
+##### Major changes:
+- Introduced a new modular and extensible `models` subpackage for building image-to-image translation models. 
+The subpackage is designed around a declarative style for creating U-Net-like architectures, with a hierarchy of abstractions:
+  - **Blocks** (`blocks.py`, `up_down_blocks.py`): Smallest modular units, categorized into computational blocks (e.g., `Conv2DNormActBlock`, `Conv2DConvNeXtBlock`) and spatial dimension altering blocks (e.g., `Conv2DDownBlock`, `PixelShuffle2DUpBlock`).
+  - **Stages** (`stages.py`): Sequences of blocks for downsampling or upsampling, such as `DownStage` and `UpStage`.
+  - **Encoder** (`encoder.py`): Implements the downsampling path of U-Net-like architectures using `DownStage` objects.
+  - **Decoder** (`decoder.py`): Implements the upsampling path with skip connections using `UpStage` objects.
+  - **BaseModel** and **BaseGeneratorModel** (`model.py`): Added abstract base classes for models, including functionality for saving weights, configuration handling, and defining the forward pass.
+  - **UNet** (`unet.py`): Predefined model class supporting fully convolutional and maxpooling-based U-Net variants.
+  - **UNeXt** (`unext.py`): Predefined U-Net variant with a ConvNeXtV2_tiny encoder and customizable decoder.
+- Added utility functions for normalization layers, activation functions, and type checking of block handles and configurations.
+- Refer to the `models` README for detailed explanations of components and usage examples.
 
-#### Models (`models`)
-- Added `FNet`: Fully convolutional encoder-decoder for image-to-image translation.
-- Added `UNet`: U-Net variant using bilinear interpolation for upsampling.
-- Added GaN discriminators:
-  - `PatchBasedDiscriminator`: Outputs a probability map.
-  - `GlobalDiscriminator`: Outputs a global scalar probability.
+### Refactored 
 
-#### Transforms (`transforms`)
-- `MinMaxNormalize`: Albumentations transform for range-based normalization.
-- `ZScoreNormalize`: Albumentations transform for z-score normalization.
-- `PixelDepthTransform`: Converts between image bit depths (e.g., 16-bit to 8-bit).
-
-#### Datasets (`datasets`)
-- `ImageDataset`: Dynamically loads multi-channel microscopy images from a PE2LoadData-formatted CSV; supports input/target channel selection and Albumentations transforms.
-- `PatchDataset`: Extends `ImageDataset` with configurable fixed-size cropping; supports object-centric patching and state retrieval (e.g., patch coordinates).
-- `GenericImageDataset`: A simplified dataset for user-formatted directories using regex-based site/channel parsing.
-- `CachedDataset`: Caches any of the above datasets in RAM to reduce I/O and speed up training.
-
-#### Losses (`losses`)
-- `AbstractLoss`: Base class defining standardized loss interface and trainer binding.
-- `GeneratorLoss`: Combines image reconstruction and adversarial loss for training GaN generators.
-- `WassersteinLoss`: Computes Wasserstein distance for GaN discriminator training.
-- `GradientPenaltyLoss`: Adds gradient penalty to improve discriminator stability.
-
-#### Metrics (`metrics`)
-- `AbstractMetrics`: Base class for accumulating, aggregating, and resetting batch-wise metrics.
-- `MetricsWrapper`: Wraps `torch.nn.Module` metrics with accumulation and aggregation logic.
-- `PSNR`: Computes Peak Signal-to-Noise Ratio (PSNR) for image quality evaluation.
-
-#### Callbacks (`callbacks`)
-- `AbstractCallback`: Base class for trainer-stage hooks (`on_train_start`, `on_epoch_end`, etc.).
-- `IntermediatePlot`: Visualizes model inference during training.
-- `MlflowLogger`: Logs trainer metrics and losses to an MLflow server.
-
-#### Training (`trainers`)
-- `AbstractTrainer`: Defines a modular training loop with support for custom models, datasets, losses, metrics, and callbacks. Exposes extensible hooks for batch and epoch-level logic.
+#### Repository Restructuring
+- Restructured the repository from a flat layout to the conventional `/src/package_name/` structure. 
+This change improves module discoverability, aligns with modern Python packaging standards, and reduces potential import conflicts. 
+All package-related code now resides under the `src/virtual_stain_flow/` directory.
+- Updated import paths throughout the codebase to reflect the new structure.
+- Adjusted setup scripts and documentation to accommodate the restructuring.
 
 ---
 
@@ -127,29 +109,46 @@ plots produced are logged as mlflow artifacts.
 
 ---
 
-## [0.3.0] - 2025-08
+## [0.1.0] - 2025-03-03
 
 ### Added
 
-#### New modular backbone for `models` subpackage
-##### Major changes:
-- Introduced a new modular and extensible `models` subpackage for building image-to-image translation models. 
-The subpackage is designed around a declarative style for creating U-Net-like architectures, with a hierarchy of abstractions:
-  - **Blocks** (`blocks.py`, `up_down_blocks.py`): Smallest modular units, categorized into computational blocks (e.g., `Conv2DNormActBlock`, `Conv2DConvNeXtBlock`) and spatial dimension altering blocks (e.g., `Conv2DDownBlock`, `PixelShuffle2DUpBlock`).
-  - **Stages** (`stages.py`): Sequences of blocks for downsampling or upsampling, such as `DownStage` and `UpStage`.
-  - **Encoder** (`encoder.py`): Implements the downsampling path of U-Net-like architectures using `DownStage` objects.
-  - **Decoder** (`decoder.py`): Implements the upsampling path with skip connections using `UpStage` objects.
-  - **BaseModel** and **BaseGeneratorModel** (`model.py`): Added abstract base classes for models, including functionality for saving weights, configuration handling, and defining the forward pass.
-  - **UNet** (`unet.py`): Predefined model class supporting fully convolutional and maxpooling-based U-Net variants.
-  - **UNeXt** (`unext.py`): Predefined U-Net variant with a ConvNeXtV2_tiny encoder and customizable decoder.
-- Added utility functions for normalization layers, activation functions, and type checking of block handles and configurations.
-- Refer to the `models` README for detailed explanations of components and usage examples.
+#### Core Framework
+- Introduced a minimal yet self-contained virtual staining framework structured around modular components for model training, dataset handling, transformations, metrics, and logging.
 
-### Refactored 
+#### Models (`models`)
+- Added `FNet`: Fully convolutional encoder-decoder for image-to-image translation.
+- Added `UNet`: U-Net variant using bilinear interpolation for upsampling.
+- Added GaN discriminators:
+  - `PatchBasedDiscriminator`: Outputs a probability map.
+  - `GlobalDiscriminator`: Outputs a global scalar probability.
 
-#### Repository Restructuring
-- Restructured the repository from a flat layout to the conventional `/src/package_name/` structure. 
-This change improves module discoverability, aligns with modern Python packaging standards, and reduces potential import conflicts. 
-All package-related code now resides under the `src/virtual_stain_flow/` directory.
-- Updated import paths throughout the codebase to reflect the new structure.
-- Adjusted setup scripts and documentation to accommodate the restructuring.
+#### Transforms (`transforms`)
+- `MinMaxNormalize`: Albumentations transform for range-based normalization.
+- `ZScoreNormalize`: Albumentations transform for z-score normalization.
+- `PixelDepthTransform`: Converts between image bit depths (e.g., 16-bit to 8-bit).
+
+#### Datasets (`datasets`)
+- `ImageDataset`: Dynamically loads multi-channel microscopy images from a PE2LoadData-formatted CSV; supports input/target channel selection and Albumentations transforms.
+- `PatchDataset`: Extends `ImageDataset` with configurable fixed-size cropping; supports object-centric patching and state retrieval (e.g., patch coordinates).
+- `GenericImageDataset`: A simplified dataset for user-formatted directories using regex-based site/channel parsing.
+- `CachedDataset`: Caches any of the above datasets in RAM to reduce I/O and speed up training.
+
+#### Losses (`losses`)
+- `AbstractLoss`: Base class defining standardized loss interface and trainer binding.
+- `GeneratorLoss`: Combines image reconstruction and adversarial loss for training GaN generators.
+- `WassersteinLoss`: Computes Wasserstein distance for GaN discriminator training.
+- `GradientPenaltyLoss`: Adds gradient penalty to improve discriminator stability.
+
+#### Metrics (`metrics`)
+- `AbstractMetrics`: Base class for accumulating, aggregating, and resetting batch-wise metrics.
+- `MetricsWrapper`: Wraps `torch.nn.Module` metrics with accumulation and aggregation logic.
+- `PSNR`: Computes Peak Signal-to-Noise Ratio (PSNR) for image quality evaluation.
+
+#### Callbacks (`callbacks`)
+- `AbstractCallback`: Base class for trainer-stage hooks (`on_train_start`, `on_epoch_end`, etc.).
+- `IntermediatePlot`: Visualizes model inference during training.
+- `MlflowLogger`: Logs trainer metrics and losses to an MLflow server.
+
+#### Training (`trainers`)
+- `AbstractTrainer`: Defines a modular training loop with support for custom models, datasets, losses, metrics, and callbacks. Exposes extensible hooks for batch and epoch-level logic.
