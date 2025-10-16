@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader, random_split
 
 from ..metrics.AbstractMetrics import AbstractMetrics
+from ..vsf_logging import MlflowLogger
 
 
 class AbstractTrainer(ABC):
@@ -184,18 +185,29 @@ class AbstractTrainer(ABC):
         
         pass
 
-    def train(self):
+    def train(self, logger: MlflowLogger):
         """
         Train the model for the specified number of epochs.
         Make calls to the train epoch and evaluate epoch methods.
         """
 
+        if not isinstance(logger, MlflowLogger):
+            raise TypeError(f"Expected logger to be an instance of "
+                            f"MlflowLogger, got {type(logger)}")
+
         self.model.to(self.device)
+        logger.bind_trainer(self)        
+        if hasattr(logger, "on_train_start"):
+            logger.on_train_start()
 
         for epoch in range(self.epochs):
 
             # Increment the epoch counter
             self.epoch += 1
+
+            # Invoke the on_epoch_start method of the logge
+            if hasattr(logger, "on_epoch_start"):
+                logger.on_epoch_start()
 
             # Access all the metrics and reset them
             for _, metric in self.metrics.items():
@@ -205,17 +217,33 @@ class AbstractTrainer(ABC):
             train_loss = self.train_epoch()
             for loss_name, loss in train_loss.items():
                 self._train_losses[loss_name].append(loss)
+                logger.log_metric(
+                    f"train_{loss_name}", loss, epoch
+                )
 
             # Evaluate the model for one epoch
             val_loss = self.evaluate_epoch()
             for loss_name, loss in val_loss.items():
                 self._val_losses[loss_name].append(loss)
+                logger.log_metric(
+                    f"val_{loss_name}", loss, epoch
+                )
 
             # Access all the metrics and compute the final epoch metric value
             for metric_name, metric in self.metrics.items():
                 train_metric, val_metric = metric.compute()
-                self._train_metrics[metric_name].append(train_metric.item())
-                self._val_metrics[metric_name].append(val_metric.item())
+                self._train_metrics[metric_name].append(train_metric)
+                self._val_metrics[metric_name].append(val_metric)
+
+                logger.log_metric(
+                    f"train_{metric_name}", train_metric, epoch
+                )
+                logger.log_metric(
+                    f"val_{metric_name}", val_metric, epoch
+                )
+
+            if hasattr(logger, "on_epoch_end"):
+                logger.on_epoch_end()
 
             # Update early stopping
             if self.update_early_stop_counter():
