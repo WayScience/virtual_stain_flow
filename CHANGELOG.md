@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2025-10-16
+
+### Added
+
+#### Loss Computation Infrastructure 
+- Added `LossGroup` class to abstract out the complexity of computating multiple losses surrounding a single forward pass iteration from the trainer. 
+Itended as prepwork for incorporating more complex wGAN training.
+
+##### Components:
+- **`LossItem`** (`loss_group.py`): Wrapper around a `torch.nn.Module` loss to specify weights and arguments needed for computing. 
+- **`LossGroup`** (`loss_group.py`): Container class organizing all `LossItem`s to be computed during the same forward pass on the same set of context objects. 
+
+---
+
 ## [0.4.0] - 2025-09-07
 
 ### Added
