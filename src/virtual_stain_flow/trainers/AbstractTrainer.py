@@ -49,23 +49,49 @@ class AbstractTrainer(ABC):
             self._device = torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu")
 
+        self._init_data(dataset, **kwargs)
+        self._init_state(early_termination_metric, **kwargs)
+
+    def _init_state(
+        self, 
+        early_termination_metric,        
+        **kwargs
+    ):
+        # Early stopping state
         self._best_model = None
         self._best_loss = float("inf")
         self._early_stop_counter = 0
         self._early_termination_metric = early_termination_metric
         self._early_termination = True if early_termination_metric else False
 
-        # Customize data splits
+        # Epoch state
+        self._epoch = 0
+
+        # Loss and metrics state
+        self._train_losses = defaultdict(list)
+        self._val_losses = defaultdict(list)
+        self._train_metrics = defaultdict(list)
+        self._val_metrics = defaultdict(list)
+
+        return None
+
+    def _init_data(
+        self, 
+        dataset: torch.utils.data.Dataset,
+        **kwargs
+    ):
+        # Obtain data splits from kwargs  
         self._train_ratio = kwargs.get("train", 0.7)
         self._val_ratio = kwargs.get("val", 0.15)
         self._test_ratio = kwargs.get(
-            "test", 1.0 - self._train_ratio - self._val_ratio)
-
+            "test", 1.0 - self._train_ratio - self._val_ratio
+        )
         if not (0 < self._train_ratio + \
                 self._val_ratio + \
                     self._test_ratio <= 1.0):
             raise ValueError("Data split ratios must sum to 1.0 or less.")
-
+        
+        # Create data splits
         train_size = int(self._train_ratio * len(dataset))
         val_size = int(self._val_ratio * len(dataset))
         test_size = len(dataset) - train_size - val_size
@@ -85,14 +111,7 @@ class AbstractTrainer(ABC):
             self._val_dataset, batch_size=self._batch_size, shuffle=False
         )
 
-        # Epoch counter
-        self._epoch = 0
-
-        # Loss and metrics storage
-        self._train_losses = defaultdict(list)
-        self._val_losses = defaultdict(list)
-        self._train_metrics = defaultdict(list)
-        self._val_metrics = defaultdict(list)
+        return None
 
     @abstractmethod
     def train_step(self, inputs: torch.tensor, targets: torch.tensor)->Dict[str, torch.Tensor]:
