@@ -5,11 +5,12 @@ from typing import Dict, Optional, Literal
 import torch
 from torch.utils.data import DataLoader, random_split
 
+from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
 from ..vsf_logging import MlflowLogger
 
 
-class AbstractTrainer(ABC):
+class AbstractTrainer(TrainerProtocol, ABC):
     """
     Abstract trainer class for img2img translation models.
     """
