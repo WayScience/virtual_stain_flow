@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, Optional
+from typing import Dict, Optional, Literal
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -22,6 +22,7 @@ class AbstractTrainer(ABC):
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
         early_termination_metric: str = None,
+        early_termination_mode: Literal['min', 'max'] = "min",
         **kwargs,
     ):
         """
@@ -36,6 +37,7 @@ class AbstractTrainer(ABC):
             early-termination count on the validation dataset. 
             If None, early termination is disabled and the
             training will run for the specified number of epochs.
+        :param early_termination_mode: (optional)
         """
 
         self._batch_size = batch_size
@@ -50,11 +52,13 @@ class AbstractTrainer(ABC):
                 "cuda" if torch.cuda.is_available() else "cpu")
 
         self._init_data(dataset, **kwargs)
-        self._init_state(early_termination_metric, **kwargs)
+        self._init_state(
+            early_termination_metric, early_termination_mode, **kwargs)
 
     def _init_state(
         self, 
-        early_termination_metric,        
+        early_termination_metric,
+        early_termination_mode,
         **kwargs
     ):
         # Early stopping state
@@ -62,6 +66,7 @@ class AbstractTrainer(ABC):
         self._best_loss = float("inf")
         self._early_stop_counter = 0
         self._early_termination_metric = early_termination_metric
+        self._early_termination_mode = early_termination_mode
         self._early_termination = True if early_termination_metric else False
 
         # Epoch state
@@ -252,8 +257,12 @@ class AbstractTrainer(ABC):
         if not self._early_termination and early_term_metric is None:
             self.best_model = self.model.state_dict().copy()
             return False
+        
+        reset_counter = (early_term_metric < self.best_loss) \
+            if self._early_termination_mode == "min" \
+                else (early_term_metric > self.best_loss)
 
-        if early_term_metric < self.best_loss:
+        if reset_counter:
             self.best_loss = early_term_metric
             self.early_stop_counter = 0
             self.best_model = self.model.state_dict().copy()
