@@ -213,45 +213,54 @@ class AbstractTrainer(ABC):
                 self._val_metrics[metric_name].append(val_metric.item())
 
             # Update early stopping
-            if self._early_termination_metric is None:
-                # Do not perform early stopping when no termination metric is specified
-                early_term_metric = None
-            else:
-                # First look for the metric in validation loss
-                if self._early_termination_metric in list(val_loss.keys()):
-                    early_term_metric = val_loss[self._early_termination_metric]
-                # Then look for the metric in validation metrics
-                elif self._early_termination_metric in list(self._val_metrics.keys()):
-                    early_term_metric = self._val_metrics[self._early_termination_metric][-1]
-                else:
-                    raise ValueError("Invalid early termination metric")                                                        
-                
-            self.update_early_stop_counter(early_term_metric)
-
-            # Check if early stopping is needed
-            if self._early_termination and self.early_stop_counter >= self.patience:
-                print(f"Early termination at epoch {epoch + 1} with best validation metric {self._best_loss}")
+            if self.update_early_stop_counter():
+                print(f"Early termination at epoch {epoch + 1} "
+                      f"with best validation metric {self._best_loss}")
                 break
 
-    def update_early_stop_counter(self, val_loss: Optional[torch.Tensor]):
+    def _collect_early_stop_metric(self) -> float:
+        if self._early_termination_metric is None:
+            # Do not perform early stopping when no termination metric is specified
+            early_term_metric = None
+        else:
+            # First look for the metric in validation loss
+            if self._early_termination_metric in list(
+                self._val_losses.keys()):
+                early_term_metric = self._val_losses[
+                    self._early_termination_metric][-1]
+            # Then look for the metric in validation metrics
+            elif self._early_termination_metric in list(
+                self._val_metrics.keys()):
+                early_term_metric = self._val_metrics[
+                    self._early_termination_metric][-1]
+            else:
+                raise ValueError("Invalid early termination metric")
+            
+        return early_term_metric
+
+    def update_early_stop_counter(self) -> bool:
         """
         Method to update the early stopping criterion
 
-        :param val_loss: The loss value on the validation set
-        :type val_loss: torch.Tensor
+        :return: True if early stopping criterion is met, False otherwise.
         """
         
-        # When early termination is disabled, the best model is updated with the current model
-        if not self._early_termination and val_loss is None:
-            self.best_model = self.model.state_dict().copy()
-            return
+        early_term_metric = self._collect_early_stop_metric()
 
-        if val_loss < self.best_loss:
-            self.best_loss = val_loss
+        # When early termination is disabled, 
+        # the best model is updated with the current model
+        if not self._early_termination and early_term_metric is None:
+            self.best_model = self.model.state_dict().copy()
+            return False
+
+        if early_term_metric < self.best_loss:
+            self.best_loss = early_term_metric
             self.early_stop_counter = 0
             self.best_model = self.model.state_dict().copy()
         else:
             self.early_stop_counter += 1
+
+        return self.early_stop_counter >= self.patience
 
     """
     Log property
