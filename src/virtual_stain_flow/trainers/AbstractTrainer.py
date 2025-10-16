@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, random_split
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
 from ..vsf_logging import MlflowLogger
+from ..datasets.data_split import default_random_split
 
 
 class AbstractTrainer(TrainerProtocol, ABC):
@@ -17,7 +18,10 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def __init__(
         self,
-        dataset: torch.utils.data.Dataset,
+        dataset: Optional[torch.utils.data.Dataset] = None,
+        train_loader: Optional[DataLoader] = None,
+        val_loader: Optional[DataLoader] = None,
+        test_loader: Optional[DataLoader] = None,
         batch_size: int = 16,
         epochs: int = 10,
         patience: int = 5,
@@ -28,7 +32,12 @@ class AbstractTrainer(TrainerProtocol, ABC):
         **kwargs,
     ):
         """
-        :param dataset: The dataset to be used for training.
+        :param dataset: (optional) The dataset to be used for training.
+            Either dataset or train_loader, val_loader, test_loader
+            must be provided.
+        :param train_loader: (optional) DataLoader for training data.
+        :param val_loader: (optional) DataLoader for validation data.
+        :param test_loader: (optional) DataLoader for test data.
         :param batch_size: The batch size for training.
         :param epochs: The number of epochs for training.
         :param patience: The number of epochs with no improvement, 
@@ -53,7 +62,8 @@ class AbstractTrainer(TrainerProtocol, ABC):
             self._device = torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu")
 
-        self._init_data(dataset, **kwargs)
+        self._init_data(
+            dataset, train_loader, val_loader, test_loader, **kwargs)
         self._init_state(
             early_termination_metric, early_termination_mode, **kwargs)
 
@@ -84,39 +94,32 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def _init_data(
         self, 
-        dataset: torch.utils.data.Dataset,
+        dataset: Optional[torch.utils.data.Dataset] = None, 
+        train_loader: Optional[DataLoader] = None, 
+        val_loader: Optional[DataLoader] = None, 
+        test_loader: Optional[DataLoader] = None, 
         **kwargs
     ):
-        # Obtain data splits from kwargs  
-        self._train_ratio = kwargs.get("train", 0.7)
-        self._val_ratio = kwargs.get("val", 0.15)
-        self._test_ratio = kwargs.get(
-            "test", 1.0 - self._train_ratio - self._val_ratio
-        )
-        if not (0 < self._train_ratio + \
-                self._val_ratio + \
-                    self._test_ratio <= 1.0):
-            raise ValueError("Data split ratios must sum to 1.0 or less.")
-        
-        # Create data splits
-        train_size = int(self._train_ratio * len(dataset))
-        val_size = int(self._val_ratio * len(dataset))
-        test_size = len(dataset) - train_size - val_size
-        (
-            self._train_dataset, 
-            self._val_dataset, 
-            self._test_dataset
-        ) = random_split(
-            dataset, [train_size, val_size, test_size]
-        )
+        if all(loader is not None for loader in [
+            train_loader, 
+            val_loader, 
+            test_loader
+        ]):
+            self._train_loader = train_loader
+            self._val_loader = val_loader
+            self._test_loader = test_loader
 
-        # Create DataLoaders
-        self._train_loader = DataLoader(
-            self._train_dataset, batch_size=self._batch_size, shuffle=True
-        )
-        self._val_loader = DataLoader(
-            self._val_dataset, batch_size=self._batch_size, shuffle=False
-        )
+        elif dataset is not None:
+            (
+                self._train_loader,
+                self._val_loader,
+                self._test_loader
+            ) = default_random_split(dataset, **kwargs)
+        else:
+            raise ValueError(
+                "Either provide dataset or all of "
+                "train_loader, val_loader, test_loader"
+            )
 
         return None
 
