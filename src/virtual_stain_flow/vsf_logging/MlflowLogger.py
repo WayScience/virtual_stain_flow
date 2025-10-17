@@ -1,21 +1,18 @@
-import os
+"""
+MlflowLogger.py
+"""
+
 import pathlib
 import tempfile
 from typing import Union, Dict, Optional, List, Any
 
 import mlflow
-import torch
 from torch import nn
 
 from ..trainers.trainer_protocol import TrainerProtocol
-# from ..trainers.AbstractTrainer import (
-#     AbstractTrainer)
 from .callbacks.LoggerCallback import (
     AbstractLoggerCallback,
-    log_type,
-    log_artifact_type,
-    log_param_type,
-    log_metric_type
+    log_type
 )
 
 path_type = Union[pathlib.Path, str]
