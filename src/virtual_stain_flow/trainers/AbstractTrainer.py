@@ -1,3 +1,7 @@
+"""
+AbstractTrainer.py
+"""
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Dict, Optional, Literal

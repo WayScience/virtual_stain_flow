@@ -1,3 +1,9 @@
+"""
+data_split.py
+
+Module for dataset splitting, to be called by trainers during initialization.
+"""
+
 from typing import Tuple
 
 from torch.utils.data import Dataset

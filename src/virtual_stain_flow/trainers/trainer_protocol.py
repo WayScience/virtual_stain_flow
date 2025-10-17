@@ -1,3 +1,9 @@
+"""
+trainer_protocol.py
+
+Protocol for defining behavior and needed attributes of a trainer class.
+"""
+
 from typing import Protocol, Dict, runtime_checkable
 
 import torch
