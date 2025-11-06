@@ -1,20 +1,18 @@
-import os
+"""
+MlflowLogger.py
+"""
+
 import pathlib
 import tempfile
 from typing import Union, Dict, Optional, List, Any
 
 import mlflow
-import torch
 from torch import nn
 
-from ..trainers.logging_trainers import (
-    AbstractLoggingTrainer)
+from ..trainers.trainer_protocol import TrainerProtocol
 from .callbacks.LoggerCallback import (
     AbstractLoggerCallback,
-    log_type,
-    log_artifact_type,
-    log_param_type,
-    log_metric_type
+    log_type
 )
 
 path_type = Union[pathlib.Path, str]
@@ -22,11 +20,11 @@ path_type = Union[pathlib.Path, str]
 class MlflowLogger:
     """
     MLflow Logger for logging training runs, metrics, artifacts, and parameters, intended to be
-        used with the AbstractLoggingTrainer subclasses.
+        used with the TrainerProtocol class.
     
     This class is distinct and independent from the `virtual_stain_flow.callback` classes,
         in that it is no longer an optional callback to be supplied during trainer initialization 
-        but a required parameter for the `train` function of the AbstractLoggingTrainer subclasses,
+        but a required parameter for the `train` function of the TrainerProtocol class,
         bound to a single train session.
     
     This class can accept a list of `AbstractLoggerCallback` subclasses so callback products are
@@ -97,7 +95,7 @@ class MlflowLogger:
             "description": description
         }
 
-        self.trainer: Optional[AbstractLoggingTrainer] = None
+        self.trainer: Optional[TrainerProtocol] = None
 
         if isinstance(tags, dict):
             for key, value in tags.items():
