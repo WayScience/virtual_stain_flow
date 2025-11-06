@@ -12,7 +12,9 @@ import torch
 @runtime_checkable
 class TrainerProtocol(Protocol):
     """
-    Protocol for defining a trainer class.
+    Protocol for defining the minimal behavior and attribute of a trainer class.
+    This protocol is useful for type hinting and checking for trainer object
+        in the `vsf_logging` subpackage to avoid circular imports.
     """
 
     _batch_size: int
