@@ -2,7 +2,7 @@
 
 ## Overview
 `virtual_stain_flow` is a framework for the reproducible development and training of image-to-image translation models that enable virtual staining (the prediction of "virtual" stains) from label-free microscopy images.  
-The package provides comprehensive experiment tracking that spans the entire model development workflow, from dataset construction, augmetnation, model customization to training.
+The package provides comprehensive experiment tracking that spans the entire model development workflow, from dataset construction, augmentation, model customization to training.
 
 ---
 
