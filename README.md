@@ -37,6 +37,9 @@ The package provides comprehensive experiment tracking that spans the entire mod
 
 Check out the **[examples/](./examples/)** directory for complete training scripts and tutorials demonstrating various use cases and configurations.
 
+Defining a UNet model generating staining of 3 target channels from 1 input (phase here).
+- Here the `compute_block` is set as the coventional Conv2D > Normalize > ReLU. 
+Alternative compute blocks are avaiable in this package, including the `Conv2DConvNeXtBlock`. 
 ```python
 from virtual_stain_flow.models import UNet, Conv2DNormActBlock
 
@@ -44,9 +47,19 @@ model = UNet(
     input_channels=1,
     output_channels=3,
     comp_block=Conv2DNormActBlock,
+    _num_units=2,
     depth=4
 )
+```
 
+
+Building a dataset tailored to the UNet model specification. 
+- The input channel is configured as `['phase']` which matches the `input_channels=1` of the model specification.
+- Likewise, the target channel is configured as `["dapi", "tubulin", "actin"]` to match the `output_channels=3` model setting.
+- Note these channel keys must exist in the supplied `file_index_df` as a column of image filepaths.
+- Specify the appropriate post-processing to match image bit depth and/or model output activation. 
+By default all models activate output with sigmoid and a maxscale normalization normalizing by max pixel value is used.  
+```python
 from virtual_stain_flow.datasets import BaseImageDataset
 from virtual_stain_flow.transforms import MaxScaleNormalize
 
