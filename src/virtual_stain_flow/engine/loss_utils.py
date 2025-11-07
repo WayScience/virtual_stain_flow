@@ -8,7 +8,7 @@ from typing import Union, Dict
 
 import torch
 
-from .AbstractLoss import AbstractLoss
+from ..losses.AbstractLoss import AbstractLoss
 
 
 def _get_loss_name(
@@ -47,4 +47,13 @@ def _scalar_from_ctx(
         of the same dtype as a given context object (dictionary of tensors)
     """
     t = next(iter(ctx.values()))
+    if isinstance(t, torch.Tensor):
+        pass
+    elif isinstance(t, torch.nn.Module):
+        t = next(t.parameters())
+    else:
+        raise TypeError(
+            f"Unsupported context value type: {type(t)}"
+        )
+    
     return _scalar_from_device(value, t.device, t.dtype)

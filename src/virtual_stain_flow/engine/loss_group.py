@@ -18,8 +18,9 @@ from typing import Optional, Union, Tuple, Dict, Sequence, List
 
 import torch
 
-from .AbstractLoss import AbstractLoss
-from .loss_utils import _get_loss_name, _scalar_from_ctx
+from .loss_utils import AbstractLoss, _get_loss_name, _scalar_from_ctx
+from .context import Context
+from .names import PREDS, TARGETS
 
 
 @dataclass
@@ -45,7 +46,7 @@ class LossItem:
     )
     """
     module: Union[torch.nn.Module, AbstractLoss]
-    args: Union[str, Tuple[str, ...]] = ("pred", "target")
+    args: Union[str, Tuple[str, ...]] = (PREDS, TARGETS)
     key: Optional[str] = None
     weight: float = 1.0
     enabled: bool = True
@@ -68,6 +69,7 @@ class LossItem:
     def __call__(
         self,
         train: bool,
+        context: Optional[Context] = None,
         **inputs: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -76,10 +78,15 @@ class LossItem:
         skipped during validation.
 
         :param train: Whether the model is in training mode.
+        :param context: Optional Context object containing tensors.
         :param inputs: Keyword arguments containing all necessary inputs for the
             loss computation.
         :return: A tuple containing the raw loss and the weighted loss.
         """
+
+        if context is not None:
+            context.require(self.args)
+            inputs = {arg: context[arg] for arg in self.args}
         
         if not self.enabled or (not train and not self.compute_at_val):
             zero = _scalar_from_ctx(0.0, inputs)
@@ -115,23 +122,26 @@ class LossGroup:
     def __call__(
         self,
         train: bool,
+        context: Optional[Context] = None,
         **inputs: torch.Tensor
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """
         Compute the total loss and individual loss values.
 
         :param train: Whether the model is in training mode.
+        :param context: Optional Context object containing tensors.
         :input inputs: Keyword arguments containing all necessary inputs for the
             loss computations.
         :return: A tuple containing the total loss and a dictionary of 
             individual loss values.
         """
-        total = _scalar_from_ctx(0.0, inputs)
+
+        total = _scalar_from_ctx(0.0, context if context else inputs)
 
         logs: Dict[str, float] = {}
 
         for item in self.items:
-            raw, weighted = item(train, **inputs)
+            raw, weighted = item(train, context=context, **inputs)
             logs[item.key] = raw.item()
             total += weighted
         
