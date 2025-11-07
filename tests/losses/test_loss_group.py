@@ -2,7 +2,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from virtual_stain_flow.losses.loss_group import LossItem, LossGroup
+from virtual_stain_flow.engine.loss_group import LossItem, LossGroup
 
 
 class SimpleLoss(nn.Module):
