@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from virtual_stain_flow.engine.context import Context, ReservedKeyTypeError
-from virtual_stain_flow.engine.names import INPUTS, TARGETS, PREDS
+from virtual_stain_flow.engine.names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL
 
 
 class TestContextBasics:
@@ -56,6 +56,19 @@ class TestContextBasics:
             ctx = Context()
             ctx.add(**{key: value})
 
+    def test_context_generator_model_addition(self, simple_conv_model):
+        """Test adding generator model with reserved key."""
+        ctx = Context()
+        ctx.add(generator=simple_conv_model)
+        assert isinstance(ctx[GENERATOR_MODEL], nn.Module)
+        assert ctx[GENERATOR_MODEL] is simple_conv_model
+
+    def test_context_reserved_model_key_type_error(self):
+        """Test that reserved model keys must be torch.nn.Module."""
+        with pytest.raises(ReservedKeyTypeError, match="Reserved key 'generator' must be a torch.nn.Module"):
+            ctx = Context()
+            ctx.add(generator="not a module")
+
 
 class TestContextRequire:
     """Test Context.require() functionality."""
@@ -104,3 +117,84 @@ class TestContextAsMetricArgs:
         preds, targets = ctx.as_metric_args()
         assert torch.equal(preds, random_input)
         assert torch.equal(targets, random_target)
+
+
+class TestContextDictBehavior:
+    """Test dict-like behavior methods of Context."""
+
+    def test_repr_empty(self):
+        """Test __repr__ for empty context."""
+        ctx = Context()
+        assert repr(ctx) == "Context()"
+
+    def test_repr_with_tensor(self, random_input):
+        """Test __repr__ with tensor."""
+        ctx = Context(inputs=random_input)
+        repr_str = repr(ctx)
+        assert "Context(" in repr_str
+        assert "inputs" in repr_str
+        assert "torch.float" in repr_str or "torch.float32" in repr_str
+
+    def test_repr_with_module(self, simple_conv_model):
+        """Test __repr__ with module."""
+        ctx = Context(generator=simple_conv_model)
+        repr_str = repr(ctx)
+        assert "Context(" in repr_str
+        assert "generator" in repr_str
+        assert "Conv2d" in repr_str
+
+    def test_getitem(self, random_input):
+        """Test __getitem__ retrieves stored values."""
+        ctx = Context(inputs=random_input)
+        assert torch.equal(ctx[INPUTS], random_input)
+
+    def test_getitem_missing_key(self):
+        """Test __getitem__ raises KeyError for missing key."""
+        ctx = Context()
+        with pytest.raises(KeyError):
+            ctx["nonexistent"]
+
+    def test_iter(self, random_input, random_target):
+        """Test __iter__ returns keys."""
+        ctx = Context(inputs=random_input, targets=random_target)
+        keys = list(iter(ctx))
+        assert INPUTS in keys
+        assert TARGETS in keys
+        assert len(keys) == 2
+
+    def test_len_empty(self):
+        """Test __len__ on empty context."""
+        ctx = Context()
+        assert len(ctx) == 0
+
+    def test_len_with_items(self, random_input, random_target):
+        """Test __len__ with items."""
+        ctx = Context(inputs=random_input, targets=random_target)
+        assert len(ctx) == 2
+
+    def test_values(self, random_input, random_target):
+        """Test values() method."""
+        ctx = Context(inputs=random_input, targets=random_target)
+        values_list = list(ctx.values())
+        assert len(values_list) == 2
+        assert any(torch.equal(v, random_input) for v in values_list if isinstance(v, torch.Tensor))
+        assert any(torch.equal(v, random_target) for v in values_list if isinstance(v, torch.Tensor))
+
+    def test_items(self, random_input, random_target):
+        """Test items() method."""
+        ctx = Context(inputs=random_input, targets=random_target)
+        items_list = list(ctx.items())
+        assert len(items_list) == 2
+        items_dict = dict(items_list)
+        assert INPUTS in items_dict
+        assert TARGETS in items_dict
+        assert torch.equal(items_dict[INPUTS], random_input)
+        assert torch.equal(items_dict[TARGETS], random_target)
+
+    def test_keys(self, random_input, random_target):
+        """Test keys() method."""
+        ctx = Context(inputs=random_input, targets=random_target)
+        keys_list = list(ctx.keys())
+        assert len(keys_list) == 2
+        assert INPUTS in keys_list
+        assert TARGETS in keys_list
