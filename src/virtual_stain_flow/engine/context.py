@@ -102,7 +102,8 @@ class Context:
             elif isinstance(v, torch.nn.Module):
                 lines.insert(0, f"  {key}: nn.{v.__class__.__name__}")
             else:
-                lines.append(f"  {key}: {type(v).__name__}")
+                pass # should not happen due to type checks in add()
+
         return "Context(\n" + "\n".join(lines) + "\n)"
     
     # --- Methods for dict like behavior of context class ---
