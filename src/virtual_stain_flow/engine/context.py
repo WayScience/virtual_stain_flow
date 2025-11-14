@@ -108,6 +108,12 @@ class Context:
     
     # --- Methods for dict like behavior of context class ---
     
+    def __setitem__(self, key: str, value: ContextValue) -> None:
+        self._store[key] = value
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._store
+
     def __getitem__(self, key: str) -> ContextValue:
         return self._store[key]
     
@@ -117,6 +123,9 @@ class Context:
     def __len__(self):
         return len(self._store)
     
+    def get(self, key: str, default: ContextValue = None) -> ContextValue:
+        return self._store.get(key, default)
+
     def values(self):
         return self._store.values()
 

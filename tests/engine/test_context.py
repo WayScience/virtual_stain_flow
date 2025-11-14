@@ -198,3 +198,48 @@ class TestContextDictBehavior:
         assert len(keys_list) == 2
         assert INPUTS in keys_list
         assert TARGETS in keys_list
+
+    def test_setitem(self, random_input):
+        """Test __setitem__ to add/update values."""
+        ctx = Context()
+        ctx[INPUTS] = random_input
+        assert torch.equal(ctx[INPUTS], random_input)
+        assert len(ctx) == 1
+
+    def test_setitem_override(self, random_input, random_target):
+        """Test __setitem__ overrides existing value."""
+        ctx = Context(inputs=random_input)
+        ctx[INPUTS] = random_target
+        assert torch.equal(ctx[INPUTS], random_target)
+        assert not torch.equal(ctx[INPUTS], random_input)
+
+    def test_contains_present_key(self, random_input):
+        """Test __contains__ for present key."""
+        ctx = Context(inputs=random_input)
+        assert INPUTS in ctx
+        assert "inputs" in ctx
+
+    def test_contains_missing_key(self):
+        """Test __contains__ for missing key."""
+        ctx = Context()
+        assert INPUTS not in ctx
+        assert "nonexistent" not in ctx
+
+    def test_get_existing_key(self, random_input):
+        """Test get() with existing key."""
+        ctx = Context(inputs=random_input)
+        retrieved = ctx.get(INPUTS)
+        assert torch.equal(retrieved, random_input)
+
+    def test_get_missing_key_default_none(self):
+        """Test get() with missing key returns None by default."""
+        ctx = Context()
+        result = ctx.get("nonexistent")
+        assert result is None
+
+    def test_get_missing_key_custom_default(self, random_input):
+        """Test get() with missing key returns custom default."""
+        ctx = Context()
+        default_value = "default"
+        result = ctx.get("nonexistent", default_value)
+        assert result == default_value
