@@ -4,9 +4,60 @@ import pytest
 import torch
 
 from virtual_stain_flow.engine.forward_groups import (
+    AbstractForwardGroup,
     GeneratorForwardGroup
 )
 from virtual_stain_flow.engine.names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL
+
+
+class TestNormalizeOutputs:
+    """Test _normalize_outputs static method."""
+
+    def test_normalize_single_tensor(self):
+        """Test normalization of single tensor output."""
+        tensor = torch.randn(2, 3, 8, 8)
+        result = AbstractForwardGroup._normalize_outputs(tensor)
+        assert isinstance(result, tuple)
+        assert len(result) == 1
+        assert torch.equal(result[0], tensor)
+
+    def test_normalize_tuple_of_tensors(self):
+        """Test normalization of tuple output."""
+        tensor1 = torch.randn(2, 3, 8, 8)
+        tensor2 = torch.randn(2, 3, 8, 8)
+        inputs = (tensor1, tensor2)
+        result = AbstractForwardGroup._normalize_outputs(inputs)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert torch.equal(result[0], tensor1)
+        assert torch.equal(result[1], tensor2)
+
+    def test_normalize_list_of_tensors(self):
+        """Test normalization of list output."""
+        tensor1 = torch.randn(2, 3, 8, 8)
+        tensor2 = torch.randn(2, 3, 8, 8)
+        inputs = [tensor1, tensor2]
+        result = AbstractForwardGroup._normalize_outputs(inputs)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert torch.equal(result[0], tensor1)
+        assert torch.equal(result[1], tensor2)
+
+    def test_normalize_dict_of_tensors(self):
+        """Test normalization of dict output (preserves insertion order)."""
+        tensor1 = torch.randn(2, 3, 8, 8)
+        tensor2 = torch.randn(2, 3, 8, 8)
+        inputs = {"first": tensor1, "second": tensor2}
+        result = AbstractForwardGroup._normalize_outputs(inputs)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert torch.equal(result[0], tensor1)
+        assert torch.equal(result[1], tensor2)
+
+    def test_normalize_unsupported_type(self):
+        """Test that unsupported types raise TypeError."""
+        with pytest.raises(TypeError, match="Unsupported model output type"):
+            AbstractForwardGroup._normalize_outputs("string")
 
 
 class TestGeneratorForwardGroup:
@@ -67,3 +118,13 @@ class TestGeneratorForwardGroup:
         
         with pytest.raises(ValueError, match="Missing required inputs.*targets"):
             forward_group(train=False, inputs=random_input)
+
+    def test_forward_output_arity_mismatch(self, multi_output_model, random_input, random_target):
+        """Test that forward raises error when model output count doesn't match expected."""
+        forward_group = GeneratorForwardGroup(
+            device=torch.device("cpu"),
+            generator=multi_output_model
+        )
+        
+        with pytest.raises(ValueError, match="Model returned 2 outputs.*output_keys expects 1"):
+            forward_group(train=False, inputs=random_input, targets=random_target)

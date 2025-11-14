@@ -46,3 +46,27 @@ def available_devices():
 def has_cuda():
     """Check if CUDA is available."""
     return torch.cuda.is_available()
+
+
+@pytest.fixture
+def multi_output_model():
+    """
+    Model that returns multiple outputs.
+    Input: (B, 3, H, W) -> Output: ((B, 3, H, W), (B, 3, H, W))
+    """
+    class MultiOutputConv(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(
+                in_channels=3,
+                out_channels=3,
+                kernel_size=3,
+                padding=1,
+                bias=True
+            )
+        
+        def forward(self, x):
+            out = self.conv(x)
+            return (out, out)  # Return tuple of 2 outputs
+    
+    return MultiOutputConv()
