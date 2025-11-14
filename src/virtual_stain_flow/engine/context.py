@@ -37,8 +37,7 @@ class Context:
 
         """
         self._store: Dict[str, ContextValue] = {}
-        for k, v in items.items():
-            self._store[k] = v
+        self.add(**items)
         
     def add(self, **items: ContextValue) -> "Context":
         """
