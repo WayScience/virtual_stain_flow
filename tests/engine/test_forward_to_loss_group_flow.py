@@ -79,7 +79,7 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
             ), "Gradients should be non-zero after backward pass"
 
         # Step optimizer
-        forward_group.optimizer[GENERATOR_MODEL].step()
+        forward_group.step()
 
         # Check that parameters have changed after optimizer step
         for initial_param, current_param in zip(
@@ -137,7 +137,7 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
         ]
         assert len(first_grad_norms) > 0
 
-        forward_group.optimizer[GENERATOR_MODEL].step()
+        forward_group.step()
 
         # Second iteration: the forward_group should zero_grad in its __call__
         # This tests that the optimizer is properly managed
@@ -171,7 +171,7 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
 
             total_loss, logs = l1_loss_group(train=True, context=ctx)
             total_loss.backward()
-            forward_group.optimizer[GENERATOR_MODEL].step()
+            forward_group.step()
 
         # After multiple steps, loss should have decreased or changed
         # (not necessarily strictly decreasing due to random initialization)

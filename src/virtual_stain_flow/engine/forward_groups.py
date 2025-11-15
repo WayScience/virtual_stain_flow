@@ -103,6 +103,14 @@ class AbstractForwardGroup(ABC):
         """
         pass
 
+    def step(self):
+        """
+        Convenience function to step all optimizers in the group.
+        """
+        for opt in self.optimizer.values():
+            if opt is not None:
+                opt.step()
+
 
 class GeneratorForwardGroup(AbstractForwardGroup):
     """
