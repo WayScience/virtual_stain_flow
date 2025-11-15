@@ -111,7 +111,9 @@ class GeneratorForwardGroup(AbstractForwardGroup):
         Executes the forward pass, managing training/eval modes and optimizer steps.
         Subclasses may override this method if needed.
 
-        :param train: Whether to run in training mode.
+        :param train: Whether to run in training mode. Meant to be specified
+            by the trainer to switch between train/eval modes and determine
+            whether gradients should be computed.
         :param inputs: Keyword arguments of input tensors.
         """
         
@@ -124,12 +126,9 @@ class GeneratorForwardGroup(AbstractForwardGroup):
         ctx.require(self.target_keys)
 
         # 2) Train/Eval switches
-        if train:
-            fp_model.train()
-            if fp_optimizer is not None:
-                fp_optimizer.zero_grad(set_to_none=True)
-        else:
-            fp_model.eval()
+        fp_model.train(mode=train)
+        # short circuit here to only zero grad if training and optimizer exists
+        train and fp_optimizer is not None and fp_optimizer.zero_grad(set_to_none=True)
 
         # 3) Forward
         with torch.set_grad_enabled(train):
