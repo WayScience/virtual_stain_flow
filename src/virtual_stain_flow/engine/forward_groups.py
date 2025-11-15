@@ -125,18 +125,15 @@ class GeneratorForwardGroup(AbstractForwardGroup):
         ctx.require(self.input_keys)
         ctx.require(self.target_keys)
 
-        # 2) Train/Eval switches
+        # 2) Forward, with grad only when training
         fp_model.train(mode=train)
-        # short circuit here to only zero grad if training and optimizer exists
         train and fp_optimizer is not None and fp_optimizer.zero_grad(set_to_none=True)
-
-        # 3) Forward
         with torch.set_grad_enabled(train):
             model_inputs = [ctx[k] for k in self.input_keys]  # ordered
             raw = fp_model(*model_inputs)
             y_tuple = self._normalize_outputs(raw)
 
-        # 4) Arity check + map outputs to names
+        # 3) Arity check + map outputs to names
         if len(y_tuple) != len(self.output_keys):
             raise ValueError(
                 f"Model returned {len(y_tuple)} outputs, "
