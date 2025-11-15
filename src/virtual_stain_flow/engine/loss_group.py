@@ -2,15 +2,23 @@
 loss_group.py
 
 LossGroup and LossItem classes for managing related loss computations.
+
 This abstraction is motivated by the complexity of managing computation
     of losses from separate forward passes during the same training step,
     which happens in wGAN training. 
-Also seconds as a way to centralize device management and loss weight control.
+
+Also serves as a way to centralize device management and loss weight control.
+
 The intended use of this module is by trainer classes, which should initialize
     LossItem and LossGroup objects as part of their setup, and then generate
     a dictionary of tensors containing all results of a forward pass and then
     call the LossGroup object directly to arrive at the total loss, and simpify
     the trainer logic substantially.
+
+Note that this module is only responsible for loss computation and 
+    weighted accumulation. Requires properly orchestrated forward passes
+    and context management upstream by the forward_group module and
+    trainer classes. See docstrings in those modules for details.
 """
 
 from dataclasses import dataclass

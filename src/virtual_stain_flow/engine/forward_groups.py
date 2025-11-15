@@ -2,6 +2,32 @@
 forward_groups.py
 
 ForwardGroup protocol and implementations for different model architectures.
+
+ForwardGroups are meant to abstract away the details of model forward passes
+    during training and evaluation and the resulting output, 
+    to enable cleaner trainer implementations and reduce complexity
+    when multiple models are involved and need to be updated in different
+    steps/at different rates.
+
+Note that forward group is only responsible for the management
+    of model and optimizer states during training/eval. 
+    The actual backpropagation and optimizer step is handled
+    by the LossGroup class which will be invoked downstream of
+    forward group calls by the trainer. 
+
+    e.g. the trainer will do 
+
+    # sets proper modes and ensures optimizer zeroing
+    ctx = forward_group(train=True, **batch)
+
+    # computes weighted losses from context and 
+    # accumulate
+    total_loss, logs = loss_group(ctx, train=True)
+    
+    # trainer finally performs backprop + optimizer step
+    total_loss.backward()
+    forward_group.optimizer['generator'].step()
+
 """
 
 from abc import ABC, abstractmethod
