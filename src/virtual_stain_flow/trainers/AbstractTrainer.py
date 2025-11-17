@@ -2,10 +2,12 @@
 AbstractTrainer.py
 """
 
+import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, Optional, Literal
+from typing import Dict, Optional, Literal, List, Union
 
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, random_split
 
@@ -22,13 +24,13 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def __init__(
         self,
+        model: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
         dataset: Optional[torch.utils.data.Dataset] = None,
         train_loader: Optional[DataLoader] = None,
         val_loader: Optional[DataLoader] = None,
         test_loader: Optional[DataLoader] = None,
         batch_size: int = 16,
-        epochs: int = 10,
-        patience: int = 5,
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
         early_termination_metric: str = None,
@@ -36,6 +38,12 @@ class AbstractTrainer(TrainerProtocol, ABC):
         **kwargs,
     ):
         """
+        Initialize the trainer with the model, optimizer, dataset/loaders,
+
+        :param model: The model to be trained. Should be supplied by subclasses
+            to facilitate logging and checkpointing.
+        :param optimizer: The optimizer to be used for training.
+            to facilitate logging and checkpointing.
         :param dataset: (optional) The dataset to be used for training.
             Either dataset or train_loader, val_loader, test_loader
             must be provided.
@@ -43,9 +51,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
         :param val_loader: (optional) DataLoader for validation data.
         :param test_loader: (optional) DataLoader for test data.
         :param batch_size: The batch size for training.
-        :param epochs: The number of epochs for training.
-        :param patience: The number of epochs with no improvement, 
-            after which training will be stopped.
         :param metrics: Dictionary of metrics to be logged.
         :param device: (optional) The device to be used for training.
         :param early_termination_metric: (optional) The metric to update 
@@ -55,9 +60,10 @@ class AbstractTrainer(TrainerProtocol, ABC):
         :param early_termination_mode: (optional)
         """
 
+        self._model = model
+        self._optimizer = optimizer
+
         self._batch_size = batch_size
-        self._epochs = epochs
-        self._patience = patience
         self._metrics = metrics if metrics else {}
 
         if isinstance(device, torch.device):
@@ -104,14 +110,11 @@ class AbstractTrainer(TrainerProtocol, ABC):
         test_loader: Optional[DataLoader] = None, 
         **kwargs
     ):
-        if all(loader is not None for loader in [
-            train_loader, 
-            val_loader, 
-            test_loader
-        ]):
+        if train_loader is not None:
+
             self._train_loader = train_loader
-            self._val_loader = val_loader
-            self._test_loader = test_loader
+            self._val_loader = val_loader if val_loader else []
+            self._test_loader = test_loader if test_loader else []
 
         elif dataset is not None:
             (
@@ -119,10 +122,11 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 self._val_loader,
                 self._test_loader
             ) = default_random_split(dataset, **kwargs)
+            
         else:
             raise ValueError(
-                "Either provide dataset or all of "
-                "train_loader, val_loader, test_loader"
+                "Either provide dataset and specify datasplit parameters, "
+                "or provide at least train_loader."
             )
 
         return None
@@ -193,22 +197,39 @@ class AbstractTrainer(TrainerProtocol, ABC):
         
         pass
 
-    def train(self, logger: MlflowLogger):
+    def train(
+        self, 
+        logger: MlflowLogger, 
+        epochs: int, 
+        patience: Optional[int] = None,
+        verbose: bool = True
+    ):
         """
         Train the model for the specified number of epochs.
         Make calls to the train epoch and evaluate epoch methods.
+
+        :param logger: The logger to be used for logging.
+        :param epochs: The number of epochs to train the model.
+        :param patience: The number of epochs with no improvement,
+            after which training will be stopped. If None, early stopping is disabled.
+        :param verbose: Whether to display the training progress bar
         """
 
         if not isinstance(logger, MlflowLogger):
             raise TypeError(f"Expected logger to be an instance of "
                             f"MlflowLogger, got {type(logger)}")
 
-        self.model.to(self.device)
         logger.bind_trainer(self)        
         if hasattr(logger, "on_train_start"):
             logger.on_train_start()
 
-        for epoch in range(self.epochs):
+        self._epochs = epochs
+        self._patience = patience if patience else epochs # no early stopping
+        self._epoch_pbar: Optional[tqdm] = tqdm(
+            range(epochs), desc="Training", unit="epoch") if verbose else None
+        iterable = self._epoch_pbar if self._epoch_pbar else range(epochs)
+
+        for epoch in iterable:
 
             # Increment the epoch counter
             self.epoch += 1
@@ -259,6 +280,9 @@ class AbstractTrainer(TrainerProtocol, ABC):
                       f"with best validation metric {self._best_loss}")
                 break
 
+        if hasattr(logger, "on_train_end"):
+            logger.on_train_end()
+
     def _collect_early_stop_metric(self) -> float:
         if self._early_termination_metric is None:
             # Do not perform early stopping when no termination metric is specified
@@ -306,6 +330,32 @@ class AbstractTrainer(TrainerProtocol, ABC):
             self.early_stop_counter += 1
 
         return self.early_stop_counter >= self.patience
+    
+    def _update_epoch_progress(
+        self,
+        batch_idx: int,
+        num_batches: int,
+        phase: Literal['Train', 'Val'] = 'Train'
+    ) -> None:
+        """
+        Helper for richer progress bar updates during epoch.
+        """
+        if self._epoch_pbar is None:
+            return
+        self._epoch_pbar.set_postfix_str(
+            f"{phase} Batch {batch_idx + 1}/{num_batches}"
+        )
+
+    @abstractmethod
+    def save_model(
+        self,
+        save_path: pathlib.Path,
+        file_name_prefix: Optional[str] = None,
+        file_name_suffix: Optional[str] = None,
+        file_ext: str = '.pth',
+        best_model: bool = True
+    ) -> Optional[List[pathlib.Path]]:
+        pass
 
     """
     Log property
