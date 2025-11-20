@@ -100,8 +100,7 @@ class CropIndexState:
     """
     crop_collection: CropManifest
     last_crop_idx: Optional[int] = None
-    last_manifest_idx: Optional[int] = None
-    last_crop_bounds: Optional[Tuple[int, int, int, int]] = None  # (x, y, w, h)
+    _last_crop: Optional[Crop] = None
     
     def is_stale(self, crop_idx: int) -> bool:
         """
@@ -121,11 +120,8 @@ class CropIndexState:
         :raises IndexError: If crop_idx is out of range.
         """
         crop = self.crop_collection.get_crop(crop_idx)
-        
-        if self.is_stale(crop_idx):
-            self.last_crop_idx = crop_idx
-            self.last_manifest_idx = crop.manifest_idx
-            self.last_crop_bounds = (crop.x, crop.y, crop.width, crop.height)
+        self.last_crop_idx = crop_idx
+        self._last_crop = crop
         
         return crop
     
@@ -134,8 +130,7 @@ class CropIndexState:
         Clear all state
         """
         self.last_crop_idx = None
-        self.last_manifest_idx = None
-        self.last_crop_bounds = None
+        self._last_crop = None
 
 
 class CropFileState:
@@ -217,6 +212,15 @@ class CropFileState:
             )
 
         return image[:, y:y + h, x:x + w]
+    
+    @property
+    def crop_info(self) -> Optional[Crop]:
+        """
+        Provides public access of the last crop information as the Crop dataclass.
+        Intended to be wrapped by dataset implementation to retrieve
+            crop details following each data access.
+        """
+        return self.crop_state._last_crop
     
     def reset(self) -> None:
         """Clear all state and caches."""
