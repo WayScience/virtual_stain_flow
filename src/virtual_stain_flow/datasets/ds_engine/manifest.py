@@ -19,7 +19,7 @@ Classes:
 from __future__ import annotations
 from pathlib import Path, PurePath
 from collections import OrderedDict
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Dict, Any
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -123,6 +123,22 @@ class DatasetManifest:
         if arr.ndim not in (2, 3):
             raise ValueError(f"Unsupported image shape {arr.shape} from {path}")
         return arr
+    
+    def to_config(self) -> Dict[str, Any]:
+        """Serialize to dict"""
+        return { # the file_index is automatically serializable by definition
+            'file_index': self.file_index.to_dict(orient='records'),
+            'pil_image_mode': self.pil_image_mode,
+        }
+    
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> DatasetManifest:
+        """Deserialize from config dict."""
+        return cls(
+            file_index=pd.DataFrame(config['file_index']),
+            pil_image_mode=config.get('pil_image_mode', 'I;16')
+        )
+
 
 @dataclass
 class IndexState:
@@ -298,3 +314,24 @@ class FileState:
         # Record the realized order
         self.input_paths = desired_input_paths
         self.target_paths = desired_target_paths
+
+    def to_config(self) -> Dict[str, Any]:
+        """
+        Serialize to dict
+        Responsible for also serializing the underlying manifest.
+        """
+        return {
+            'manifest': self.manifest.to_config(),
+            'cache_capacity': self.cache_capacity
+        }
+    
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> FileState:
+        """
+        Deserialize from config dict.
+        Responsible for also deserializing the underlying manifest.
+        """
+        return cls(
+            manifest=DatasetManifest.from_config(config['manifest']),
+            cache_capacity=config.get('cache_capacity', None)
+        )

@@ -22,17 +22,20 @@ class BaseImageDataset(Dataset):
     
     def __init__(
         self,
-        file_index: pd.DataFrame,
+        *,
+        file_index: Optional[pd.DataFrame] = None,
         pil_image_mode: str = "I;16",
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         cache_capacity: Optional[int] = None,
+        file_state: Optional[FileState] = None,
     ):
         
         """
         Initializes the BaseImageDataset.
 
-        :param file_index: DataFrame containing exclusively file paths as pathlikes
+        :param file_index: Optional DataFrame containing exclusively file paths as pathlikes
+            Must be provided if `file_state` is not provided.
         :param pil_image_mode: Mode for PIL images, default is "I;16".
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
@@ -42,18 +45,26 @@ class BaseImageDataset(Dataset):
             caching without eviction is used. When set to a positive integer,
             the cache will hold at most that many images, evicting the least recently
             used images when the cache is full (LRU cache). Other values are
-            invalid.                 
+            invalid.     
+        :param file_state: Optional pre-initialized FileState object. If provided,
+            it takes precedence over `file_index` and `pil_image_mode`. Intended
+            to be used by only .from_config class method and similar deserialization
+            utilities.         
         """
-
-        self.manifest = DatasetManifest(
-            file_index=file_index, 
-            pil_image_mode=pil_image_mode
-        )
         self.index_state = IndexState()
+
+        if file_state is None and file_index is None:
+            raise ValueError(
+                "Either 'file_state' or 'file_index' must be provided."
+            )
         self.file_state = FileState(
-            manifest=self.manifest, 
+            DatasetManifest(
+                file_index=file_index, 
+                pil_image_mode=pil_image_mode
+            ), 
             cache_capacity=cache_capacity
-        )
+        ) if file_state is None else file_state
+        self.manifest = self.file_state.manifest
 
         self.input_channel_keys = input_channel_keys
         self.target_channel_keys = target_channel_keys
@@ -176,30 +187,12 @@ class BaseImageDataset(Dataset):
         Internal method for serializing the dataset as a configuration dictionary.        
         :return: Dictionary containing the serialized configuration.
         """
-        # Convert file_index to records format for JSON serialization
-        # Convert Path objects to strings for JSON compatibility
-        file_index_for_json = self.file_index.copy()
-        for col in file_index_for_json.columns:
-            file_index_for_json[col] = file_index_for_json[col].apply(
-                lambda x: str(x) if isinstance(x, (Path, PurePath)) else x
-            )
-        
-        file_index_records = file_index_for_json.to_dict('records')
-        file_index_columns = list(self.file_index.columns)
-        
-        config = {
-            'file_index': {
-                'records': file_index_records,
-                'columns': file_index_columns
-            },
-            'pil_image_mode': self.pil_image_mode,
+
+        return {
+            'file_state': self.file_state.to_config(),
             'input_channel_keys': self.input_channel_keys,
             'target_channel_keys': self.target_channel_keys,
-            'cache_capacity': self.file_state.cache_capacity,
-            'dataset_length': len(self)
         }
-        
-        return config
     
     def to_json_config(self, filepath: Union[str, Path]) -> None:
         """
@@ -218,66 +211,20 @@ class BaseImageDataset(Dataset):
             json.dump(config, json_config_file, indent=2, ensure_ascii=False)
 
     @classmethod
-    def _deserialize_config_core(
-        cls,
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Internal method for deserializing the core configuration
-        from a configuration dictionary.
-        Subclass deserialization methods may call this method
-            to conveniently extract the common configuration.
-        """
-        # Reconstruct file_index DataFrame
-        file_index_data = config.get('file_index', None)
-        if file_index_data is None:
-            raise ValueError(
-                "Expected 'file_index' in config, "
-                "but found none or empty."
-            )
-        
-        file_index = pd.DataFrame(file_index_data['records'])
-        # Convert string paths back to Path objects
-        for col in file_index.columns:
-            file_index[col] = file_index[col].apply(
-                lambda x: Path(x) if isinstance(x, str) else x
-            )
-
-        pil_image_mode = config.get('pil_image_mode', None)
-        if pil_image_mode is None:
-            raise ValueError(
-                "Expected 'pil_image_mode' in config, "
-                "but found none or empty."
-            )
-        
-        input_channel_keys=config.get('input_channel_keys', None)
-        target_channel_keys=config.get('target_channel_keys', None)
-        cache_capacity=config.get('cache_capacity', None)
-                    
-        return {
-            'file_index': file_index,
-            'pil_image_mode': pil_image_mode,
-            'input_channel_keys': input_channel_keys,
-            'target_channel_keys': target_channel_keys,
-            'cache_capacity': cache_capacity
-        }
-
-    @classmethod
     def from_config(
         cls,
         config: Dict[str, Any]
     ) -> 'BaseImageDataset':
         """
         Class method to instantiate a dataset from a configuration dictionary.
-        As this is the base class, only the core configuration deserialization
-            is performed here. Subclasses may override this method to handle
-            additional configuration parameters.
         
         :param config: Configuration dictionary.
         :return: An instance of BaseImageDataset or its subclass.
         """
-        core_ds_kwargs = cls._deserialize_config_core(config)
-
         return cls(
-            **core_ds_kwargs
+            file_state=FileState.from_config( # heavy lifting handled by FileState
+                config['file_state']
+            ),
+            input_channel_keys=config.get('input_channel_keys', None),
+            target_channel_keys=config.get('target_channel_keys', None),
         )
