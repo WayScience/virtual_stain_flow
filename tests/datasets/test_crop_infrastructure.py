@@ -12,8 +12,6 @@ import pytest
 import numpy as np
 import pandas as pd
 from pathlib import Path
-import tempfile
-import json
 from PIL import Image
 
 from virtual_stain_flow.datasets.ds_engine.manifest import DatasetManifest
