@@ -16,7 +16,7 @@ from dataclasses import dataclass, asdict
 
 import numpy as np
 
-from ..manifest import DatasetManifest, FileState
+from .manifest import DatasetManifest, FileState
 
 
 @dataclass

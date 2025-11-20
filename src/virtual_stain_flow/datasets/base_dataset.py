@@ -15,7 +15,8 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from .manifest import DatasetManifest, IndexState, FileState
+from .ds_engine.manifest import DatasetManifest, IndexState, FileState
+
 
 class BaseImageDataset(Dataset):
     
