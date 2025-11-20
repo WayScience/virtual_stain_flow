@@ -8,7 +8,7 @@
 
 # ## Dependencies
 
-# In[ ]:
+# In[1]:
 
 
 import json
@@ -31,7 +31,7 @@ from virtual_stain_flow.models.unet import UNet
 
 # ## Additional utils
 
-# In[ ]:
+# In[2]:
 
 
 class SimpleDataset(Dataset):
@@ -87,7 +87,7 @@ class SimpleDataset(Dataset):
 
 # ## Retrieve Demo Data
 
-# In[ ]:
+# In[3]:
 
 
 data_dir = pathlib.Path(
@@ -113,7 +113,7 @@ print(index.head())
 
 # ## Peek several patches
 
-# In[ ]:
+# In[4]:
 
 
 # Create dataset instance
@@ -144,7 +144,7 @@ plt.show()
 
 # ## Configure and train
 
-# In[ ]:
+# In[5]:
 
 
 ## Hyperparameters
@@ -225,7 +225,7 @@ trainer.train(logger=logger, epochs=epochs)
 
 # ### Display the last logged prediction plot artifact
 
-# In[ ]:
+# In[6]:
 
 
 # Create MLflow client
@@ -275,7 +275,7 @@ else:
 
 # ### Also visualize metrics from tracking
 
-# In[ ]:
+# In[7]:
 
 
 metric_keys = list(run.data.metrics.keys()) or []
