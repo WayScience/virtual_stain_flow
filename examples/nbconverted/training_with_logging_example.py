@@ -147,10 +147,19 @@ plt.show()
 # In[ ]:
 
 
-# Hyperparameters
-batch_size = 16
+## Hyperparameters
+
+# Batch size arbitrarily chosen for demo purposes. 
+# With a value of 16, the training fits comfortably into a nvidia RTX 3090 and utilizing <10GB of VRAM.
+# Tune to your hardware capabilities.
+batch_size = 16 
+
+# Small number of epochs for demo purposes
 epochs = 100
-learning_rate = 0.001 # larger learning rate for demo purposes
+
+# larger learning rate for demo purposes,
+# such that the epoch to epoch changes in model predictions are more visible
+learning_rate = 0.001 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Batch with DataLoader
