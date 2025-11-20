@@ -29,41 +29,16 @@ from virtual_stain_flow.vsf_logging.callbacks.PlotCallback import PlotPrediction
 from virtual_stain_flow.models.unet import UNet
 
 
-# ## Retrieve Demo Data
+# ## Additional utils
 
-# In[2]:
-
-
-data_dir = pathlib.Path(
-    "/mnt/data_nvme1/data/alsf_portable/12000_train_set"
-).resolve(strict=True)
-
-if not data_dir.exists():
-    raise FileNotFoundError(f"Data directory {data_dir} does not exist.")
-
-dataset_index_json = data_dir / "dataset.json"
-
-# dataset_index_json = list(data_dir.rglob("dataset.json"))
-if not dataset_index_json:
-    raise FileNotFoundError(f"No dataset.json found in {data_dir}.")
-# dataset_index_json = dataset_index_json[0]
-
-with open(dataset_index_json, "r") as f:
-    dataset_index = json.load(f)
-
-index = pd.DataFrame(dataset_index['file_index']['records'])
-print(f"Total number of samples: {len(index)}")
-index = index.sample(n=40, random_state=42).reset_index(drop=True)
-print(f"Subset number of samples: {len(index)}")
-print(index.head())
-
-
-# ## Define custom dataset that simply crops the center patch and does normalization
-
-# In[3]:
+# In[ ]:
 
 
 class SimpleDataset(Dataset):
+    """
+    Simple dataset for demo purposes.
+    Loads images from disk, crops the center, and performs hard-coded normalization.
+    """
     def __init__(self, index_df, data_dir):
         self.index_df = index_df
         self.data_dir = data_dir
@@ -109,13 +84,44 @@ class SimpleDataset(Dataset):
 
         return brightfield_tensor, dna_tensor
 
+
+# ## Retrieve Demo Data
+
+# In[ ]:
+
+
+data_dir = pathlib.Path(
+    "/mnt/data_nvme1/data/alsf_portable/12000_train_set"
+).resolve(strict=True)
+
+if not data_dir.exists():
+    raise FileNotFoundError(f"Data directory {data_dir} does not exist.")
+
+dataset_index_json = data_dir / "dataset.json"
+
+# dataset_index_json = list(data_dir.rglob("dataset.json"))
+if not dataset_index_json:
+    raise FileNotFoundError(f"No dataset.json found in {data_dir}.")
+# dataset_index_json = dataset_index_json[0]
+
+with open(dataset_index_json, "r") as f:
+    dataset_index = json.load(f)
+
+index = pd.DataFrame(dataset_index['file_index']['records'])
+print(f"Total number of samples: {len(index)}")
+index = index.sample(n=40, random_state=42).reset_index(drop=True)
+print(f"Subset number of samples: {len(index)}")
+print(index.head())
+
+
+# ## Peek several patches
+
+# In[ ]:
+
+
 # Create dataset instance
 dataset = SimpleDataset(index, data_dir)
 print(f"Dataset created with {len(dataset)} samples")
-
-
-# In[4]:
-
 
 # Plot the first 5 samples from the dataset
 fig, axes = plt.subplots(5, 2, figsize=(8, 16))
@@ -263,7 +269,7 @@ else:
 
 # ### Also visualize metrics from tracking
 
-# In[7]:
+# In[ ]:
 
 
 metric_keys = list(run.data.metrics.keys()) or []
