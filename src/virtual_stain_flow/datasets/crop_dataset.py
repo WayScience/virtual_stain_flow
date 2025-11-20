@@ -72,18 +72,6 @@ class CropImageDataset(BaseImageDataset):
         self.input_channel_keys = input_channel_keys
         self.target_channel_keys = target_channel_keys
 
-    # ----
-    # Explicit inheriting of key public methods and properties for clarity
-    # ----
-    def get_raw_item(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        return super().get_raw_item(idx)
-    
-    def __len__(self) -> int:
-        return super().__len__()
-    
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        return super().__getitem__(idx)
-    
     @property
     def pil_image_mode(self) -> str:
         return self.manifest.pil_image_mode
@@ -91,36 +79,6 @@ class CropImageDataset(BaseImageDataset):
     @property
     def file_index(self) -> pd.DataFrame:
         return self.manifest.file_index
-    
-    @property
-    def input_channel_keys(self) -> Optional[Union[str, Sequence[str]]]:
-        """
-        Returns the input channel keys.
-        """
-        return self._input_channel_keys
-    
-    @input_channel_keys.setter
-    def input_channel_keys(self, value: Optional[Union[str, Sequence[str]]]=None):
-        """
-        Sets the input channel keys.
-        """
-        value = self._validate_channel_keys(value)        
-        self._input_channel_keys = value
-
-    @property
-    def target_channel_keys(self) -> Optional[Union[str, Sequence[str]]]:
-        """
-        Returns the target channel keys.
-        """
-        return self._target_channel_keys
-    
-    @target_channel_keys.setter
-    def target_channel_keys(self, value: Optional[Union[str, Sequence[str]]]=None):
-        """
-        Sets the target channel keys.
-        """
-        value = self._validate_channel_keys(value)        
-        self._target_channel_keys = value
     
     # ----
     # Property(ies) specific to CropImageDataset
