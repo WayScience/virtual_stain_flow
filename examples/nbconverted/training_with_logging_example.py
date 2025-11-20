@@ -98,11 +98,8 @@ if not data_dir.exists():
     raise FileNotFoundError(f"Data directory {data_dir} does not exist.")
 
 dataset_index_json = data_dir / "dataset.json"
-
-# dataset_index_json = list(data_dir.rglob("dataset.json"))
-if not dataset_index_json:
+if not dataset_index_json.exists():
     raise FileNotFoundError(f"No dataset.json found in {data_dir}.")
-# dataset_index_json = dataset_index_json[0]
 
 with open(dataset_index_json, "r") as f:
     dataset_index = json.load(f)
