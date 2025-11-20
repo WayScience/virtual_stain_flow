@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 import tempfile
 from unittest.mock import patch, MagicMock
-from virtual_stain_flow.datasets.manifest import DatasetManifest, IndexState, FileState
+from virtual_stain_flow.datasets.ds_engine.manifest import DatasetManifest, IndexState, FileState
 
 class TestDatasetManifest:
     
@@ -99,7 +99,7 @@ class TestDatasetManifest:
         with pytest.raises(FileNotFoundError, match="File not found"):
             manifest.read_image(Path('/nonexistent.tif'))
     
-    @patch("virtual_stain_flow.datasets.manifest.Image.open")
+    @patch("virtual_stain_flow.datasets.ds_engine.manifest.Image.open")
     def test_read_image_success(self, mock_open):
         """Test DatasetManifest read_image successfully reads image."""
         # Mock PIL Image
@@ -112,13 +112,13 @@ class TestDatasetManifest:
         
         # Mock numpy array
         mock_array = np.ones((100, 100), dtype=np.uint16)
-        with patch("virtual_stain_flow.datasets.manifest.np.asarray", return_value=mock_array):
+        with patch("virtual_stain_flow.datasets.ds_engine.manifest.np.asarray", return_value=mock_array):
             
             with tempfile.NamedTemporaryFile(suffix='.tif') as tmp:
                 result = manifest.read_image(Path(tmp.name))
                 assert np.array_equal(result, mock_array)
     
-    @patch("virtual_stain_flow.datasets.manifest.Image.open")
+    @patch("virtual_stain_flow.datasets.ds_engine.manifest.Image.open")
     def test_read_image_invalid_shape(self, mock_open):
         """Test DatasetManifest read_image raises ValueError for invalid shape."""
         mock_img = MagicMock()
@@ -130,7 +130,7 @@ class TestDatasetManifest:
         
         # Mock 1D array (invalid)
         bad = np.ones((100,), dtype=np.uint16)
-        with patch("virtual_stain_flow.datasets.manifest.np.asarray", return_value=bad):            
+        with patch("virtual_stain_flow.datasets.ds_engine.manifest.np.asarray", return_value=bad):            
             with tempfile.NamedTemporaryFile(suffix='.tif') as tmp:
                 with pytest.raises(ValueError, match="Unsupported image shape"):
                     manifest.read_image(Path(tmp.name))
