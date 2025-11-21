@@ -33,12 +33,19 @@ from virtual_stain_flow.vsf_logging.callbacks.PlotCallback import PlotPrediction
 from virtual_stain_flow.models.unet import UNet
 
 
-# ## Additional utils
+# ## Pathing and Additional utils
 
-# Dataset processing and subsetting utils
+# Dataset processing and subsetting utils.
+# Please see [README.md](./README.md) and [0.download_data.py](./0.download_data.py) for data access details.
 
-# In[2]:
+# In[ ]:
 
+
+DATA_PATH = pathlib.Path("/YOUR/DATA/PATH/")  # Change to where the download_data script outputs data
+
+# Sanity check for data existence
+if not DATA_PATH.exists() or not DATA_PATH.is_dir():
+    raise FileNotFoundError(f"Data path {DATA_PATH} does not exist or is not a directory.")
 
 # Matches filenames like:
 # r01c01f01p01-ch1sk1fk1fl1.tiff
@@ -209,17 +216,11 @@ class SimpleDataset(Dataset):
 # In[ ]:
 
 
-data_path = pathlib.Path(
-    "/mnt/hdd20tb/jump_data/2020_11_04_CPJUMP1/BR00117010__2020-11-08T18_18_00-Measurement1/"
-).resolve(strict=True)
-if not data_path.exists() or not data_path.is_dir():
-    raise FileNotFoundError(f"Data path {data_path} does not exist or is not a directory.")
-
 # Load very small subset of CJUMP1, BF and Hoechst channel as input-target pairs
 # for demo purposes
 # See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1 for details
 X, Y, prefixes = load_jump_bf_hoechst(
-    plate_dir=data_path,
+    plate_dir=DATA_PATH,
     # retrieve up to 64 fields (different positions of images)
     # this results in a very small sample size good for demo purposes
     # for better training results, increase this number/load the full dataset
