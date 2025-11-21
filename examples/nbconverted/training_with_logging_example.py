@@ -11,12 +11,16 @@
 # In[1]:
 
 
+import re
 import json
 import pathlib
+from typing import List, Tuple
+
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
@@ -31,93 +35,226 @@ from virtual_stain_flow.models.unet import UNet
 
 # ## Additional utils
 
+# Dataset processing and subsetting utils
+
 # In[2]:
+
+
+# Matches filenames like:
+# r01c01f01p01-ch1sk1fk1fl1.tiff
+FIELD_RE = re.compile(
+    r"(r\d{2}c\d{2}f\d{2}p01)-ch(\d+)sk1fk1fl1\.tiff$"
+)
+
+def _collect_field_prefixes(
+    plate_dir: pathlib.Path,
+    max_fields: int = 16,
+) -> List[str]:
+    """
+    Scan a JUMP CPJUMP1 plate directory and collect distinct field prefixes.
+    Expects image filename like:
+        r01c01f01p01-ch1sk1fk1fl1.tiff
+    """
+    prefixes: List[str] = []
+    for path in sorted(plate_dir.glob("*.tiff")):
+        m = FIELD_RE.match(path.name)
+        if not m:
+            continue
+        prefix = m.group(1)  # e.g. "r01c01f01p01"
+        if prefix not in prefixes:
+            prefixes.append(prefix)
+            if len(prefixes) >= max_fields:
+                break
+    return prefixes
+
+
+def _load_single_channel(
+    plate_dir: pathlib.Path,
+    field_prefix: str,
+    channel: int,
+    normalize: bool = True,
+) -> np.ndarray:
+    """
+    Load a single channel image for a given field prefix and channel index.
+
+    :param plate_dir: Directory containing TIFF files for one JUMP plate
+    :param field_prefix: Prefix like 'r01c01f01p01'.
+    :param channel: Channel index, e.g. 5 for Hoechst, 7 for BF mid-z.
+    :param normalize: If True, convert to float32 and divide by dtype max
+    :return: Image array of shape (H, W), float32.
+    """
+    fname = f"{field_prefix}-ch{channel:d}sk1fk1fl1.tiff"
+    path = plate_dir / fname
+    if not path.exists():
+        raise FileNotFoundError(f"Expected file not found: {path}")
+
+    arr = np.array(Image.open(path))  # typically uint16
+
+    if normalize:
+        if np.issubdtype(arr.dtype, np.integer):
+            info = np.iinfo(arr.dtype)
+            arr = arr.astype("float32") / float(info.max)
+        else:
+            arr = arr.astype("float32")
+    else:
+        arr = arr.astype("float32")
+
+    return arr  # (H, W), float32
+
+
+def load_jump_bf_hoechst(
+    plate_dir: str | pathlib.Path,
+    max_fields: int = 32,
+    bf_channel: int = 7,
+    dna_channel: int = 5,
+    normalize: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """
+    Load a small BF->Hoechst subset from a CPJUMP1 plate.
+
+    :param plate_dir: Directory containing TIFF files for one JUMP plate
+    :param max_fields: Maximum number of fields to load
+    :param bf_channel: Channel index for BF mid-z (default 7)
+    :param dna_channel: Channel index for Hoechst (default 5)
+    :param normalize: If True, convert to float32 and divide by dtype max
+    """
+    plate_dir = pathlib.Path(plate_dir)
+
+    if not plate_dir.exists() or not plate_dir.is_dir():
+        raise FileNotFoundError(
+            f"Plate directory {plate_dir} does not exist or is not a directory."
+        )
+
+    prefixes = _collect_field_prefixes(plate_dir, max_fields=max_fields)
+    if not prefixes:
+        raise RuntimeError(f"No valid JUMP image files found in {plate_dir}")
+
+    bf_list: list[np.ndarray] = []
+    dna_list: list[np.ndarray] = []
+    used_prefixes: list[str] = []
+
+    for prefix in prefixes:
+        try:
+            bf = _load_single_channel(
+                plate_dir, prefix, bf_channel, normalize=normalize
+            )
+            dna = _load_single_channel(
+                plate_dir, prefix, dna_channel, normalize=normalize
+            )
+        except FileNotFoundError:
+            # Skip incomplete fields (missing channels)
+            continue
+
+        # Add channel axis: (1, H, W)
+        bf_list.append(bf[None, ...])
+        dna_list.append(dna[None, ...])
+        used_prefixes.append(prefix)
+
+    if not bf_list:
+        raise RuntimeError(
+            f"No complete BF + DNA pairs found in {plate_dir} "
+            f"for bf_channel={bf_channel}, dna_channel={dna_channel}"
+        )
+
+    X = np.stack(bf_list, axis=0)   # (N, 1, H, W)
+    Y = np.stack(dna_list, axis=0)  # (N, 1, H, W)
+
+    return X, Y, used_prefixes
+
+
+# Dataset object for training
+
+# In[3]:
 
 
 class SimpleDataset(Dataset):
     """
     Simple dataset for demo purposes.
-    Loads images from disk, crops the center, and performs hard-coded normalization.
+    Loads images from disk, crops the center, and returns as tensors.
     """
-    def __init__(self, index_df, data_dir):
-        self.index_df = index_df
-        self.data_dir = data_dir
+    def __init__(self, X: np.ndarray, Y: np.ndarray, crop_size: int = 256):
+        self.X = X
+        self.Y = Y
+        self.crop_size = crop_size
 
     def __len__(self):
-        return len(self.index_df)
+        return len(self.X)
 
     def __getitem__(self, idx):
-        row = self.index_df.iloc[idx]
-
-        # Load images
-        brightfield_path = self.data_dir / 'data' / row['OrigBrightfield']
-        dna_path = self.data_dir / 'data' / row['OrigDNA']
-
-        brightfield_img = Image.open(brightfield_path)
-        brightfield_img.convert('I;16')
-        dna_img = Image.open(dna_path)
-        dna_img.convert('I;16')
-        brightfield_img = np.asarray(brightfield_img, dtype=np.float32)
-        dna_img = np.asarray(dna_img, dtype=np.float32)
+        x = self.X[idx, 0, :, :]
+        y = self.Y[idx, 0, :, :]
 
         # Get image dimensions
-        width, height = brightfield_img.shape
+        height, width = x.shape
 
-        # Calculate crop coordinates for center 256x256
-        left = (width - 256) // 2
-        top = (height - 256) // 2
-        right = left + 256
-        bottom = top + 256
+        # Calculate crop coordinates for center
+        left = (width - self.crop_size) // 2
+        top = (height - self.crop_size) // 2
+        right = left + self.crop_size
+        bottom = top + self.crop_size
 
-        # Crop center 256x256
-        brightfield_crop = brightfield_img[top:bottom,left:right]
-        dna_crop = dna_img[top:bottom,left:right]
-
-        # Normalize by 16bit max value
-        factor = 2 ** 16 - 1
-        brightfield_crop = brightfield_crop / factor
-        dna_crop = dna_crop / factor
+        # Crop center
+        x_crop = x[top:bottom,left:right]
+        y_crop = y[top:bottom,left:right]
 
         # Convert to tensor
-        brightfield_tensor = torch.from_numpy(brightfield_crop).unsqueeze(0)  # Add channel dimension
-        dna_tensor = torch.from_numpy(dna_crop).unsqueeze(0)  # Add channel dimension
+        x_tensor = torch.from_numpy(x_crop).unsqueeze(0)  # Add channel dimension
+        y_tensor = torch.from_numpy(y_crop).unsqueeze(0)  # Add channel dimension
 
-        return brightfield_tensor, dna_tensor
-
-
-# ## Retrieve Demo Data
-
-# In[3]:
+        return x_tensor, y_tensor
 
 
-data_dir = pathlib.Path(
-    "/mnt/data_nvme1/data/alsf_portable/12000_train_set"
+# ## Load subsetted demo data
+
+# In[ ]:
+
+
+data_path = pathlib.Path(
+    "/mnt/hdd20tb/jump_data/2020_11_04_CPJUMP1/BR00117010__2020-11-08T18_18_00-Measurement1/"
 ).resolve(strict=True)
+if not data_path.exists() or not data_path.is_dir():
+    raise FileNotFoundError(f"Data path {data_path} does not exist or is not a directory.")
 
-if not data_dir.exists():
-    raise FileNotFoundError(f"Data directory {data_dir} does not exist.")
+# Load very small subset of CJUMP1, BF and Hoechst channel as input-target pairs
+# for demo purposes
+# See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1 for details
+X, Y, prefixes = load_jump_bf_hoechst(
+    plate_dir=data_path,
+    # retrieve up to 64 fields (different positions of images)
+    # this results in a very small sample size good for demo purposes
+    # for better training results, increase this number/load the full dataset
+    max_fields=64,   
+    bf_channel=7,    # mid-z BF for CPJUMP1
+    dna_channel=5,   # Hoechst
+)
 
-dataset_index_json = data_dir / "dataset.json"
-if not dataset_index_json.exists():
-    raise FileNotFoundError(f"No dataset.json found in {data_dir}.")
+print("X (BF):", X.shape, X.dtype)   # (N, 1, H, W)
+print("Y (DNA):", Y.shape, Y.dtype)  # (N, 1, H, W)
+print("First few fields:", prefixes[:5])
 
-with open(dataset_index_json, "r") as f:
-    dataset_index = json.load(f)
+panel_width = 3
+indices = [1, 2, 3]
+fig, ax = plt.subplots(len(indices), 2, figsize=(panel_width * 2, panel_width * len(indices)))
 
-index = pd.DataFrame(dataset_index['file_index']['records'])
-print(f"Total number of samples: {len(index)}")
-index = index.sample(n=40, random_state=42).reset_index(drop=True)
-print(f"Subset number of samples: {len(index)}")
-print(index.head())
+for i, j in enumerate(indices):
+    input, target = X[j], Y[j]
+    ax[i][0].imshow(input[0], cmap='gray')
+    ax[i][0].set_title(f'No.{j} Input')
+    ax[i][0].axis('off')
+    ax[i][1].imshow(target[0], cmap='gray')
+    ax[i][1].set_title(f'No.{j} Target')
+    ax[i][1].axis('off')
+plt.tight_layout()
+plt.show()
 
 
 # ## Peek several patches
 
-# In[4]:
+# In[5]:
 
 
 # Create dataset instance
-dataset = SimpleDataset(index, data_dir)
+dataset = SimpleDataset(X, Y, crop_size=256)
 print(f"Dataset created with {len(dataset)} samples")
 
 # Plot the first 5 samples from the dataset
@@ -144,7 +281,7 @@ plt.show()
 
 # ## Configure and train
 
-# In[5]:
+# In[6]:
 
 
 ## Hyperparameters
@@ -155,6 +292,7 @@ plt.show()
 batch_size = 16 
 
 # Small number of epochs for demo purposes
+# For better training results, increase this number
 epochs = 100
 
 # larger learning rate for demo purposes,
@@ -225,7 +363,7 @@ trainer.train(logger=logger, epochs=epochs)
 
 # ### Display the last logged prediction plot artifact
 
-# In[6]:
+# In[7]:
 
 
 # Create MLflow client
@@ -275,7 +413,7 @@ else:
 
 # ### Also visualize metrics from tracking
 
-# In[7]:
+# In[8]:
 
 
 metric_keys = list(run.data.metrics.keys()) or []
