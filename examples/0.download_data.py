@@ -30,7 +30,7 @@ Requirements:
     - Internet connection
     - Sufficient disk space (~10GB for full plate)
 
-Note: Initial download may take several minutes depending on internet speed.
+Note: Initial download may take minutes to hours depending on internet speed.
 """
 
 import subprocess
