@@ -28,6 +28,7 @@ dependencies = [
   "ipython",
   "jupyter",
   "notebook",
+  "tifffile",
 ]
 
 [project.optional-dependencies]

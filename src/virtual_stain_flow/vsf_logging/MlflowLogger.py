@@ -44,6 +44,9 @@ class MlflowLogger:
         mlflow_start_run_args: dict = None,
         mlflow_log_params_args: dict = None,
         callbacks: Optional[List[Any]] = None,
+        save_model_at_train_end: bool = True,
+        save_model_every_n_epochs: Optional[int] = None,
+        save_best_model: bool = True
     ):
         """
         Initialize the MLflowLoggerV2.
@@ -60,6 +63,9 @@ class MlflowLogger:
         :param mlflow_start_run_args: Additional arguments for starting an MLflow run, defaults to None.
         :param mlflow_log_params_args: Additional arguments for logging parameters to MLflow, defaults to None.
         :param callbacks: List of logger callbacks to be used for logging artifacts, metrics, and parameters, defaults to None.
+        :param save_model_at_train_end: Whether to save the model at the end of training, defaults to True.
+        :param save_model_every_n_epochs: Save the model every n epochs, defaults to None.
+        :param save_best_model: Whether to save the best model during training, defaults to True.        
         :raises RuntimeError: If there is an error setting the MLflow tracking URI or experiment.
         :raises TypeError: If any callback is not an instance of AbstractLoggerCallback.
         :return: None
@@ -69,7 +75,6 @@ class MlflowLogger:
 
         self.name = name
 
-        # self.tracking_uri = str(tracking_uri)
         if tracking_uri is not None:
             try:
                 mlflow.set_tracking_uri(tracking_uri)
@@ -80,9 +85,15 @@ class MlflowLogger:
         # this one when the user explicitly calls end_run
         self.__run_id: Optional[str] = None
 
-        # logged as experiment name
-        if experiment_name is None:
-            mlflow.set_experiment(experiment_name)
+        # Tracking defaults to 'Default' experiment if none provided
+        # Forces creation of non-existing experiment
+        self._experiment_name = experiment_name or "Default"
+        exp = mlflow.get_experiment_by_name(self._experiment_name)
+        if exp is None:
+            exp_id = mlflow.create_experiment(self._experiment_name)
+        else:
+            exp_id = exp.experiment_id
+        self.__experiment_id = exp_id
 
         # logged at run start
         self.run_name = run_name
@@ -107,8 +118,8 @@ class MlflowLogger:
         elif tags is not None:
             raise TypeError("tags must be a dictionary or None.")
 
-        self._mlflow_start_run_args = mlflow_start_run_args
-        self._mlflow_log_params_args = mlflow_log_params_args
+        self._mlflow_start_run_args = mlflow_start_run_args or {}
+        self._mlflow_log_params_args = mlflow_log_params_args or {}
 
         self.callbacks = callbacks or []
         for cb in self.callbacks:
@@ -118,8 +129,12 @@ class MlflowLogger:
                 )
             cb.bind_parent(self)
 
-        self._run_id = None
-        
+        self._run_id = None        
+
+        self._save_model_at_train_end = save_model_at_train_end
+        self._save_model_every_n_epochs = save_model_every_n_epochs
+        self._save_best_model = save_best_model
+
         return None
     
     """
@@ -151,19 +166,18 @@ class MlflowLogger:
         Calls mlflow start run and logs params if provided
         """
 
-        if self._mlflow_start_run_args is None:
-            self._mlflow_start_run_args = {}
-        elif isinstance(self._mlflow_start_run_args, Dict):
-            pass
-        else:
+        if not isinstance(self._mlflow_start_run_args, Dict):
             raise TypeError("mlflow_start_run_args must be None or a dictionary.")        
         
         _run = mlflow.start_run(
+            experiment_id=self.__experiment_id,
             run_name=self.run_name,
             **self._mlflow_start_run_args
         )
+
         # keep track of the run id
         self.__run_id = _run.info.run_id
+        print(f"MLflow run started with ID: {self.__run_id}")
         
         for key, value in self.tags.items():
             if value is not None:
@@ -216,6 +230,19 @@ class MlflowLogger:
         Iterate over the most recent log items in trainer and call mlflow log metric
         """
 
+        if self._save_model_every_n_epochs is not None:
+            if self.trainer.epoch % self._save_model_every_n_epochs == 0:
+                self._save_model_weights(
+                    artifact_path='weights',
+                    best_model=False
+                )
+
+        if self._save_best_model:
+            self._save_model_weights(
+                artifact_path='weights',
+                best_model=True
+            )
+
         # Call on_epoch_end for all registered callbacks
         for callback in self.callbacks:
             if hasattr(callback, 'on_epoch_end'):
@@ -235,25 +262,17 @@ class MlflowLogger:
         Then ends run
         """
         # Save weights to a temporary directory and log artifacts
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            
-            tmpdirpath = pathlib.Path(tmpdirname)
-            
-            saved_file_paths = self.trainer.save_model(
-                save_path=tmpdirpath,
-                file_name_prefix=self.name,
-                file_name_suffix=f"epoch_{self.trainer.epoch}",
-                file_ext='.pth',
-                best_model=True
+        if self._save_model_at_train_end:
+            self._save_model_weights(
+                artifact_path='weights',
+                best_model=False
             )
 
-            for saved_file_path in saved_file_paths:
-                mlflow.log_artifact(
-                    str(saved_file_path), 
-                    # TODO consider if we want to allow for more 
-                    # granularity in the weight save path
-                    artifact_path="weights/best"
-                )
+        if self._save_best_model:
+            self._save_model_weights(
+                artifact_path='weights',
+                best_model=True
+            )
 
         for callback in self.callbacks:
             if hasattr(callback, 'on_train_end'):
@@ -264,6 +283,8 @@ class MlflowLogger:
                     stage='train',
                     step=self.trainer.epoch
                 )
+
+        self.end_run()
 
     """
     Run management methods
@@ -426,6 +447,31 @@ class MlflowLogger:
                 # TODO decide if we want to raise an error or just skip
                 continue
                 # raise TypeError("Unsupported callback return type for logging.")
+
+    def _save_model_weights(
+        self,
+        prefix: Optional[str] = None,
+        suffix: Optional[str] = None,
+        artifact_path: str = "weights",
+        best_model: bool = True
+    ):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            
+            tmpdirpath = pathlib.Path(tmpdirname)
+            
+            saved_file_paths = self.trainer.save_model(
+                save_path=tmpdirpath,
+                file_name_prefix=prefix,
+                file_name_suffix=suffix,
+                file_ext='.pth',
+                best_model=best_model
+            )
+
+            for saved_file_path in saved_file_paths:
+                mlflow.log_artifact(
+                    str(saved_file_path), 
+                    artifact_path=artifact_path
+                )
     
     """
     Access point for callback to model

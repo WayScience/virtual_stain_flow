@@ -1,8 +1,10 @@
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Optional
 import pathlib
 import random
+import tempfile
 
 import torch.nn as nn
+from torch.utils.data import Dataset
 
 from .LoggerCallback import (
     AbstractLoggerCallback,
@@ -15,8 +17,8 @@ class PlotPredictionCallback(AbstractLoggerCallback):
     def __init__(
         self,
         name: str,
-        save_path: Union[pathlib.Path, str],
-        dataset: PatchDataset, 
+        dataset: Dataset, 
+        save_path: Optional[Union[pathlib.Path, str]] = None,
         plot_n_patches: int=5,
         indices: Union[List[int], None]=None,
         plot_metrics: List[nn.Module]=None,
@@ -47,12 +49,15 @@ class PlotPredictionCallback(AbstractLoggerCallback):
 
         super().__init__(name)
 
-        self._path = save_path
-        if isinstance(dataset, PatchDataset):
-            pass
+        if save_path:
+            self._path = pathlib.Path(save_path)
         else:
-            raise TypeError(f"Expected PatchDataset, got {type(dataset)}")
-        
+            self.__tmpdir = tempfile.TemporaryDirectory()
+            self._path = pathlib.Path(self.__tmpdir.name)
+
+        if not isinstance(dataset, Dataset):
+            raise TypeError(f"Expected Dataset, got {type(dataset)}")
+
         self._dataset = dataset
 
         # Additional kwargs passed to plot_patches
