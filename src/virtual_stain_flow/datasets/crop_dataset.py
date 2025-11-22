@@ -5,9 +5,6 @@ crop_dataset.py
 from typing import Any, Dict, List, Sequence, Optional, Tuple, Union
 
 import pandas as pd
-import numpy as np
-
-from virtual_stain_flow.datasets.ds_engine.manifest import DatasetManifest
 
 from .base_dataset import BaseImageDataset
 from .ds_engine.crop_manifest import CropManifest, CropFileState, Crop
@@ -80,16 +77,10 @@ class CropImageDataset(BaseImageDataset):
     def file_index(self) -> pd.DataFrame:
         return self.manifest.file_index
     
-    # ----
-    # Property(ies) specific to CropImageDataset
-    # ----
     @property
     def crop_info(self) -> Optional[Crop]:
         return self.file_state.crop_info
     
-    # ----
-    # Serialization methods
-    # ----    
     def to_config(self) -> Dict[str, Any]:
         """
         Serialize to dict.
