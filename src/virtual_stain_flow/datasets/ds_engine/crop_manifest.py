@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional, Sequence
 from dataclasses import dataclass, asdict
 
+import pandas as pd
 import numpy as np
 
 from .manifest import DatasetManifest, FileState
@@ -42,16 +43,30 @@ class CropManifest:
     Wraps a DatasetManifest for file access.
     """
     
-    def __init__(self, crops: List[Crop], manifest: DatasetManifest):
+    def __init__(
+        self, 
+        crops: List[Crop], 
+        file_index: Optional[pd.DataFrame] = None,
+        manifest: Optional[DatasetManifest] = None,
+        **kwargs
+    ):
         """
         Initialize a crop manifest.
         
         :param crops: List of Crop objects.
-        :param manifest: DatasetManifest containing the file index.
+        :param file_index: Optional DataFrame for DatasetManifest construction.
+            Must be provided if `manifest` is not provided.
+        :param manifest: Optional pre-initialized DatasetManifest. If provided,
+            it takes precedence over `file_index`. Intended to be used by only
+            .from_config class method and similar deserialization utilities.
         """
         if not crops:
             raise ValueError("crops list cannot be empty.")
         
+        if manifest is None and file_index is None:
+            raise ValueError("Either manifest or file_index must be provided.")
+        manifest = manifest or DatasetManifest(file_index=file_index, **kwargs)
+                
         if not all(crop.manifest_idx < len(manifest) for crop in crops):
                 raise IndexError("One or more crop.manifest_idx values are out of bounds.")
         
@@ -77,19 +92,50 @@ class CropManifest:
     def to_config(self) -> Dict[str, Any]:
         """
         Serialize to dict (not including manifest, which is handled separately).
+        Also serializes the underlying DatasetManifest.
         """
         return {
             'crops': [crop.to_dict() for crop in self.crops],
+            'manifest': self.manifest.to_config()
         }
     
+    @property
+    def pil_image_mode(self) -> str:
+        return self.manifest.pil_image_mode
+    
+    @property
+    def file_index(self) -> pd.DataFrame:
+        return self.manifest.file_index
+    
     @classmethod
-    def from_config(cls, config: Dict[str, Any], manifest: DatasetManifest) -> 'CropManifest':
+    def from_config(
+        cls, 
+        config: Dict[str, Any], 
+    ) -> 'CropManifest':
         """
-        Deserialize from config dict.
-        Requires manifest to be provided (since it's not stored in config).
+        Deserialize from dict.
+        Also deserializes the underlying DatasetManifest.
         """
         crops = [Crop.from_dict(c) for c in config['crops']]
-        return cls(crops, manifest)
+        manifest = DatasetManifest.from_config(config['manifest'])
+        return cls(crops, manifest=manifest)
+    
+    @classmethod
+    def from_coord_size(
+        cls,
+        crop_specs: Dict[int, List[Tuple[Tuple[int, int], int, int]]],
+        file_index: Optional[pd.DataFrame] = None,
+        manifest: Optional[DatasetManifest] = None,
+        **kwargs
+    ) -> 'CropManifest':
+        """
+        Factory: convert (top_left, width, height) to Crop objects.
+        """
+        crops = []
+        for manifest_idx, coord_list in crop_specs.items():
+            for (x, y), w, h in coord_list:
+                crops.append(Crop(manifest_idx, x, y, w, h))
+        return cls(crops, file_index=file_index, manifest=manifest, **kwargs)
 
 
 @dataclass
@@ -111,6 +157,10 @@ class CropIndexState:
         """
         return self.last_crop_idx is None or crop_idx != self.last_crop_idx
     
+    def update(self, *args, **kwargs) -> None:
+        """No-op placeholder for symmetry with other State classes."""
+        pass
+
     def get_and_update(self, crop_idx: int) -> Crop:
         """
         Get the Crop at crop_idx and update internal state if the index changed.
@@ -120,8 +170,10 @@ class CropIndexState:
         :raises IndexError: If crop_idx is out of range.
         """
         crop = self.crop_collection.get_crop(crop_idx)
-        self.last_crop_idx = crop_idx
-        self._last_crop = crop
+
+        if self.is_stale(crop_idx):
+            self.last_crop_idx = crop_idx
+            self._last_crop = crop
         
         return crop
     
@@ -158,6 +210,7 @@ class CropFileState:
             - -1: Unbounded cache.
             - N > 0: LRU cache with capacity N.
         """
+        self.crop_collection = crop_collection
         self.manifest = crop_collection.manifest
         self._file_state = FileState(self.manifest, cache_capacity=cache_capacity)
         self.crop_state = CropIndexState(crop_collection)
@@ -213,6 +266,16 @@ class CropFileState:
 
         return image[:, y:y + h, x:x + w]
     
+    def to_config(self) -> Dict[str, Any]:
+        """
+        Serialize to dict
+        Also serializes the underlying CropManifest.
+        """
+        return {
+            'crop_collection': self.crop_collection.to_config(),
+            'cache_capacity': self._file_state.cache_capacity
+        }
+    
     @property
     def crop_info(self) -> Optional[Crop]:
         """
@@ -222,9 +285,31 @@ class CropFileState:
         """
         return self.crop_state._last_crop
     
+    @property 
+    def input_image_raw(self) -> Optional[np.ndarray]:
+        return self.input_crop_raw # acronym
+    
+    @property
+    def target_image_raw(self) -> Optional[np.ndarray]:
+        return self.target_crop_raw # acronym
+    
     def reset(self) -> None:
         """Clear all state and caches."""
         self._file_state.reset()
         self.crop_state.reset()
         self.input_crop_raw, self.target_crop_raw = None, None
         self.input_paths, self.target_paths = [], []
+
+    @classmethod
+    def from_config(
+        cls, 
+        config: Dict[str, Any], 
+    ) -> 'CropFileState':
+        """
+        Deserialize from config dict.
+        Also deserializes the underlying CropManifest.
+        """
+        return cls(
+            crop_collection=CropManifest.from_config(config['crop_collection']),
+            cache_capacity=config.get('cache_capacity', None)
+        )
