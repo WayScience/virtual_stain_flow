@@ -132,7 +132,7 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
 
         # Check that gradients exist after first backward
         first_grad_norms = [
-            param.grad.norm().item() for param in forward_group.models[GENERATOR_MODEL].parameters()
+            param.grad.norm().item() for param in forward_group._models[GENERATOR_MODEL].parameters()
             if param.grad is not None
         ]
         assert len(first_grad_norms) > 0
@@ -152,7 +152,7 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
 
         # Gradients should exist again after second backward
         second_grad_norms = [
-            param.grad.norm().item() for param in forward_group.models[GENERATOR_MODEL].parameters()
+            param.grad.norm().item() for param in forward_group._models[GENERATOR_MODEL].parameters()
             if param.grad is not None
         ]
         assert len(second_grad_norms) > 0
