@@ -131,64 +131,6 @@ class SingleGeneratorTrainer(AbstractTrainer):
 
         return logs
     
-    def train_epoch(self):
-        """
-        Perform a full training epoch over the training dataset.
-        Primarily responsible for iterating over the data loader and
-            invoking train_step, and then collecting the losses.
-
-        :returns: A dictionary of average loss values for the epoch.
-        """
-        losses = defaultdict(list)
-
-        batch_idx = 0
-        for inputs, targets in self._train_loader:
-
-            self._update_epoch_progress(
-                batch_idx=batch_idx,
-                num_batches=len(self._train_loader),
-                phase="Train"
-            )
-
-            batch_loss = self.train_step(inputs, targets)
-            for key, value in batch_loss.items():
-                losses[key].append(value)
-
-            batch_idx += 1            
-
-        return {
-            key: sum(values) / len(values) for key, values in losses.items()
-        }
-    
-    def evaluate_epoch(self):
-        """
-        Perform a full evaluation epoch over the validation dataset.
-        Primarily responsible for iterating over the data loader and
-            invoking evaluate_step, and then collecting the losses.
-
-        :returns: A dictionary of average loss values for the epoch.
-        """
-        losses = defaultdict(list)
-
-        batch_idx = 0
-        for inputs, targets in self._val_loader:
-
-            self._update_epoch_progress(
-                batch_idx=batch_idx,
-                num_batches=len(self._val_loader),
-                phase="Val"
-            )
-
-            batch_loss = self.evaluate_step(inputs, targets)
-            for key, value in batch_loss.items():
-                losses[key].append(value)
-
-            batch_idx += 1
-
-        return {
-            key: sum(values) / len(values) for key, values in losses.items()
-        }
-
     def save_model(
         self,
         save_path: pathlib.Path,

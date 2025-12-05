@@ -165,37 +165,69 @@ class AbstractTrainer(TrainerProtocol, ABC):
         """
         pass
     
-    @abstractmethod
-    def train_epoch(self)->dict[str, torch.Tensor]:
+    def train_epoch(self):
         """
+        Requires implemented train_step method
+        Perform a full training epoch over the training dataset.
+        Primarily responsible for iterating over the data loader and
+            invoking train_step, and then collecting the losses.
+
         Can be overridden by subclasses to implement custom training logic.
-        Make calls to the train_step method for each batch 
-        in the training DataLoader.
 
-        Return a dictionary with loss name as key and 
-        torch tensor loss as value. Multiple losses can be returned.
-
-        :return: A dictionary containing the loss values for the epoch.
-        :rtype: dict[str, torch.Tensor]
+        :returns: A dictionary of average loss values for the epoch.
         """
+        losses = defaultdict(list)
 
-        pass        
+        batch_idx = 0
+        for inputs, targets in self._train_loader:
 
-    @abstractmethod
-    def evaluate_epoch(self)->dict[str, torch.Tensor]:
+            self._update_epoch_progress(
+                batch_idx=batch_idx,
+                num_batches=len(self._train_loader),
+                phase="Train"
+            )
+
+            batch_loss = self.train_step(inputs, targets)
+            for key, value in batch_loss.items():
+                losses[key].append(value)
+
+            batch_idx += 1            
+
+        return {
+            key: sum(values) / len(values) for key, values in losses.items()
+        }
+    
+    def evaluate_epoch(self):
         """
+        Requires implemented evaluate_step method
+        Perform a full evaluation epoch over the validation dataset.
+        Primarily responsible for iterating over the data loader and
+            invoking evaluate_step, and then collecting the losses.
+
         Can be overridden by subclasses to implement custom evaluation logic.
-        Should make calls to the evaluate_step method for each batch 
-        in the validation DataLoader.
 
-        Should return a dictionary with loss name as key and
-        torch tensor loss as value. Multiple losses can be returned.
-
-        :return: A dictionary containing the loss values for the epoch.
-        :rtype: dict[str, torch.Tensor]
+        :returns: A dictionary of average loss values for the epoch.
         """
-        
-        pass
+        losses = defaultdict(list)
+
+        batch_idx = 0
+        for inputs, targets in self._val_loader:
+
+            self._update_epoch_progress(
+                batch_idx=batch_idx,
+                num_batches=len(self._val_loader),
+                phase="Val"
+            )
+
+            batch_loss = self.evaluate_step(inputs, targets)
+            for key, value in batch_loss.items():
+                losses[key].append(value)
+
+            batch_idx += 1
+
+        return {
+            key: sum(values) / len(values) for key, values in losses.items()
+        }
 
     def train(
         self, 
