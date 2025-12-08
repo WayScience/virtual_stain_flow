@@ -1,6 +1,7 @@
 """
 conftest.py - Fixtures for trainer tests
 """
+import pathlib
 import pytest
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -332,3 +333,43 @@ def conv_trainer(conv_model, conv_optimizer, simple_loss, image_train_loader, im
         early_termination_metric='MSELoss'
     )
     return trainer
+
+
+class MockModelWithSaveWeights(torch.nn.Module):
+    """
+    Mock model that implements save_weights method for testing.
+    Mimics the BaseModel interface for save_weights.
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.conv = torch.nn.Conv2d(1, 1, kernel_size=3, padding=1)
+    
+    def forward(self, x):
+        return self.conv(x)
+    
+    def save_weights(self, filename: str, dir) -> pathlib.Path:
+        """Save model weights to file."""
+        if isinstance(dir, str):
+            dir = pathlib.Path(dir)
+        
+        if not dir.exists():
+            raise FileNotFoundError(f"Path {dir} does not exist.")
+        if not dir.is_dir():
+            raise NotADirectoryError(f"Path {dir} is not a directory.")
+        
+        weight_file = dir / filename
+        torch.save(self.state_dict(), weight_file)
+        return weight_file
+
+
+@pytest.fixture
+def mock_model_with_save():
+    """Create a mock model with save_weights method."""
+    return MockModelWithSaveWeights()
+
+
+@pytest.fixture
+def mock_optimizer(mock_model_with_save):
+    """Create an optimizer for the mock model."""
+    return torch.optim.Adam(mock_model_with_save.parameters(), lr=0.001)
