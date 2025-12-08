@@ -5,11 +5,11 @@ AbstractTrainer.py
 import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, Optional, Literal, List, Union
+from typing import Dict, Optional, Literal, List
 
 from tqdm import tqdm
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
