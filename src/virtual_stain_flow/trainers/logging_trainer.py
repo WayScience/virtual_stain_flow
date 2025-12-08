@@ -9,7 +9,6 @@ computations.
 
 import pathlib
 from typing import Dict, List, Union, Optional
-from collections import defaultdict
 
 import torch
 
