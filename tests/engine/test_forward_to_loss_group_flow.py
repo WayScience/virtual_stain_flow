@@ -5,12 +5,9 @@ This module tests the correct interaction between forward groups and loss groups
 including gradient computation, optimizer state management, and training vs. eval modes.
 """
 
-import pytest
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
-from virtual_stain_flow.engine.forward_groups import GeneratorForwardGroup
 from virtual_stain_flow.engine.loss_group import LossItem, LossGroup
 from virtual_stain_flow.engine.context import Context
 from virtual_stain_flow.engine.names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL
@@ -198,7 +195,6 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
         self, forward_group, torch_device, random_input, random_target
     ):
         """Test that disabled loss items are not included in total loss."""
-        from virtual_stain_flow.engine.loss_group import LossItem, LossGroup
         from virtual_stain_flow.engine.names import PREDS, TARGETS
         
         loss_group = LossGroup(
@@ -233,7 +229,6 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
         self, forward_group, torch_device, random_input, random_target
     ):
         """Test that compute_at_val flag works correctly."""
-        from virtual_stain_flow.engine.loss_group import LossItem, LossGroup
         from virtual_stain_flow.engine.names import PREDS, TARGETS
         
         # Loss item that should only be computed during training
