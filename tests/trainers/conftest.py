@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from virtual_stain_flow.trainers.AbstractTrainer import AbstractTrainer
 from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
-
+from virtual_stain_flow.vsf_logging.MlflowLogger import MlflowLogger
 
 class MinimalDataset(Dataset):
     """Minimal dataset for testing."""
@@ -198,5 +198,137 @@ def multi_loss_trainer(minimal_model, minimal_optimizer, multiple_losses, train_
         train_loader=train_dataloader,
         val_loader=val_dataloader,
         batch_size=2
+    )
+    return trainer
+
+
+class DummyLogger(MlflowLogger):
+    """
+    Dummy logger fixture that tracks method calls for testing.
+    Mimics the MlflowLogger interface without actually logging to MLflow.
+    
+    Inherits from MlflowLogger to pass type checks. 
+    """
+    
+    def __init__(self):
+        self.trainer = None
+        self.bind_trainer_called = False
+        self.on_train_start_called = False
+        self.on_epoch_start_calls = []
+        self.on_epoch_end_calls = []
+        self.on_train_end_called = False
+        self.logged_metrics = []
+    
+    def bind_trainer(self, trainer):
+        """Bind trainer to logger."""
+        self.trainer = trainer
+        self.bind_trainer_called = True
+    
+    def on_train_start(self):
+        """Called at the start of training."""
+        self.on_train_start_called = True
+    
+    def on_epoch_start(self):
+        """Called at the start of each epoch."""
+        self.on_epoch_start_calls.append(True)
+    
+    def on_epoch_end(self):
+        """Called at the end of each epoch."""
+        self.on_epoch_end_calls.append(True)
+    
+    def on_train_end(self):
+        """Called at the end of training."""
+        self.on_train_end_called = True
+    
+    def log_metric(self, metric_name: str, metric_value, step: int):
+        """Log a metric."""
+        self.logged_metrics.append({
+            'name': metric_name,
+            'value': metric_value,
+            'step': step
+        })
+
+    def end_run(self, *args, **kwargs):
+        """No-op fixture for Logger cleanup."""
+        pass
+
+
+@pytest.fixture
+def dummy_logger():
+    """Create a dummy logger for testing."""
+    return DummyLogger()
+
+
+@pytest.fixture
+def conv_model():
+    """Create a simple convolutional model for testing."""
+    model = torch.nn.Sequential(
+        torch.nn.Conv2d(1, 8, kernel_size=3, padding=1),
+        torch.nn.ReLU(),
+        torch.nn.Conv2d(8, 1, kernel_size=3, padding=1)
+    )
+    return model
+
+
+@pytest.fixture
+def conv_optimizer(conv_model):
+    """Create an optimizer for the conv model."""
+    return torch.optim.Adam(conv_model.parameters(), lr=0.001)
+
+
+@pytest.fixture
+def image_dataset():
+    """Create a minimal image dataset for testing."""
+    class ImageDataset(Dataset):
+        def __init__(self, num_samples=20):
+            self.num_samples = num_samples
+        
+        def __len__(self):
+            return self.num_samples
+        
+        def __getitem__(self, idx):
+            # Return 1-channel 16x16 images
+            return (
+                torch.randn(1, 16, 16),
+                torch.randn(1, 16, 16)
+            )
+    
+    return ImageDataset(num_samples=20)
+
+
+@pytest.fixture
+def image_train_loader(image_dataset):
+    """Create a train dataloader with image data."""
+    from torch.utils.data import random_split
+    train_size = 12
+    val_size = len(image_dataset) - train_size
+    train_dataset, _ = random_split(image_dataset, [train_size, val_size])
+    return DataLoader(train_dataset, batch_size=4, shuffle=False)
+
+
+@pytest.fixture
+def image_val_loader(image_dataset):
+    """Create a validation dataloader with image data."""
+    from torch.utils.data import random_split
+    train_size = 12
+    val_size = len(image_dataset) - train_size
+    _, val_dataset = random_split(image_dataset, [train_size, val_size])
+    return DataLoader(val_dataset, batch_size=4, shuffle=False)
+
+
+@pytest.fixture
+def conv_trainer(conv_model, conv_optimizer, simple_loss, image_train_loader, image_val_loader):
+    """
+    Create a SingleGeneratorTrainer with conv model for full training tests.
+    """
+    trainer = SingleGeneratorTrainer(
+        model=conv_model,
+        optimizer=conv_optimizer,
+        losses=simple_loss,
+        device=torch.device('cpu'),
+        train_loader=image_train_loader,
+        val_loader=image_val_loader,
+        batch_size=4,
+        early_termination_metric='MSELoss'
     )
     return trainer
