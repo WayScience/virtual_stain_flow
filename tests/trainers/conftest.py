@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from virtual_stain_flow.trainers.AbstractTrainer import AbstractTrainer
+from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
 
 
 class MinimalDataset(Dataset):
@@ -150,5 +151,52 @@ def trainer_with_empty_val_loader(minimal_model, minimal_optimizer, train_datalo
         val_loader=empty_dataloader,
         batch_size=2,
         device=torch.device('cpu')
+    )
+    return trainer
+
+
+@pytest.fixture
+def simple_loss():
+    """Create a simple MSE loss function."""
+    return torch.nn.MSELoss()
+
+
+@pytest.fixture
+def multiple_losses():
+    """Create multiple loss functions."""
+    return [torch.nn.MSELoss(), torch.nn.L1Loss()]
+
+
+@pytest.fixture
+def single_generator_trainer(minimal_model, minimal_optimizer, simple_loss, train_dataloader, val_dataloader):
+    """
+    Create a SingleGeneratorTrainer with a single loss function.
+    """
+    trainer = SingleGeneratorTrainer(
+        model=minimal_model,
+        optimizer=minimal_optimizer,
+        losses=simple_loss,
+        device=torch.device('cpu'),
+        train_loader=train_dataloader,
+        val_loader=val_dataloader,
+        batch_size=2
+    )
+    return trainer
+
+
+@pytest.fixture
+def multi_loss_trainer(minimal_model, minimal_optimizer, multiple_losses, train_dataloader, val_dataloader):
+    """
+    Create a SingleGeneratorTrainer with multiple loss functions.
+    """
+    trainer = SingleGeneratorTrainer(
+        model=minimal_model,
+        optimizer=minimal_optimizer,
+        losses=multiple_losses,
+        device=torch.device('cpu'),
+        loss_weights=[0.5, 0.5],
+        train_loader=train_dataloader,
+        val_loader=val_dataloader,
+        batch_size=2
     )
     return trainer
