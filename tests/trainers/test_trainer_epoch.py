@@ -6,6 +6,8 @@ Contract tests for AbstractTrainer.train_epoch and evaluate_epoch methods
 
 import torch
 
+from conftest import MinimalTrainerRealization
+
 
 class TestTrainEpochBatchIteration:
     """Test that train_epoch iterates over all batches."""
@@ -191,3 +193,132 @@ class TestTrainEpochEpochCounter:
         
         # evaluate_epoch should not increment epoch
         assert trainer.epoch == initial_epoch
+
+
+
+class TestTrainEpochEdgeCases:
+    """Test edge cases for train_epoch and evaluate_epoch."""
+    
+    def test_train_epoch_with_empty_dataloader(self, minimal_model, minimal_optimizer, empty_dataloader):
+        """
+        Verify train_epoch handles empty dataloader gracefully.
+        Should return a dict with empty lists aggregated (likely NaN or empty).
+        """
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            train_loader=empty_dataloader,
+            val_loader=empty_dataloader,
+            batch_size=2,
+            device=torch.device('cpu')
+        )
+        
+        # Should not raise an error
+        result = trainer.train_epoch()
+        
+        # With empty dataloader, no batches are processed
+        assert len(trainer.train_step_calls) == 0
+        # Result should be an empty dict (no losses collected)
+        assert result == {}
+    
+    def test_evaluate_epoch_with_empty_dataloader(self, minimal_model, minimal_optimizer, empty_dataloader):
+        """
+        Verify evaluate_epoch handles empty dataloader gracefully.
+        """
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            train_loader=empty_dataloader,
+            val_loader=empty_dataloader,
+            batch_size=2,
+            device=torch.device('cpu')
+        )
+        
+        # Should not raise an error
+        result = trainer.evaluate_epoch()
+        
+        # With empty dataloader, no batches are processed
+        assert len(trainer.evaluate_step_calls) == 0
+        # Result should be an empty dict (no losses collected)
+        assert result == {}
+    
+    def test_train_epoch_with_single_batch(self, minimal_model, minimal_optimizer):
+        """
+        Verify train_epoch works correctly with a single batch.
+        """
+        from torch.utils.data import DataLoader
+        from conftest import MinimalDataset
+        
+        dataset = MinimalDataset(num_samples=2, input_size=4, target_size=2)
+        train_loader = DataLoader(dataset, batch_size=2, shuffle=False)
+        
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            train_loader=train_loader,
+            val_loader=train_loader,
+            batch_size=2,
+            device=torch.device('cpu')
+        )
+        
+        result = trainer.train_epoch()
+        
+        # Should process exactly 1 batch
+        assert len(trainer.train_step_calls) == 1
+        # Result should contain loss_a and loss_b
+        assert 'loss_a' in result
+        assert 'loss_b' in result
+    
+    def test_evaluate_epoch_with_single_batch(self, minimal_model, minimal_optimizer):
+        """
+        Verify evaluate_epoch works correctly with a single batch.
+        """
+        from torch.utils.data import DataLoader
+        from conftest import MinimalDataset
+        
+        dataset = MinimalDataset(num_samples=2, input_size=4, target_size=2)
+        val_loader = DataLoader(dataset, batch_size=2, shuffle=False)
+        
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            train_loader=val_loader,
+            val_loader=val_loader,
+            batch_size=2,
+            device=torch.device('cpu')
+        )
+        
+        result = trainer.evaluate_epoch()
+        
+        # Should process exactly 1 batch
+        assert len(trainer.evaluate_step_calls) == 1
+        # Result should contain loss_a and loss_b
+        assert 'loss_a' in result
+        assert 'loss_b' in result
+    
+    def test_train_epoch_with_large_batch_count(self, minimal_model, minimal_optimizer):
+        """
+        Verify train_epoch works correctly with many batches.
+        """
+        from torch.utils.data import DataLoader
+        from conftest import MinimalDataset
+        
+        dataset = MinimalDataset(num_samples=100, input_size=4, target_size=2)
+        train_loader = DataLoader(dataset, batch_size=10, shuffle=False)
+        
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            train_loader=train_loader,
+            val_loader=train_loader,
+            batch_size=10,
+            device=torch.device('cpu')
+        )
+        
+        result = trainer.train_epoch()
+        
+        # Should process all 10 batches
+        assert len(trainer.train_step_calls) == 10
+        # Result should contain loss_a and loss_b
+        assert 'loss_a' in result
+        assert 'loss_b' in result
