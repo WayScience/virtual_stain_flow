@@ -161,3 +161,33 @@ class TestTrainEpochLossAggregation:
         # Mean = (0.1 + 0.2 + 0.3 + 0.4 + 0.5) / 5 = 0.3
         expected_mean = (0.1 + 0.2 + 0.3 + 0.4 + 0.5) / 5
         assert torch.isclose(result['loss'], torch.tensor(expected_mean))
+
+
+class TestTrainEpochEpochCounter:
+    """Test that train_epoch and evaluate_epoch work with epoch counter."""
+    
+    def test_epoch_counter_not_incremented_by_train_epoch(self, trainer_with_loaders):
+        """
+        Verify that train_epoch does NOT increment the epoch counter.
+        The epoch counter is incremented by the train() method, not train_epoch().
+        """
+        trainer = trainer_with_loaders
+        initial_epoch = trainer.epoch
+        
+        trainer.train_epoch()
+        
+        # train_epoch should not increment epoch
+        assert trainer.epoch == initial_epoch
+    
+    def test_epoch_counter_not_incremented_by_evaluate_epoch(self, trainer_with_loaders):
+        """
+        Verify that evaluate_epoch does NOT increment the epoch counter.
+        The epoch counter is incremented by the train() method, not evaluate_epoch().
+        """
+        trainer = trainer_with_loaders
+        initial_epoch = trainer.epoch
+        
+        trainer.evaluate_epoch()
+        
+        # evaluate_epoch should not increment epoch
+        assert trainer.epoch == initial_epoch
