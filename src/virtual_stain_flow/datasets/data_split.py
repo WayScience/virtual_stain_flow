@@ -52,10 +52,7 @@ def default_random_split(
     train_split, val_split, test_split = random_split(dataset, 
         [n_train, n_val, n_test]
     )
-
-    batch_size = kwargs.get("batch_size", 4)
-    shuffle = kwargs.get("shuffle", True)
-
+    
     return tuple([
         DataLoader(split, shuffle=shuffle, batch_size=batch_size) for split in [
             train_split, val_split, test_split
