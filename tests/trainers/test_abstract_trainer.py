@@ -1,6 +1,4 @@
 """
-test_trainer_epoch.py
-
 Contract tests for AbstractTrainer.train_epoch and evaluate_epoch methods
 """
 
