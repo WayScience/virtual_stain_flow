@@ -253,3 +253,28 @@ def simple_loss():
 def multiple_losses():
     """Create multiple loss functions."""
     return [torch.nn.MSELoss(), torch.nn.L1Loss()]
+
+
+class MockMetric:
+    """Mock metric class for testing."""
+    
+    def __init__(self, name: str = "mock_metric"):
+        self.name = name
+        self.call_count = 0
+    
+    def __call__(self, pred, target):
+        self.call_count += 1
+        # Return a simple metric value based on inputs
+        return torch.tensor(0.75)
+
+
+@pytest.fixture
+def mock_metric():
+    """Create a mock metric for testing."""
+    return MockMetric("accuracy")
+
+
+@pytest.fixture
+def dataset_for_splitting():
+    """Create a larger dataset suitable for train/val/test splitting."""
+    return MinimalDataset(num_samples=100, input_size=4, target_size=2)
