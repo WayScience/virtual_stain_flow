@@ -2,19 +2,23 @@
 AbstractTrainer.py
 """
 
+from __future__ import annotations
 import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, Optional, Literal, List, Union
+from typing import Dict, Optional, Literal, List, TYPE_CHECKING
 
 from tqdm import tqdm
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
-from ..vsf_logging import MlflowLogger
 from ..datasets.data_split import default_random_split
+
+
+if TYPE_CHECKING:
+    from ..vsf_logging import MlflowLogger
 
 
 class AbstractTrainer(TrainerProtocol, ABC):
@@ -30,7 +34,10 @@ class AbstractTrainer(TrainerProtocol, ABC):
         train_loader: Optional[DataLoader] = None,
         val_loader: Optional[DataLoader] = None,
         test_loader: Optional[DataLoader] = None,
-        batch_size: int = 16,
+        batch_size: Optional[int] = 16,
+        train_ratio: Optional[float] = 0.7,
+        val_ratio: Optional[float] = 0.15,
+        test_ratio: Optional[float] = 0.15,
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
         early_termination_metric: str = None,
@@ -50,7 +57,13 @@ class AbstractTrainer(TrainerProtocol, ABC):
         :param train_loader: (optional) DataLoader for training data.
         :param val_loader: (optional) DataLoader for validation data.
         :param test_loader: (optional) DataLoader for test data.
-        :param batch_size: The batch size for training.
+        :param batch_size: (optional) The batch size for training.
+        :param train_ratio: (optional) The ratio of training data when
+            dataset is provided. Default is 0.7.
+        :param val_ratio: (optional) The ratio of validation data when
+            dataset is provided. Default is 0.15.
+        :param test_ratio: (optional) The ratio of test data when
+            dataset is provided. Default is 0.15.
         :param metrics: Dictionary of metrics to be logged.
         :param device: (optional) The device to be used for training.
         :param early_termination_metric: (optional) The metric to update 
@@ -62,8 +75,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
         self._model = model
         self._optimizer = optimizer
-
-        self._batch_size = batch_size
         self._metrics = metrics if metrics else {}
 
         if isinstance(device, torch.device):
@@ -73,7 +84,16 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 "cuda" if torch.cuda.is_available() else "cpu")
 
         self._init_data(
-            dataset, train_loader, val_loader, test_loader, **kwargs)
+            dataset=dataset,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            batch_size=batch_size,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            **kwargs
+        )
         self._init_state(
             early_termination_metric, early_termination_mode, **kwargs)
 
@@ -104,10 +124,15 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def _init_data(
         self, 
+        *,
         dataset: Optional[torch.utils.data.Dataset] = None, 
         train_loader: Optional[DataLoader] = None, 
         val_loader: Optional[DataLoader] = None, 
         test_loader: Optional[DataLoader] = None, 
+        batch_size: Optional[int] = 16,
+        train_ratio: Optional[float] = 0.7,
+        val_ratio: Optional[float] = 0.15,
+        test_ratio: Optional[float] = 0.15,
         **kwargs
     ):
         if train_loader is not None:
@@ -116,12 +141,32 @@ class AbstractTrainer(TrainerProtocol, ABC):
             self._val_loader = val_loader if val_loader else []
             self._test_loader = test_loader if test_loader else []
 
+            # Set dataset attributes to None as they are not used
+            self._batch_size = None
+            self._train_ratio, self._val_ratio, self._test_ratio = (
+                None, None, None
+            )
+    
         elif dataset is not None:
+
             (
                 self._train_loader,
                 self._val_loader,
                 self._test_loader
-            ) = default_random_split(dataset, **kwargs)
+            ) = default_random_split(
+                dataset, 
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                batch_size=batch_size,
+                shuffle=True,
+                **kwargs
+            )
+
+            self._batch_size = batch_size
+            self._train_ratio, self._val_ratio, self._test_ratio = (
+                train_ratio, val_ratio, test_ratio
+            )
             
         else:
             raise ValueError(
@@ -165,37 +210,69 @@ class AbstractTrainer(TrainerProtocol, ABC):
         """
         pass
     
-    @abstractmethod
-    def train_epoch(self)->dict[str, torch.Tensor]:
+    def train_epoch(self):
         """
+        Requires implemented train_step method
+        Perform a full training epoch over the training dataset.
+        Primarily responsible for iterating over the data loader and
+            invoking train_step, and then collecting the losses.
+
         Can be overridden by subclasses to implement custom training logic.
-        Make calls to the train_step method for each batch 
-        in the training DataLoader.
 
-        Return a dictionary with loss name as key and 
-        torch tensor loss as value. Multiple losses can be returned.
-
-        :return: A dictionary containing the loss values for the epoch.
-        :rtype: dict[str, torch.Tensor]
+        :returns: A dictionary of average loss values for the epoch.
         """
+        losses = defaultdict(list)
 
-        pass        
+        batch_idx = 0
+        for inputs, targets in self._train_loader:
 
-    @abstractmethod
-    def evaluate_epoch(self)->dict[str, torch.Tensor]:
+            self._update_epoch_progress(
+                batch_idx=batch_idx,
+                num_batches=len(self._train_loader),
+                phase="Train"
+            )
+
+            batch_loss = self.train_step(inputs, targets)
+            for key, value in batch_loss.items():
+                losses[key].append(value)
+
+            batch_idx += 1            
+
+        return {
+            key: sum(values) / len(values) for key, values in losses.items()
+        }
+    
+    def evaluate_epoch(self):
         """
+        Requires implemented evaluate_step method
+        Perform a full evaluation epoch over the validation dataset.
+        Primarily responsible for iterating over the data loader and
+            invoking evaluate_step, and then collecting the losses.
+
         Can be overridden by subclasses to implement custom evaluation logic.
-        Should make calls to the evaluate_step method for each batch 
-        in the validation DataLoader.
 
-        Should return a dictionary with loss name as key and
-        torch tensor loss as value. Multiple losses can be returned.
-
-        :return: A dictionary containing the loss values for the epoch.
-        :rtype: dict[str, torch.Tensor]
+        :returns: A dictionary of average loss values for the epoch.
         """
-        
-        pass
+        losses = defaultdict(list)
+
+        batch_idx = 0
+        for inputs, targets in self._val_loader:
+
+            self._update_epoch_progress(
+                batch_idx=batch_idx,
+                num_batches=len(self._val_loader),
+                phase="Val"
+            )
+
+            batch_loss = self.evaluate_step(inputs, targets)
+            for key, value in batch_loss.items():
+                losses[key].append(value)
+
+            batch_idx += 1
+
+        return {
+            key: sum(values) / len(values) for key, values in losses.items()
+        }
 
     def train(
         self, 
@@ -215,6 +292,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         :param verbose: Whether to display the training progress bar
         """
 
+        from ..vsf_logging import MlflowLogger # lazy import to avoid circular
         if not isinstance(logger, MlflowLogger):
             raise TypeError(f"Expected logger to be an instance of "
                             f"MlflowLogger, got {type(logger)}")
@@ -497,42 +575,22 @@ class AbstractTrainer(TrainerProtocol, ABC):
     Properties for accessing the split datasets.
     """
     @property
-    def train_dataset(self, loader=False):
+    def train_dataset(self):
         """
-        Returns the training dataset or DataLoader if loader=True
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the training DataLoader
         """
-        if loader:
-            return self._train_loader
-        else:
-            return self._train_dataset
+        return self._train_loader
     
     @property
-    def val_dataset(self, loader=False):
+    def val_dataset(self):
         """
-        Returns the validation dataset or DataLoader if loader=True
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the validation DataLoader
         """
-        if loader:
-            return self._val_loader
-        else:
-            return self._val_dataset
+        return self._val_loader
     
     @property
-    def test_dataset(self, loader=False):
+    def test_dataset(self):
         """
-        Returns the test dataset or DataLoader if loader=True
-        Generates the DataLoader on the fly as the test data loader is not 
-        pre-defined during object initialization
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the test DataLoader
         """
-        if loader:
-            return DataLoader(self._test_dataset, batch_size=self._batch_size, shuffle=False)
-        else:
-            return self._test_dataset   
+        return self._test_loader

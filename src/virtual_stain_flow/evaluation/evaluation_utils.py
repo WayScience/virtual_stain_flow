@@ -3,7 +3,6 @@ from typing import List, Optional
 import pandas as pd
 import torch
 from torch.nn import Module
-from torch.utils.data import DataLoader
 
 def evaluate_per_image_metric(
     predictions: torch.Tensor,
