@@ -11,7 +11,6 @@ from .LoggerCallback import (
     log_artifact_type
 )
 from ...evaluation.visualization_utils import plot_predictions_grid_from_model
-from ...datasets.PatchDataset import PatchDataset
 
 class PlotPredictionCallback(AbstractLoggerCallback):
     def __init__(
