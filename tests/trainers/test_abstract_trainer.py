@@ -825,4 +825,172 @@ class TestProperties:
         # Verify the underlying datasets have correct sizes
         assert len(train_loader.dataset) == 60  # 60% of 100 samples
         assert len(val_loader.dataset) == 20  # 20% of 100 samples
-        assert len(test_loader.dataset) == 20  # 20% of 100 samples        
+        assert len(test_loader.dataset) == 20  # 20% of 100 samples
+    
+    def test_batch_size_property_with_dataset_init(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that batch_size property returns the correct batch size when initialized with dataset."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=8,
+            device=torch.device('cpu')
+        )
+        
+        # batch_size should be stored and accessible
+        assert trainer.batch_size == 8
+    
+    def test_batch_size_property_with_loader_init(self, minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
+        """Verify that batch_size property is None when initialized with loaders."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            train_loader=train_dataloader,
+            val_loader=val_dataloader,
+            batch_size=2,
+            device=torch.device('cpu')
+        )
+        
+        # When providing loaders, batch_size is set to None
+        assert trainer.batch_size is None
+    
+    def test_batch_size_property_default_value(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that batch_size property uses default value when not specified."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            device=torch.device('cpu')
+        )
+        
+        # Default batch_size is 16
+        assert trainer.batch_size == 16
+    
+    def test_train_ratio_property_with_dataset_init(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that train_ratio property returns the correct ratio."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            train_ratio=0.6,
+            val_ratio=0.2,
+            test_ratio=0.2,
+            device=torch.device('cpu')
+        )
+        
+        assert trainer.train_ratio == 0.6
+    
+    def test_val_ratio_property_with_dataset_init(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that val_ratio property returns the correct ratio."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            train_ratio=0.6,
+            val_ratio=0.2,
+            test_ratio=0.2,
+            device=torch.device('cpu')
+        )
+        
+        assert trainer.val_ratio == 0.2
+    
+    def test_test_ratio_property_with_dataset_init(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that test_ratio property returns the correct ratio."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            train_ratio=0.6,
+            val_ratio=0.2,
+            test_ratio=0.2,
+            device=torch.device('cpu')
+        )
+        
+        assert trainer.test_ratio == 0.2
+    
+    def test_ratio_properties_with_default_values(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that ratio properties use default values when not specified."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            device=torch.device('cpu')
+        )
+        
+        # Default ratios are 0.7, 0.15, 0.15
+        assert trainer.train_ratio == 0.7
+        assert trainer.val_ratio == 0.15
+        assert trainer.test_ratio == 0.15
+    
+    def test_ratio_properties_with_loader_init(self, minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
+        """Verify that ratio properties are None when initialized with loaders."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            train_loader=train_dataloader,
+            val_loader=val_dataloader,
+            batch_size=2,
+            device=torch.device('cpu')
+        )
+        
+        # When providing loaders, ratios are None
+        assert trainer.train_ratio is None
+        assert trainer.val_ratio is None
+        assert trainer.test_ratio is None
+    
+    def test_all_loaders_have_consistent_batch_size(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that all data loaders have the same batch size when initialized with dataset."""
+        batch_size = 8
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=batch_size,
+            device=torch.device('cpu')
+        )
+        
+        # All loaders should have the same batch size
+        # They all use the batch_size passed to the trainer
+        train_bs = trainer.train_dataset.batch_size
+        val_bs = trainer.val_dataset.batch_size
+        test_bs = trainer.test_dataset.batch_size
+        
+        assert train_bs == val_bs == test_bs
+        # Verify they're using the correct batch size
+        assert train_bs == batch_size
+    
+    def test_batch_size_affects_number_of_batches(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that changing batch_size affects the number of batches in loaders."""
+        # Smaller batch size = more batches
+        trainer_small_batch = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=5,
+            device=torch.device('cpu')
+        )
+        
+        # Larger batch size = fewer batches
+        trainer_large_batch = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=10,
+            device=torch.device('cpu')
+        )
+        
+        # Get the actual number of batches (length of DataLoader)
+        small_batch_count = len(trainer_small_batch.train_dataset)
+        large_batch_count = len(trainer_large_batch.train_dataset)
+        
+        # Verify that smaller batch size leads to more batches
+        assert small_batch_count > large_batch_count
+        
+        # With 70 train samples and batch_size=5: ceil(70/5) = 14 batches
+        # With 70 train samples and batch_size=10: ceil(70/10) = 7 batches
+        assert small_batch_count == 14
+        assert large_batch_count == 7
