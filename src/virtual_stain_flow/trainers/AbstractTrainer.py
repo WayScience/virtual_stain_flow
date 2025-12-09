@@ -572,42 +572,22 @@ class AbstractTrainer(TrainerProtocol, ABC):
     Properties for accessing the split datasets.
     """
     @property
-    def train_dataset(self, loader=False):
+    def train_dataset(self):
         """
-        Returns the training dataset or DataLoader if loader=True
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the training DataLoader
         """
-        if loader:
-            return self._train_loader
-        else:
-            return self._train_dataset
+        return self._train_loader
     
     @property
-    def val_dataset(self, loader=False):
+    def val_dataset(self):
         """
-        Returns the validation dataset or DataLoader if loader=True
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the validation DataLoader
         """
-        if loader:
-            return self._val_loader
-        else:
-            return self._val_dataset
+        return self._val_loader
     
     @property
-    def test_dataset(self, loader=False):
+    def test_dataset(self):
         """
-        Returns the test dataset or DataLoader if loader=True
-        Generates the DataLoader on the fly as the test data loader is not 
-        pre-defined during object initialization
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the test DataLoader
         """
-        if loader:
-            return DataLoader(self._test_dataset, batch_size=self._batch_size, shuffle=False)
-        else:
-            return self._test_dataset   
+        return self._test_loader

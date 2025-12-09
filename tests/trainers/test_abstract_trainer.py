@@ -692,3 +692,137 @@ class TestEarlyTermination:
         
         assert trainer.best_model is not None
         assert should_stop is False
+
+
+class TestProperties:
+    """Test that AbstractTrainer dataset properties work correctly."""
+
+    def test_train_dataset_property_returns_dataloader(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that train_dataset property returns the training DataLoader."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            device=torch.device('cpu')
+        )
+        
+        # The train_dataset property should return the DataLoader
+        train_loader = trainer.train_dataset
+        
+        from torch.utils.data import DataLoader
+        assert isinstance(train_loader, DataLoader)
+        assert train_loader is trainer._train_loader
+        assert train_loader.batch_size == 4
+    
+    def test_val_dataset_property_returns_dataloader(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that val_dataset property returns the validation DataLoader."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            device=torch.device('cpu')
+        )
+        
+        # The val_dataset property should return the DataLoader
+        val_loader = trainer.val_dataset
+        
+        from torch.utils.data import DataLoader
+        assert isinstance(val_loader, DataLoader)
+        assert val_loader is trainer._val_loader
+        assert val_loader.batch_size == 4
+    
+    def test_test_dataset_property_returns_dataloader(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that test_dataset property returns the test DataLoader."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            device=torch.device('cpu')
+        )
+        
+        # The test_dataset property should return the DataLoader
+        test_loader = trainer.test_dataset
+        
+        from torch.utils.data import DataLoader
+        assert isinstance(test_loader, DataLoader)
+        assert test_loader is trainer._test_loader
+        assert test_loader.batch_size == 4
+    
+    def test_train_dataset_underlying_dataset_has_correct_size(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that train_dataset DataLoader contains correct number of samples."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            device=torch.device('cpu')
+        )
+        
+        # Access the underlying dataset from the DataLoader
+        train_loader = trainer.train_dataset
+        
+        # Verify the dataset size is correct (70% of 100 samples)
+        assert len(train_loader.dataset) == 70
+    
+    def test_val_dataset_underlying_dataset_has_correct_size(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that val_dataset DataLoader contains correct number of samples."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            device=torch.device('cpu')
+        )
+        
+        # Access the underlying dataset from the DataLoader
+        val_loader = trainer.val_dataset
+        
+        # Verify the dataset size is correct (15% of 100 samples)
+        assert len(val_loader.dataset) == 15
+    
+    def test_test_dataset_underlying_dataset_has_correct_size(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that test_dataset DataLoader contains correct number of samples."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            device=torch.device('cpu')
+        )
+        
+        # Access the underlying dataset from the DataLoader
+        test_loader = trainer.test_dataset
+        
+        # Verify the dataset size is correct (15% of 100 samples)
+        assert len(test_loader.dataset) == 15
+    
+    def test_dataset_properties_with_custom_split_ratios(self, minimal_model, minimal_optimizer, dataset_for_splitting):
+        """Verify that dataset properties respect custom split ratios."""
+        trainer = MinimalTrainerRealization(
+            model=minimal_model,
+            optimizer=minimal_optimizer,
+            dataset=dataset_for_splitting,
+            batch_size=4,
+            train_ratio=0.6,
+            val_ratio=0.2,
+            test_ratio=0.2,
+            device=torch.device('cpu')
+        )
+        
+        train_loader = trainer.train_dataset
+        val_loader = trainer.val_dataset
+        test_loader = trainer.test_dataset
+        
+        # Verify all properties return DataLoaders
+        from torch.utils.data import DataLoader
+        assert isinstance(train_loader, DataLoader)
+        assert isinstance(val_loader, DataLoader)
+        assert isinstance(test_loader, DataLoader)
+        
+        # Verify the underlying datasets have correct sizes
+        assert len(train_loader.dataset) == 60  # 60% of 100 samples
+        assert len(val_loader.dataset) == 20  # 20% of 100 samples
+        assert len(test_loader.dataset) == 20  # 20% of 100 samples        
