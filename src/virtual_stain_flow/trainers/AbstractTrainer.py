@@ -2,20 +2,23 @@
 AbstractTrainer.py
 """
 
+from __future__ import annotations
 import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, Optional, Literal, List
+from typing import Dict, Optional, Literal, List, TYPE_CHECKING
 
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 
-from virtual_stain_flow.callbacks.MlflowLogger import MlflowLogger
-
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
 from ..datasets.data_split import default_random_split
+
+
+if TYPE_CHECKING:
+    from ..vsf_logging import MlflowLogger
 
 
 class AbstractTrainer(TrainerProtocol, ABC):
@@ -273,7 +276,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def train(
         self, 
-        logger: "MlflowLogger", 
+        logger: MlflowLogger, 
         epochs: int, 
         patience: Optional[int] = None,
         verbose: bool = True
