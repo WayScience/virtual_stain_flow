@@ -370,9 +370,9 @@ class TestDataSplitting:
             optimizer=minimal_optimizer,
             dataset=dataset_for_splitting,
             batch_size=4,
-            train_frac=0.6,
-            val_frac=0.2,
-            test_frac=0.2,
+            train_ratio=0.6,
+            val_ratio=0.2,
+            test_ratio=0.2,
             device=torch.device('cpu')
         )
         

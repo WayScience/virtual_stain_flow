@@ -31,7 +31,10 @@ class AbstractTrainer(TrainerProtocol, ABC):
         train_loader: Optional[DataLoader] = None,
         val_loader: Optional[DataLoader] = None,
         test_loader: Optional[DataLoader] = None,
-        batch_size: int = 16,
+        batch_size: Optional[int] = 16,
+        train_ratio: Optional[float] = 0.7,
+        val_ratio: Optional[float] = 0.15,
+        test_ratio: Optional[float] = 0.15,
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
         early_termination_metric: str = None,
@@ -51,7 +54,13 @@ class AbstractTrainer(TrainerProtocol, ABC):
         :param train_loader: (optional) DataLoader for training data.
         :param val_loader: (optional) DataLoader for validation data.
         :param test_loader: (optional) DataLoader for test data.
-        :param batch_size: The batch size for training.
+        :param batch_size: (optional) The batch size for training.
+        :param train_ratio: (optional) The ratio of training data when
+            dataset is provided. Default is 0.7.
+        :param val_ratio: (optional) The ratio of validation data when
+            dataset is provided. Default is 0.15.
+        :param test_ratio: (optional) The ratio of test data when
+            dataset is provided. Default is 0.15.
         :param metrics: Dictionary of metrics to be logged.
         :param device: (optional) The device to be used for training.
         :param early_termination_metric: (optional) The metric to update 
@@ -63,8 +72,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
         self._model = model
         self._optimizer = optimizer
-
-        self._batch_size = batch_size
         self._metrics = metrics if metrics else {}
 
         if isinstance(device, torch.device):
@@ -74,7 +81,16 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 "cuda" if torch.cuda.is_available() else "cpu")
 
         self._init_data(
-            dataset, train_loader, val_loader, test_loader, **kwargs)
+            dataset=dataset,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            batch_size=batch_size,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            **kwargs
+        )
         self._init_state(
             early_termination_metric, early_termination_mode, **kwargs)
 
@@ -105,10 +121,15 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def _init_data(
         self, 
+        *,
         dataset: Optional[torch.utils.data.Dataset] = None, 
         train_loader: Optional[DataLoader] = None, 
         val_loader: Optional[DataLoader] = None, 
         test_loader: Optional[DataLoader] = None, 
+        batch_size: Optional[int] = 16,
+        train_ratio: Optional[float] = 0.7,
+        val_ratio: Optional[float] = 0.15,
+        test_ratio: Optional[float] = 0.15,
         **kwargs
     ):
         if train_loader is not None:
@@ -117,12 +138,32 @@ class AbstractTrainer(TrainerProtocol, ABC):
             self._val_loader = val_loader if val_loader else []
             self._test_loader = test_loader if test_loader else []
 
+            # Set dataset attributes to None as they are not used
+            self._batch_size = None
+            self._train_ratio, self._val_ratio, self._test_ratio = (
+                None, None, None
+            )
+    
         elif dataset is not None:
+
             (
                 self._train_loader,
                 self._val_loader,
                 self._test_loader
-            ) = default_random_split(dataset, **kwargs)
+            ) = default_random_split(
+                dataset, 
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                batch_size=batch_size,
+                shuffle=True,
+                **kwargs
+            )
+
+            self._batch_size = batch_size
+            self._train_ratio, self._val_ratio, self._test_ratio = (
+                train_ratio, val_ratio, test_ratio
+            )
             
         else:
             raise ValueError(
@@ -247,7 +288,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
             after which training will be stopped. If None, early stopping is disabled.
         :param verbose: Whether to display the training progress bar
         """
-        
+
         from ..vsf_logging import MlflowLogger # lazy import to avoid circular
         if not isinstance(logger, MlflowLogger):
             raise TypeError(f"Expected logger to be an instance of "

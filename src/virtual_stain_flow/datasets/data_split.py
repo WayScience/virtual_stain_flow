@@ -4,46 +4,49 @@ data_split.py
 Module for dataset splitting, to be called by trainers during initialization.
 """
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader, random_split
 
 
 def default_random_split(
-    dataset: Dataset, 
+    dataset: Dataset,
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.15,
+    test_ratio: Optional[float] = None,
+    batch_size: int = 4,
+    shuffle: bool = True,
     **kwargs
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Randomly split a dataset into train, validation, and test sets.
     :param dataset: The dataset to split.
-    :param train_frac: Fraction of data to use for training (default: 0.7).
-    :param val_frac: Fraction of data to use for validation (default: 0.15).
-    :param test_frac: Fraction of data to use for testing (default: remaining).
+    :param train_ratio: Fraction of data to use for training (default: 0.7).
+    :param val_ratio: Fraction of data to use for validation (default: 0.15).
+    :param test_ratio: Fraction of data to use for testing (default: remaining).
     :param batch_size: Batch size for the DataLoaders (default: 4).
     :param shuffle: Whether to shuffle the data in the DataLoaders
         (default: True).
     :return: A tuple of DataLoaders for (train, val, test) splits.    
     """
-    
-    train_frac = kwargs.get("train_frac", 0.7)
-    val_frac = kwargs.get("val_frac", 0.15)
-    test_frac = kwargs.get(
-        "test_frac", 1.0 - train_frac - val_frac
-    )
-    
-    for frac in (train_frac, val_frac, test_frac):
-        if not (0.0 < frac < 1.0):
+
+    for ratio in (train_ratio, val_ratio, test_ratio):
+        if ratio is not None and not (0.0 < ratio < 1.0):
             raise ValueError(
-                "train_frac, val_frac, test_frac must be in (0.0, 1.0)"
-            )
-    if not train_frac + val_frac + test_frac <= 1.0 + 1e-8:
+                "train_ratio, val_ratio, test_ratio must be in (0.0, 1.0)"
+            )   
+
+    if not test_ratio:
+        test_ratio = 1.0 - train_ratio - val_ratio
+    
+    if not train_ratio + val_ratio + test_ratio <= 1.0 + 1e-8:
         raise ValueError(
-            "train_frac + val_frac + test_frac must sum to 1.0"
+            "train_ratio + val_ratio + test_ratio must sum to 1.0"
         )
     
-    n_train = int(len(dataset) * train_frac)
-    n_val = int(len(dataset) * val_frac)
+    n_train = int(len(dataset) * train_ratio)
+    n_val = int(len(dataset) * val_ratio)
     n_test = len(dataset) - n_train - n_val
 
     train_split, val_split, test_split = random_split(dataset, 
