@@ -11,9 +11,10 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 
+from virtual_stain_flow.callbacks.MlflowLogger import MlflowLogger
+
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
-from ..vsf_logging import MlflowLogger
 from ..datasets.data_split import default_random_split
 
 
@@ -231,7 +232,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def train(
         self, 
-        logger: MlflowLogger, 
+        logger: "MlflowLogger", 
         epochs: int, 
         patience: Optional[int] = None,
         verbose: bool = True
@@ -246,7 +247,8 @@ class AbstractTrainer(TrainerProtocol, ABC):
             after which training will be stopped. If None, early stopping is disabled.
         :param verbose: Whether to display the training progress bar
         """
-
+        
+        from ..vsf_logging import MlflowLogger # lazy import to avoid circular
         if not isinstance(logger, MlflowLogger):
             raise TypeError(f"Expected logger to be an instance of "
                             f"MlflowLogger, got {type(logger)}")

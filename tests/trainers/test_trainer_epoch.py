@@ -242,14 +242,13 @@ class TestTrainEpochEdgeCases:
         # Result should be an empty dict (no losses collected)
         assert result == {}
     
-    def test_train_epoch_with_single_batch(self, minimal_model, minimal_optimizer):
+    def test_train_epoch_with_single_batch(self, minimal_model, minimal_optimizer, small_minimal_dataset):
         """
         Verify train_epoch works correctly with a single batch.
         """
         from torch.utils.data import DataLoader
-        from conftest import MinimalDataset
         
-        dataset = MinimalDataset(num_samples=2, input_size=4, target_size=2)
+        dataset = small_minimal_dataset
         train_loader = DataLoader(dataset, batch_size=2, shuffle=False)
         
         trainer = MinimalTrainerRealization(
@@ -269,14 +268,13 @@ class TestTrainEpochEdgeCases:
         assert 'loss_a' in result
         assert 'loss_b' in result
     
-    def test_evaluate_epoch_with_single_batch(self, minimal_model, minimal_optimizer):
+    def test_evaluate_epoch_with_single_batch(self, minimal_model, minimal_optimizer, small_minimal_dataset):
         """
         Verify evaluate_epoch works correctly with a single batch.
         """
         from torch.utils.data import DataLoader
-        from conftest import MinimalDataset
         
-        dataset = MinimalDataset(num_samples=2, input_size=4, target_size=2)
+        dataset = small_minimal_dataset
         val_loader = DataLoader(dataset, batch_size=2, shuffle=False)
         
         trainer = MinimalTrainerRealization(
@@ -296,14 +294,13 @@ class TestTrainEpochEdgeCases:
         assert 'loss_a' in result
         assert 'loss_b' in result
     
-    def test_train_epoch_with_large_batch_count(self, minimal_model, minimal_optimizer):
+    def test_train_epoch_with_large_batch_count(self, minimal_model, minimal_optimizer, big_minimal_dataset):
         """
         Verify train_epoch works correctly with many batches.
         """
         from torch.utils.data import DataLoader
-        from conftest import MinimalDataset
         
-        dataset = MinimalDataset(num_samples=100, input_size=4, target_size=2)
+        dataset = big_minimal_dataset
         train_loader = DataLoader(dataset, batch_size=10, shuffle=False)
         
         trainer = MinimalTrainerRealization(
