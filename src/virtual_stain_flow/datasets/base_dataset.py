@@ -8,7 +8,7 @@ Uses a `DatasetManifest` and `FileState` backbone.
 
 from typing import Dict, Sequence, Optional, Tuple, Union, Any
 import json
-from pathlib import Path, PurePath
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
