@@ -11,7 +11,7 @@ Engine for datasets defined by not full images, but crops extracted
 """
 
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional, Sequence
+from typing import Dict, List, Any, Optional, Sequence, Tuple
 from dataclasses import dataclass, asdict
 
 import pandas as pd
