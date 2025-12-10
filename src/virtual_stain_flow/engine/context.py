@@ -67,7 +67,7 @@ class Context:
 
         :param keys: An iterable of keys that are required to be present.
         """
-        missing = [k for k in keys if not (k in self)]
+        missing = [k for k in keys if k not in self]
         if missing:
             raise ValueError(
                 f"Missing required inputs {missing} for forward group."

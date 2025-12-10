@@ -2,17 +2,23 @@
 AbstractTrainer.py
 """
 
+from __future__ import annotations
+import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, Optional, Literal
+from typing import Dict, Optional, Literal, List, TYPE_CHECKING
 
+from tqdm import tqdm
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
-from ..vsf_logging import MlflowLogger
 from ..datasets.data_split import default_random_split
+
+
+if TYPE_CHECKING:
+    from ..vsf_logging import MlflowLogger
 
 
 class AbstractTrainer(TrainerProtocol, ABC):
@@ -22,13 +28,16 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def __init__(
         self,
+        model: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
         dataset: Optional[torch.utils.data.Dataset] = None,
         train_loader: Optional[DataLoader] = None,
         val_loader: Optional[DataLoader] = None,
         test_loader: Optional[DataLoader] = None,
-        batch_size: int = 16,
-        epochs: int = 10,
-        patience: int = 5,
+        batch_size: Optional[int] = 16,
+        train_ratio: Optional[float] = 0.7,
+        val_ratio: Optional[float] = 0.15,
+        test_ratio: Optional[float] = 0.15,
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
         early_termination_metric: str = None,
@@ -36,16 +45,25 @@ class AbstractTrainer(TrainerProtocol, ABC):
         **kwargs,
     ):
         """
+        Initialize the trainer with the model, optimizer, dataset/loaders,
+
+        :param model: The model to be trained. Should be supplied by subclasses
+            to facilitate logging and checkpointing.
+        :param optimizer: The optimizer to be used for training.
+            to facilitate logging and checkpointing.
         :param dataset: (optional) The dataset to be used for training.
             Either dataset or train_loader, val_loader, test_loader
             must be provided.
         :param train_loader: (optional) DataLoader for training data.
         :param val_loader: (optional) DataLoader for validation data.
         :param test_loader: (optional) DataLoader for test data.
-        :param batch_size: The batch size for training.
-        :param epochs: The number of epochs for training.
-        :param patience: The number of epochs with no improvement, 
-            after which training will be stopped.
+        :param batch_size: (optional) The batch size for training.
+        :param train_ratio: (optional) The ratio of training data when
+            dataset is provided. Default is 0.7.
+        :param val_ratio: (optional) The ratio of validation data when
+            dataset is provided. Default is 0.15.
+        :param test_ratio: (optional) The ratio of test data when
+            dataset is provided. Default is 0.15.
         :param metrics: Dictionary of metrics to be logged.
         :param device: (optional) The device to be used for training.
         :param early_termination_metric: (optional) The metric to update 
@@ -55,9 +73,8 @@ class AbstractTrainer(TrainerProtocol, ABC):
         :param early_termination_mode: (optional)
         """
 
-        self._batch_size = batch_size
-        self._epochs = epochs
-        self._patience = patience
+        self._model = model
+        self._optimizer = optimizer
         self._metrics = metrics if metrics else {}
 
         if isinstance(device, torch.device):
@@ -67,7 +84,16 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 "cuda" if torch.cuda.is_available() else "cpu")
 
         self._init_data(
-            dataset, train_loader, val_loader, test_loader, **kwargs)
+            dataset=dataset,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            batch_size=batch_size,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            **kwargs
+        )
         self._init_state(
             early_termination_metric, early_termination_mode, **kwargs)
 
@@ -98,31 +124,54 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def _init_data(
         self, 
+        *,
         dataset: Optional[torch.utils.data.Dataset] = None, 
         train_loader: Optional[DataLoader] = None, 
         val_loader: Optional[DataLoader] = None, 
         test_loader: Optional[DataLoader] = None, 
+        batch_size: Optional[int] = 16,
+        train_ratio: Optional[float] = 0.7,
+        val_ratio: Optional[float] = 0.15,
+        test_ratio: Optional[float] = 0.15,
         **kwargs
     ):
-        if all(loader is not None for loader in [
-            train_loader, 
-            val_loader, 
-            test_loader
-        ]):
-            self._train_loader = train_loader
-            self._val_loader = val_loader
-            self._test_loader = test_loader
+        if train_loader is not None:
 
+            self._train_loader = train_loader
+            self._val_loader = val_loader if val_loader else []
+            self._test_loader = test_loader if test_loader else []
+
+            # Set dataset attributes to None as they are not used
+            self._batch_size = None
+            self._train_ratio, self._val_ratio, self._test_ratio = (
+                None, None, None
+            )
+    
         elif dataset is not None:
+
             (
                 self._train_loader,
                 self._val_loader,
                 self._test_loader
-            ) = default_random_split(dataset, **kwargs)
+            ) = default_random_split(
+                dataset, 
+                train_ratio=train_ratio,
+                val_ratio=val_ratio,
+                test_ratio=test_ratio,
+                batch_size=batch_size,
+                shuffle=True,
+                **kwargs
+            )
+
+            self._batch_size = batch_size
+            self._train_ratio, self._val_ratio, self._test_ratio = (
+                train_ratio, val_ratio, test_ratio
+            )
+            
         else:
             raise ValueError(
-                "Either provide dataset or all of "
-                "train_loader, val_loader, test_loader"
+                "Either provide dataset and specify datasplit parameters, "
+                "or provide at least train_loader."
             )
 
         return None
@@ -161,54 +210,104 @@ class AbstractTrainer(TrainerProtocol, ABC):
         """
         pass
     
-    @abstractmethod
-    def train_epoch(self)->dict[str, torch.Tensor]:
+    def train_epoch(self):
         """
+        Requires implemented train_step method
+        Perform a full training epoch over the training dataset.
+        Primarily responsible for iterating over the data loader and
+            invoking train_step, and then collecting the losses.
+
         Can be overridden by subclasses to implement custom training logic.
-        Make calls to the train_step method for each batch 
-        in the training DataLoader.
 
-        Return a dictionary with loss name as key and 
-        torch tensor loss as value. Multiple losses can be returned.
-
-        :return: A dictionary containing the loss values for the epoch.
-        :rtype: dict[str, torch.Tensor]
+        :returns: A dictionary of average loss values for the epoch.
         """
+        losses = defaultdict(list)
 
-        pass        
+        batch_idx = 0
+        for inputs, targets in self._train_loader:
 
-    @abstractmethod
-    def evaluate_epoch(self)->dict[str, torch.Tensor]:
+            self._update_epoch_progress(
+                batch_idx=batch_idx,
+                num_batches=len(self._train_loader),
+                phase="Train"
+            )
+
+            batch_loss = self.train_step(inputs, targets)
+            for key, value in batch_loss.items():
+                losses[key].append(value)
+
+            batch_idx += 1            
+
+        return {
+            key: sum(values) / len(values) for key, values in losses.items()
+        }
+    
+    def evaluate_epoch(self):
         """
+        Requires implemented evaluate_step method
+        Perform a full evaluation epoch over the validation dataset.
+        Primarily responsible for iterating over the data loader and
+            invoking evaluate_step, and then collecting the losses.
+
         Can be overridden by subclasses to implement custom evaluation logic.
-        Should make calls to the evaluate_step method for each batch 
-        in the validation DataLoader.
 
-        Should return a dictionary with loss name as key and
-        torch tensor loss as value. Multiple losses can be returned.
-
-        :return: A dictionary containing the loss values for the epoch.
-        :rtype: dict[str, torch.Tensor]
+        :returns: A dictionary of average loss values for the epoch.
         """
-        
-        pass
+        losses = defaultdict(list)
 
-    def train(self, logger: MlflowLogger):
+        batch_idx = 0
+        for inputs, targets in self._val_loader:
+
+            self._update_epoch_progress(
+                batch_idx=batch_idx,
+                num_batches=len(self._val_loader),
+                phase="Val"
+            )
+
+            batch_loss = self.evaluate_step(inputs, targets)
+            for key, value in batch_loss.items():
+                losses[key].append(value)
+
+            batch_idx += 1
+
+        return {
+            key: sum(values) / len(values) for key, values in losses.items()
+        }
+
+    def train(
+        self, 
+        logger: MlflowLogger, 
+        epochs: int, 
+        patience: Optional[int] = None,
+        verbose: bool = True
+    ):
         """
         Train the model for the specified number of epochs.
         Make calls to the train epoch and evaluate epoch methods.
+
+        :param logger: The logger to be used for logging.
+        :param epochs: The number of epochs to train the model.
+        :param patience: The number of epochs with no improvement,
+            after which training will be stopped. If None, early stopping is disabled.
+        :param verbose: Whether to display the training progress bar
         """
 
+        from ..vsf_logging import MlflowLogger # lazy import to avoid circular
         if not isinstance(logger, MlflowLogger):
             raise TypeError(f"Expected logger to be an instance of "
                             f"MlflowLogger, got {type(logger)}")
 
-        self.model.to(self.device)
         logger.bind_trainer(self)        
         if hasattr(logger, "on_train_start"):
             logger.on_train_start()
 
-        for epoch in range(self.epochs):
+        self._epochs = epochs
+        self._patience = patience if patience else epochs # no early stopping
+        self._epoch_pbar: Optional[tqdm] = tqdm(
+            range(epochs), desc="Training", unit="epoch") if verbose else None
+        iterable = self._epoch_pbar if self._epoch_pbar else range(epochs)
+
+        for epoch in iterable:
 
             # Increment the epoch counter
             self.epoch += 1
@@ -259,6 +358,9 @@ class AbstractTrainer(TrainerProtocol, ABC):
                       f"with best validation metric {self._best_loss}")
                 break
 
+        if hasattr(logger, "on_train_end"):
+            logger.on_train_end()
+
     def _collect_early_stop_metric(self) -> float:
         if self._early_termination_metric is None:
             # Do not perform early stopping when no termination metric is specified
@@ -306,6 +408,32 @@ class AbstractTrainer(TrainerProtocol, ABC):
             self.early_stop_counter += 1
 
         return self.early_stop_counter >= self.patience
+    
+    def _update_epoch_progress(
+        self,
+        batch_idx: int,
+        num_batches: int,
+        phase: Literal['Train', 'Val'] = 'Train'
+    ) -> None:
+        """
+        Helper for richer progress bar updates during epoch.
+        """
+        if self._epoch_pbar is None:
+            return
+        self._epoch_pbar.set_postfix_str(
+            f"{phase} Batch {batch_idx + 1}/{num_batches}"
+        )
+
+    @abstractmethod
+    def save_model(
+        self,
+        save_path: pathlib.Path,
+        file_name_prefix: Optional[str] = None,
+        file_name_suffix: Optional[str] = None,
+        file_ext: str = '.pth',
+        best_model: bool = True
+    ) -> Optional[List[pathlib.Path]]:
+        pass
 
     """
     Log property
@@ -447,42 +575,22 @@ class AbstractTrainer(TrainerProtocol, ABC):
     Properties for accessing the split datasets.
     """
     @property
-    def train_dataset(self, loader=False):
+    def train_dataset(self):
         """
-        Returns the training dataset or DataLoader if loader=True
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the training DataLoader
         """
-        if loader:
-            return self._train_loader
-        else:
-            return self._train_dataset
+        return self._train_loader
     
     @property
-    def val_dataset(self, loader=False):
+    def val_dataset(self):
         """
-        Returns the validation dataset or DataLoader if loader=True
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the validation DataLoader
         """
-        if loader:
-            return self._val_loader
-        else:
-            return self._val_dataset
+        return self._val_loader
     
     @property
-    def test_dataset(self, loader=False):
+    def test_dataset(self):
         """
-        Returns the test dataset or DataLoader if loader=True
-        Generates the DataLoader on the fly as the test data loader is not 
-        pre-defined during object initialization
-
-        :param loader: (bool) whether to return a DataLoader or the dataset
-        :type loader: bool
+        Returns the test DataLoader
         """
-        if loader:
-            return DataLoader(self._test_dataset, batch_size=self._batch_size, shuffle=False)
-        else:
-            return self._test_dataset   
+        return self._test_loader

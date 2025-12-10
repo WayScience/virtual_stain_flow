@@ -106,6 +106,9 @@ class LossItem:
                 f"Missing required arguments {missing} for loss computation."
             )
         
+        if hasattr(self.module, 'to'):
+            self.module.to(self.device)
+        
         raw = self.module(*[inputs[arg] for arg in self.args])
 
         return raw, raw * _scalar_from_ctx(self.weight, inputs)

@@ -3,13 +3,30 @@ repos:
     rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            examples/nbconverted/.*|
+            examples/nbconvert/.*|
+            .*\.ipynb$
+          )
 
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.0
-    hooks:
-      - id: ruff
-        args: ["--line-length=100"]
-      # linter.
-      - id: ruff-check
-        types_or: [ python, pyi ]
-        args: [ --fix ]
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.14.0
+  hooks:
+    - id: ruff
+      types_or: [python, pyi]
+      args: [--fix, --line-length=100]
+      # Only lint src/ and tests/
+      files: |
+        (?x)^(
+          src/|
+          tests/
+        )
+      # and ignore ipynb-generated Python files if needed:
+      exclude: |
+        (?x)^(
+          examples/.*|
+          .*nbconvert.*|
+          .*nbconverted.*|
+          .*\.ipynb$
+        )

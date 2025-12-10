@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import List, Tuple, Optional, Union, Dict, Any, TYPE_CHECKING
 import pathlib
 

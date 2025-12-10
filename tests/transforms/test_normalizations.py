@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-from unittest.mock import patch
 from virtual_stain_flow.transforms.normalizations import MaxScaleNormalize, ZScoreNormalize
 
 class TestMaxScaleNormalize:

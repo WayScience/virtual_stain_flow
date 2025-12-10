@@ -1,9 +1,7 @@
 from .AbstractTrainer import AbstractTrainer
-from .Trainer import Trainer
-from .WGANTrainer import WGANTrainer
+from .logging_trainer import SingleGeneratorTrainer
 
 __all__ = [
     'AbstractTrainer',
-    'Trainer',
-    'WGANTrainer',
+    'SingleGeneratorTrainer',
 ]
