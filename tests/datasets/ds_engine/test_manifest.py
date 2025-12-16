@@ -1,10 +1,17 @@
+"""
+Tests for the DatasetManifest, IndexState, and FileState classes.
+"""
+
+from pathlib import Path
+import tempfile
+
 import pytest
 import numpy as np
 import pandas as pd
-from pathlib import Path
-import tempfile
 from unittest.mock import patch, MagicMock
+
 from virtual_stain_flow.datasets.ds_engine.manifest import DatasetManifest, IndexState, FileState
+
 
 class TestDatasetManifest:
     
