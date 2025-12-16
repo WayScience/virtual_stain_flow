@@ -14,14 +14,14 @@ class TestDatasetManifest:
             'channel1': ['/path/to/img1.tif', '/path/to/img2.tif'],
             'channel2': ['/path/to/img3.tif', '/path/to/img4.tif']
         })
-        manifest = DatasetManifest(file_index=df, pil_image_mode="RGB")
+        manifest = DatasetManifest(file_index=df, pil_image_mode="RGB", check_exists=False)
         assert manifest.file_index.equals(df)
         assert manifest.pil_image_mode == "RGB"
     
     def test_init_default_pil_mode(self):
         """Test DatasetManifest uses default PIL mode."""
         df = pd.DataFrame({'channel1': ['/path/to/img1.tif']})
-        manifest = DatasetManifest(file_index=df)
+        manifest = DatasetManifest(file_index=df, check_exists=False)
         assert manifest.pil_image_mode == "I;16"
     
     def test_init_empty_dataframe_raises(self):

@@ -24,6 +24,7 @@ class BaseImageDataset(Dataset):
         self,
         *,
         file_index: Optional[pd.DataFrame] = None,
+        check_exists: bool = False,
         pil_image_mode: str = "I;16",
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
@@ -41,6 +42,7 @@ class BaseImageDataset(Dataset):
             (field of view, etc.). All cells should be path-likes to tiff files.
             Required unless `file_state` is provided (see below ).
         :param pil_image_mode: Mode for PIL images, default is "I;16".
+        :param check_exists: Whether to check if files exist at initialization.
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
         :param cache_capacity: Optional capacity for caching loaded images. 
@@ -64,7 +66,8 @@ class BaseImageDataset(Dataset):
         self.file_state = FileState(
             DatasetManifest(
                 file_index=file_index, 
-                pil_image_mode=pil_image_mode
+                pil_image_mode=pil_image_mode,
+                check_exists=check_exists
             ), 
             cache_capacity=cache_capacity
         ) if file_state is None else file_state
@@ -226,9 +229,8 @@ class BaseImageDataset(Dataset):
         :return: An instance of BaseImageDataset or its subclass.
         """
         return cls(
-            file_state=FileState.from_config( # heavy lifting handled by FileState
-                config['file_state']
-            ),
+            # heavy lifting handled by FileState
+            file_state=FileState.from_config(config.get('file_state', None)),
             input_channel_keys=config.get('input_channel_keys', None),
             target_channel_keys=config.get('target_channel_keys', None),
         )

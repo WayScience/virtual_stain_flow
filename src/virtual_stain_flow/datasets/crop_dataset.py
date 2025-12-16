@@ -20,6 +20,7 @@ class CropImageDataset(BaseImageDataset):
         self,
         *,
         file_index: Optional[pd.DataFrame] = None,
+        check_exists: bool = False,
         crop_specs: Optional[Dict[int, List[Tuple[Tuple[int, int], int, int]]]] = None,
         pil_image_mode: str = "I;16",
         cache_capacity: Optional[int] = None,
@@ -33,6 +34,7 @@ class CropImageDataset(BaseImageDataset):
         :param file_index: Optional DataFrame containing exclusively file paths as pathlikes.
             Must be provided if `crop_file_state` is not provided. See
             `BaseImageDataset` for more details on schema and requirements.
+        :param check_exists: Whether to check if the files exist. Default is False.
         :param crop_specs: Optional dictionary mapping file index positions to lists of crop
             specifications. Each crop specification is a tuple of ((x, y), width, height).
             Must be provided if `crop_file_state` is not provided.
@@ -60,7 +62,8 @@ class CropImageDataset(BaseImageDataset):
             CropManifest.from_coord_size(
                 crop_specs=crop_specs,
                 file_index=file_index,
-                pil_image_mode=pil_image_mode
+                pil_image_mode=pil_image_mode,
+                check_exists=check_exists
             ),
             cache_capacity=cache_capacity
         )

@@ -1,106 +1,13 @@
 # tests/test_base_image_dataset.py
 import json
 from pathlib import Path
-from typing import Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
 import torch
 import pytest
 
-# Import the module under test so we can monkeypatch its collaborators
-import virtual_stain_flow.datasets.base_dataset as base_mod
 from virtual_stain_flow.datasets.base_dataset import BaseImageDataset
-
-
-# Dummy for Manifest, IndexState, and FileState classes so 
-# test focuses on BaseImageDataset logic
-class DummyManifest:
-    def __init__(self, file_index: pd.DataFrame, pil_image_mode: str = "I;16"):
-        self.file_index = file_index
-        self.pil_image_mode = pil_image_mode
-
-    def __len__(self) -> int:
-        return len(self.file_index)
-
-
-class DummyIndexState:
-    def __init__(self):
-        self.updated = False
-        self.updated_with: Optional[int] = None
-        self.update_calls = 0
-
-    def update(self, idx: int):
-        self.updated = True
-        self.updated_with = idx
-        self.update_calls += 1
-
-
-class DummyFileState:
-    def __init__(self, manifest: DummyManifest, cache_capacity: Optional[int] = None):
-        self.manifest = manifest
-        # Implement the same default logic as real FileState
-        if cache_capacity is None:
-            self.cache_capacity = manifest.file_index.shape[1]  # equivalent to manifest.n_channels
-        else:
-            self.cache_capacity = cache_capacity
-        self.update_calls = 0
-        self.last_update_kwargs = None
-        self.input_image_raw = None
-        self.target_image_raw = None
-
-    def update(
-        self,
-        idx: int,
-        input_keys: Optional[Union[str, Sequence[str]]] = None,
-        target_keys: Optional[Union[str, Sequence[str]]] = None,
-    ):
-        # record call
-        self.update_calls += 1
-        self.last_update_kwargs = {
-            "idx": idx,
-            "input_keys": list(input_keys) if input_keys is not None else [],
-            "target_keys": list(target_keys) if target_keys is not None else [],
-        }
-        # fabricate deterministic "loaded" arrays
-        # shape is arbitrary but stable
-        self.input_image_raw = np.full((2, 3), float(idx), dtype=np.float32)
-        self.target_image_raw = np.full((2, 3), float(idx + 1), dtype=np.float32)
-
-
-# fixture to auto-patch the .manifest collaborators for all tests
-@pytest.fixture(autouse=True)
-def patch_manifest_classes(monkeypatch):
-    """
-    Automatically monkeypatch the .manifest collaborators for all tests.
-    """
-    monkeypatch.setattr(base_mod, "DatasetManifest", DummyManifest)
-    monkeypatch.setattr(base_mod, "IndexState", DummyIndexState)
-    monkeypatch.setattr(base_mod, "FileState", DummyFileState)
-
-
-@pytest.fixture
-def file_index():
-    """Minimal, pathlike-only DataFrame matching the class contract."""
-    return pd.DataFrame(
-        {
-            "input_ch1": [Path("/data/img_0_in1.tif"), Path("/data/img_1_in1.tif")],
-            "input_ch2": [Path("/data/img_0_in2.tif"), Path("/data/img_1_in2.tif")],
-            "target_ch1": [Path("/data/img_0_tar.tif"), Path("/data/img_1_tar.tif")],
-        }
-    )
-
-
-@pytest.fixture
-def basic_dataset(file_index):
-    """Basic dataset with valid channel keys for testing."""
-    return BaseImageDataset(
-        file_index=file_index,
-        pil_image_mode="I;16",
-        input_channel_keys=["input_ch1", "input_ch2"],
-        target_channel_keys="target_ch1",
-        cache_capacity=8,
-    )
 
 
 class TestBaseImageDataset:
@@ -183,25 +90,25 @@ class TestBaseImageDataset:
         inp_np, tar_np = basic_dataset.get_raw_item(1)
         assert isinstance(inp_np, np.ndarray)
         assert isinstance(tar_np, np.ndarray)
-        assert np.all(inp_np == 1.0)
-        assert np.all(tar_np == 2.0)
+        # For image 1: input_ch1=3, input_ch2=4, target_ch1=2
+        assert inp_np.shape == (2, 10, 10)  # 2 input channels
+        assert tar_np.shape == (1, 10, 10)  # 1 target channel
+        assert np.all(inp_np[0] == 3)  # input_ch1 for image 1
+        assert np.all(inp_np[1] == 4)  # input_ch2 for image 1
+        assert np.all(tar_np[0] == 2)  # target_ch1 for image 1
 
     def test_get_raw_item_triggers_state_updates(self, basic_dataset):
         """Test get_raw_item triggers IndexState and FileState updates."""
         basic_dataset.get_raw_item(1)
         
-        # Check IndexState update
-        assert basic_dataset.index_state.updated is True
-        assert basic_dataset.index_state.updated_with == 1
-        assert basic_dataset.index_state.update_calls >= 1
+        # Check IndexState update - it should record the last index
+        assert basic_dataset.index_state.last == 1
         
-        # Check FileState update
-        assert basic_dataset.file_state.update_calls >= 1
-        assert basic_dataset.file_state.last_update_kwargs == {
-            "idx": 1,
-            "input_keys": ["input_ch1", "input_ch2"],
-            "target_keys": ["target_ch1"],
-        }
+        # Check FileState update - it should have loaded the correct paths
+        assert len(basic_dataset.file_state.input_paths) == 2
+        assert len(basic_dataset.file_state.target_paths) == 1
+        assert basic_dataset.file_state.input_image_raw is not None
+        assert basic_dataset.file_state.target_image_raw is not None
 
     def test_getitem_returns_tensors(self, basic_dataset):
         """Test __getitem__ returns torch tensors with correct dtype."""
@@ -210,8 +117,12 @@ class TestBaseImageDataset:
         assert isinstance(tar_t, torch.Tensor)
         assert inp_t.dtype == torch.float32
         assert tar_t.dtype == torch.float32
-        assert torch.all(inp_t == 1.0)
-        assert torch.all(tar_t == 2.0)
+        # For image 1: input_ch1=3, input_ch2=4, target_ch1=2
+        assert inp_t.shape == (2, 10, 10)
+        assert tar_t.shape == (1, 10, 10)
+        assert torch.all(inp_t[0] == 3.0)  # input_ch1 for image 1
+        assert torch.all(inp_t[1] == 4.0)  # input_ch2 for image 1
+        assert torch.all(tar_t[0] == 2.0)  # target_ch1 for image 1
 
     def test_channel_keys_setter_valid(self, basic_dataset):
         """Test channel keys setter with valid inputs."""
@@ -266,34 +177,52 @@ class TestBaseImageDatasetSerialization:
     def test_to_config_contains_expected_fields(self, basic_dataset):
         """Test to_config contains all expected fields."""
         cfg = basic_dataset.to_config()
+        
         expected_keys = [
-            "file_index",
-            "pil_image_mode", 
-            "input_channel_keys",
-            "target_channel_keys",
-            "cache_capacity",
-            "dataset_length",
+            "file_state",
         ]
         for key in expected_keys:
             assert key in cfg
+        
+        state_cfg = cfg.get("file_state", {})
+        expected_keys_state = [
+            "cache_capacity",
+            "manifest",
+        ]
+        for key in expected_keys_state:
+            assert key in state_cfg
+        
+        manifest_cfg = state_cfg.get("manifest", {})
+        expected_keys_manifest = [
+            "file_index",
+            "pil_image_mode",
+        ]
+        for key in expected_keys_manifest:
+            assert key in manifest_cfg
 
     def test_to_config_dataset_length(self, basic_dataset):
         """Test to_config dataset_length matches actual length."""
         cfg = basic_dataset.to_config()
-        assert cfg["dataset_length"] == len(basic_dataset)
+        assert len(cfg.get("file_state", {}).get("manifest", {}).get("file_index", [])) == len(basic_dataset)
 
     def test_to_config_file_index_structure(self, basic_dataset):
         """Test to_config file_index has correct structure."""
         cfg = basic_dataset.to_config()
-        file_index = cfg["file_index"]
+        file_index = cfg.get(
+            "file_state", {}).get("manifest", {}).get("file_index", []
+        )
         
-        assert set(file_index.keys()) == {"records", "columns"}
-        assert file_index["columns"] == list(basic_dataset.file_index.columns)
+        assert len(file_index) > 0
+
+        for record in file_index:
+            assert "input_ch1" in record
+            assert "input_ch2" in record
+            assert "target_ch1" in record
         
         # All paths should be converted to strings
-        for record in file_index["records"]:
-            for col in file_index["columns"]:
-                assert isinstance(record[col], str)
+        for record in file_index:
+            for key, value in record.items():
+                assert isinstance(value, str)
 
     def test_from_config_roundtrip(self, basic_dataset):
         """Test from_config can reconstruct dataset from to_config output."""
@@ -314,18 +243,38 @@ class TestBaseImageDatasetSerialization:
     def test_from_config_missing_file_index(self):
         """Test from_config raises ValueError when file_index is missing."""
         config = {"pil_image_mode": "I;16"}
-        with pytest.raises(ValueError, match="Expected 'file_index' in config"):
+        with pytest.raises(TypeError, match="Expected config to be a dict"):
             BaseImageDataset.from_config(config)
 
-    def test_from_config_missing_pil_image_mode(self, file_index):
-        """Test from_config raises ValueError when pil_image_mode is missing."""
         config = {
-            "file_index": {
-                "records": file_index.to_dict('records'),
-                "columns": list(file_index.columns)
+            "pil_image_mode": "I;16", 
+            "file_state": {
+                "manifest": None
             }
         }
-        with pytest.raises(ValueError, match="Expected 'pil_image_mode' in config"):
+        with pytest.raises(ValueError, match="Missing 'manifest' key in config"):
+            BaseImageDataset.from_config(config)
+
+        config = {
+            "pil_image_mode": "I;16", 
+            "file_state": {
+                "manifest": {
+                    "file_index": None
+                }
+            }
+        }
+        with pytest.raises(ValueError, match="Missing 'file_index' key in manifest config"):
+            BaseImageDataset.from_config(config)
+
+        config = {
+            "pil_image_mode": "I;16", 
+            "file_state": {
+                "manifest": {
+                    "file_index": {}
+                }
+            }
+        }
+        with pytest.raises(TypeError, match="Expected file_index to be a list"):
             BaseImageDataset.from_config(config)
 
     def test_to_json_config_creates_file(self, tmp_path, basic_dataset):
@@ -339,9 +288,14 @@ class TestBaseImageDatasetSerialization:
         with open(output_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         
-        assert "file_index" in data
-        assert "records" in data["file_index"]
-        assert data["dataset_length"] == len(basic_dataset)
+        assert "file_state" in data
+        assert "input_channel_keys" in data
+        assert "target_channel_keys" in data
+        assert "manifest" in data["file_state"]
+        assert "cache_capacity" in data["file_state"]
+        assert "file_index" in data["file_state"]["manifest"]
+        assert "pil_image_mode" in data["file_state"]["manifest"]
+        assert len(data["file_state"]["manifest"]["file_index"]) == len(basic_dataset)
 
     def test_to_json_config_roundtrip(self, tmp_path, basic_dataset):
         """Test full JSON serialization roundtrip."""
