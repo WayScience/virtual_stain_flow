@@ -59,6 +59,8 @@ class CropManifest:
         :param manifest: Optional pre-initialized DatasetManifest. If provided,
             it takes precedence over `file_index`. Intended to be used by only
             .from_config class method and similar deserialization utilities.
+        :param kwargs: Additional arguments other than file_index to pass
+            to DatasetManifest. See DatasetManifest docstring for details.
         """
         if not crops:
             raise ValueError("crops list cannot be empty.")
