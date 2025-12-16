@@ -242,8 +242,9 @@ class TestBaseImageDatasetSerialization:
 
     def test_from_config_missing_file_index(self):
         """Test from_config raises ValueError when file_index is missing."""
+        
         config = {"pil_image_mode": "I;16"}
-        with pytest.raises(TypeError, match="Expected config to be a dict"):
+        with pytest.raises(ValueError, match="Configuration must include 'file_state'."):
             BaseImageDataset.from_config(config)
 
         config = {

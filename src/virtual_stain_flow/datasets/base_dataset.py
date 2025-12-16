@@ -228,6 +228,14 @@ class BaseImageDataset(Dataset):
         :param config: Configuration dictionary.
         :return: An instance of BaseImageDataset or its subclass.
         """
+
+        file_state_config = config.get('file_state', None)
+        if file_state_config is None:
+            raise ValueError(
+                "Configuration must include 'file_state'."
+                "Perhaps this is the wrong configuration for BaseImageDataset?"
+            )
+
         return cls(
             # heavy lifting handled by FileState
             file_state=FileState.from_config(config.get('file_state', None)),
