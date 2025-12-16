@@ -34,8 +34,12 @@ class BaseImageDataset(Dataset):
         """
         Initializes the BaseImageDataset.
 
-        :param file_index: Optional DataFrame containing exclusively file paths as pathlikes
-            Must be provided if `file_state` is not provided.
+        :param file_index: DataFrame specifying paths to images, intended
+            to be provided by the user upon creation of the dataset.
+            Expected a dataframe with columns corresponding to the identifiers
+            of channels and rows corresponding to individual imaging positions
+            (field of view, etc.). All cells should be path-likes to tiff files.
+            Required unless `file_state` is provided (see below ).
         :param pil_image_mode: Mode for PIL images, default is "I;16".
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
@@ -48,8 +52,8 @@ class BaseImageDataset(Dataset):
             invalid.     
         :param file_state: Optional pre-initialized FileState object. If provided,
             it takes precedence over `file_index` and `pil_image_mode`. Intended
-            to be used by only .from_config class method and similar deserialization
-            utilities.         
+            to be used internally by only .from_config class method and similar deserialization
+            utilities. Users should provide file_index to initialize datasets.
         """
         self.index_state = IndexState()
 

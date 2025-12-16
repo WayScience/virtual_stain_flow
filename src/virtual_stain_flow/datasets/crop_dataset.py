@@ -31,7 +31,8 @@ class CropImageDataset(BaseImageDataset):
         Initialize the CropImageDataset.
 
         :param file_index: Optional DataFrame containing exclusively file paths as pathlikes.
-            Must be provided if `crop_file_state` is not provided.
+            Must be provided if `crop_file_state` is not provided. See
+            `BaseImageDataset` for more details on schema and requirements.
         :param crop_specs: Optional dictionary mapping file index positions to lists of crop
             specifications. Each crop specification is a tuple of ((x, y), width, height).
             Must be provided if `crop_file_state` is not provided.
