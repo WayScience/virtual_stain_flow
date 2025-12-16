@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from virtual_stain_flow.datasets.base_dataset import BaseImageDataset
+from virtual_stain_flow.datasets.crop_dataset import CropImageDataset
 from virtual_stain_flow.datasets.ds_engine.manifest import DatasetManifest
 
 
@@ -87,3 +88,31 @@ def basic_dataset(file_index):
 def sample_manifest(file_index):
     """Create a simple manifest for testing."""
     return DatasetManifest(file_index=file_index, pil_image_mode="I;16")
+
+
+@pytest.fixture
+def crop_specs():
+    """
+    Create crop specifications for testing.
+    Defines 2 crops per image for 3 images (total 6 crops).
+    Each crop is 4x4 pixels.
+    """
+    return {
+        0: [((0, 0), 4, 4), ((5, 5), 4, 4)],  # 2 crops from image 0
+        1: [((0, 0), 4, 4), ((5, 5), 4, 4)],  # 2 crops from image 1
+        2: [((0, 0), 4, 4), ((5, 5), 4, 4)],  # 2 crops from image 2
+    }
+
+
+@pytest.fixture
+def crop_dataset(file_index, crop_specs):
+    """Basic crop dataset with valid channel keys for testing."""
+    return CropImageDataset(
+        file_index=file_index,
+        crop_specs=crop_specs,
+        pil_image_mode="I;16",
+        check_exists=False,
+        input_channel_keys=["input_ch1", "input_ch2"],
+        target_channel_keys="target_ch1",
+        cache_capacity=8,
+    )

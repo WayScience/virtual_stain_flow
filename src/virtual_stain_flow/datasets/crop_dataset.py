@@ -110,6 +110,21 @@ class CropImageDataset(BaseImageDataset):
         :param config: Dict containing the configuration produced
             by `CropImageDataset.to_config()`.
         """
+
+        crop_file_state_config = config.get('crop_file_state', None)
+        if crop_file_state_config is None:
+
+            if "file_state" in config:
+                raise ValueError(
+                    "Expected configuration for CropImageDataset. "
+                    "Likely the received configuration is for BaseImageDataset "
+                    "or other subclasses and not CropImageDataset."
+                )
+
+            raise ValueError(
+                "Configuration missing required field 'crop_file_state'. "
+                "Perhaps this is the wrong configuration for CropImageDataset?"
+            )
         
         return cls(
             crop_file_state=CropFileState.from_config(
