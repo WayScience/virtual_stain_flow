@@ -156,9 +156,9 @@ class DatasetManifest:
 
         file_index = config.get('file_index', None)
         if file_index is None:
-            raise ValueError("Missing 'file_index' key in manifest config")
+            raise ValueError("DatasetManifest.from_config: missing 'file_index' key in config")
         if not isinstance(file_index, list):
-            raise TypeError(f"Expected file_index to be a list, got {type(file_index)}")
+            raise TypeError(f"DatasetManifest.from_config: expected 'file_index' to be a list, got {type(file_index).__name__}")
 
         return cls(
             file_index=cls._deserialize_file_index(
@@ -360,13 +360,13 @@ class FileState:
         Responsible for also deserializing the underlying manifest.
         """
         if not isinstance(config, dict):
-            raise TypeError(f"Expected config to be a dict, got {type(config)}")
+            raise TypeError(f"FileState.from_config: expected config to be a dict, got {type(config).__name__}")
         
         manifest_config = config.get('manifest', None)
         if manifest_config is None:
-            raise ValueError("Missing 'manifest' key in config")
+            raise ValueError("FileState.from_config: missing 'manifest' key in config")
         if not isinstance(manifest_config, dict):
-            raise TypeError(f"Expected manifest to be a dict, got {type(manifest_config)}")
+            raise TypeError(f"FileState.from_config: expected 'manifest' to be a dict, got {type(manifest_config).__name__}")
 
         return cls(
             manifest=DatasetManifest.from_config(manifest_config),

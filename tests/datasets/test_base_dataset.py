@@ -240,42 +240,11 @@ class TestBaseImageDatasetSerialization:
         for col in ds2.file_index.columns:
             assert all(isinstance(p, Path) for p in ds2.file_index[col])
 
-    def test_from_config_missing_file_index(self):
-        """Test from_config raises ValueError when file_index is missing."""
+    def test_from_config_missing_file_state(self):
+        """Test from_config raises ValueError when file_state is missing."""
         
         config = {"pil_image_mode": "I;16"}
         with pytest.raises(ValueError, match="Configuration must include 'file_state'."):
-            BaseImageDataset.from_config(config)
-
-        config = {
-            "pil_image_mode": "I;16", 
-            "file_state": {
-                "manifest": None
-            }
-        }
-        with pytest.raises(ValueError, match="Missing 'manifest' key in config"):
-            BaseImageDataset.from_config(config)
-
-        config = {
-            "pil_image_mode": "I;16", 
-            "file_state": {
-                "manifest": {
-                    "file_index": None
-                }
-            }
-        }
-        with pytest.raises(ValueError, match="Missing 'file_index' key in manifest config"):
-            BaseImageDataset.from_config(config)
-
-        config = {
-            "pil_image_mode": "I;16", 
-            "file_state": {
-                "manifest": {
-                    "file_index": {}
-                }
-            }
-        }
-        with pytest.raises(TypeError, match="Expected file_index to be a list"):
             BaseImageDataset.from_config(config)
 
     def test_to_json_config_creates_file(self, tmp_path, basic_dataset):

@@ -118,8 +118,23 @@ class CropManifest:
         Deserialize from dict.
         Also deserializes the underlying DatasetManifest.
         """
-        crops = [Crop.from_dict(c) for c in config['crops']]
-        manifest = DatasetManifest.from_config(config['manifest'])
+        if not isinstance(config, dict):
+            raise TypeError(f"CropManifest.from_config: expected config to be a dict, got {type(config).__name__}")
+        
+        crops_config = config.get('crops', None)
+        if crops_config is None:
+            raise ValueError("CropManifest.from_config: missing 'crops' key in config")
+        if not isinstance(crops_config, list):
+            raise TypeError(f"CropManifest.from_config: expected 'crops' to be a list, got {type(crops_config).__name__}")
+        
+        manifest_config = config.get('manifest', None)
+        if manifest_config is None:
+            raise ValueError("CropManifest.from_config: missing 'manifest' key in config")
+        if not isinstance(manifest_config, dict):
+            raise TypeError(f"CropManifest.from_config: expected 'manifest' to be a dict, got {type(manifest_config).__name__}")
+        
+        crops = [Crop.from_dict(c) for c in crops_config]
+        manifest = DatasetManifest.from_config(manifest_config)
         return cls(crops, manifest=manifest)
     
     @classmethod
@@ -312,12 +327,12 @@ class CropFileState:
         Also deserializes the underlying CropManifest.
         """
         if not isinstance(config, dict):
-            raise TypeError("Expected CropFileState config to be a dict.")
+            raise TypeError(f"CropFileState.from_config: expected config to be a dict, got {type(config).__name__}")
         crop_collection_config = config.get('crop_collection', None)
         if crop_collection_config is None:
-            raise ValueError("Missing 'crop_collection' key in CropFileState config.")
+            raise ValueError("CropFileState.from_config: missing 'crop_collection' key in config")
         if not isinstance(crop_collection_config, dict):
-            raise TypeError("Expected 'crop_collection' to be a dict.")
+            raise TypeError(f"CropFileState.from_config: expected 'crop_collection' to be a dict, got {type(crop_collection_config).__name__}")
 
         return cls(
             crop_collection=CropManifest.from_config(crop_collection_config),

@@ -519,3 +519,57 @@ class TestCropFileState:
         # After reset
         cfs.reset()
         assert cfs.crop_info is None
+
+
+class TestCropManifestSerialization:
+    """Test suite for CropManifest serialization methods."""
+
+    def test_from_config_invalid_config_type(self):
+        """Test CropManifest.from_config raises TypeError when config is not a dict."""
+        with pytest.raises(TypeError, match="CropManifest.from_config: expected config to be a dict"):
+            CropManifest.from_config("not_a_dict")
+
+    def test_from_config_missing_crops(self):
+        """Test CropManifest.from_config raises ValueError when crops is missing."""
+        config = {"manifest": {"file_index": [], "pil_image_mode": "I;16"}}
+        with pytest.raises(ValueError, match="CropManifest.from_config: missing 'crops' key in config"):
+            CropManifest.from_config(config)
+
+    def test_from_config_invalid_crops_type(self):
+        """Test CropManifest.from_config raises TypeError when crops is not a list."""
+        config = {"crops": "not_a_list", "manifest": {"file_index": [], "pil_image_mode": "I;16"}}
+        with pytest.raises(TypeError, match="CropManifest.from_config: expected 'crops' to be a list"):
+            CropManifest.from_config(config)
+
+    def test_from_config_missing_manifest(self):
+        """Test CropManifest.from_config raises ValueError when manifest is missing."""
+        config = {"crops": [{"manifest_idx": 0, "x": 0, "y": 0, "width": 10, "height": 10}]}
+        with pytest.raises(ValueError, match="CropManifest.from_config: missing 'manifest' key in config"):
+            CropManifest.from_config(config)
+
+    def test_from_config_invalid_manifest_type(self):
+        """Test CropManifest.from_config raises TypeError when manifest is not a dict."""
+        config = {"crops": [{"manifest_idx": 0, "x": 0, "y": 0, "width": 10, "height": 10}], "manifest": "not_a_dict"}
+        with pytest.raises(TypeError, match="CropManifest.from_config: expected 'manifest' to be a dict"):
+            CropManifest.from_config(config)
+
+
+class TestCropFileStateSerialization:
+    """Test suite for CropFileState serialization methods."""
+
+    def test_from_config_invalid_config_type(self):
+        """Test CropFileState.from_config raises TypeError when config is not a dict."""
+        with pytest.raises(TypeError, match="CropFileState.from_config: expected config to be a dict"):
+            CropFileState.from_config("not_a_dict")
+
+    def test_from_config_missing_crop_collection(self):
+        """Test CropFileState.from_config raises ValueError when crop_collection is missing."""
+        config = {"cache_capacity": 10, "crop_collection": None}
+        with pytest.raises(ValueError, match="CropFileState.from_config: missing 'crop_collection' key in config"):
+            CropFileState.from_config(config)
+
+    def test_from_config_invalid_crop_collection_type(self):
+        """Test CropFileState.from_config raises TypeError when crop_collection is not a dict."""
+        config = {"cache_capacity": 10, "crop_collection": "not_a_dict"}
+        with pytest.raises(TypeError, match="CropFileState.from_config: expected 'crop_collection' to be a dict"):
+            CropFileState.from_config(config)
