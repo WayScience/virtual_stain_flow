@@ -106,11 +106,14 @@ class CropImageDataset(BaseImageDataset):
         Deserialize from dict.
         Mirrors design of BaseImageDataset.from_config().
         Deserializes the underlying CropFileState.
+
+        :param config: Dict containing the configuration produced
+            by `CropImageDataset.to_config()`.
         """
+        
         return cls(
             crop_file_state=CropFileState.from_config(
-                config['crop_file_state']
-            ),
+                config.get('crop_file_state', None)),
             input_channel_keys=config.get('input_channel_keys', None),
             target_channel_keys=config.get('target_channel_keys', None)
         )

@@ -311,7 +311,14 @@ class CropFileState:
         Deserialize from config dict.
         Also deserializes the underlying CropManifest.
         """
+
+        crop_collection_config = config.get('crop_collection', None)
+        if crop_collection_config is None:
+            raise ValueError("Missing 'crop_collection' key in CropFileState config.")
+        if not isinstance(crop_collection_config, dict):
+            raise TypeError("Expected 'crop_collection' to be a dict.")
+
         return cls(
-            crop_collection=CropManifest.from_config(config['crop_collection']),
+            crop_collection=CropManifest.from_config(crop_collection_config),
             cache_capacity=config.get('cache_capacity', None)
         )
