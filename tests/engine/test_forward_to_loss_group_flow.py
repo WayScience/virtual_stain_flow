@@ -5,12 +5,9 @@ This module tests the correct interaction between forward groups and loss groups
 including gradient computation, optimizer state management, and training vs. eval modes.
 """
 
-import pytest
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
-from virtual_stain_flow.engine.forward_groups import GeneratorForwardGroup
 from virtual_stain_flow.engine.loss_group import LossItem, LossGroup
 from virtual_stain_flow.engine.context import Context
 from virtual_stain_flow.engine.names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL
@@ -132,7 +129,7 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
 
         # Check that gradients exist after first backward
         first_grad_norms = [
-            param.grad.norm().item() for param in forward_group.models[GENERATOR_MODEL].parameters()
+            param.grad.norm().item() for param in forward_group._models[GENERATOR_MODEL].parameters()
             if param.grad is not None
         ]
         assert len(first_grad_norms) > 0
@@ -152,7 +149,7 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
 
         # Gradients should exist again after second backward
         second_grad_norms = [
-            param.grad.norm().item() for param in forward_group.models[GENERATOR_MODEL].parameters()
+            param.grad.norm().item() for param in forward_group._models[GENERATOR_MODEL].parameters()
             if param.grad is not None
         ]
         assert len(second_grad_norms) > 0
@@ -198,7 +195,6 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
         self, forward_group, torch_device, random_input, random_target
     ):
         """Test that disabled loss items are not included in total loss."""
-        from virtual_stain_flow.engine.loss_group import LossItem, LossGroup
         from virtual_stain_flow.engine.names import PREDS, TARGETS
         
         loss_group = LossGroup(
@@ -233,7 +229,6 @@ class TestGeneratorForwardGroupAndLossGroupIntegration:
         self, forward_group, torch_device, random_input, random_target
     ):
         """Test that compute_at_val flag works correctly."""
-        from virtual_stain_flow.engine.loss_group import LossItem, LossGroup
         from virtual_stain_flow.engine.names import PREDS, TARGETS
         
         # Loss item that should only be computed during training

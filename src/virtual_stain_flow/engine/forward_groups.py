@@ -63,8 +63,8 @@ class AbstractForwardGroup(ABC):
         """
         Initialize the forward group. Subclass should override as needed.
         """
-        self.models: Dict[str, nn.Module] = {}
-        self.optimizer: Dict[str, Optional[optim.Optimizer]] = {}
+        self._models: Dict[str, nn.Module] = {}
+        self._optimizers: Dict[str, Optional[optim.Optimizer]] = {}
         self.device = device
 
     def _move_tensors(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -107,9 +107,25 @@ class AbstractForwardGroup(ABC):
         """
         Convenience function to step all optimizers in the group.
         """
-        for opt in self.optimizer.values():
+        for opt in self._optimizers.values():
             if opt is not None:
                 opt.step()
+
+    @property
+    @abstractmethod
+    def model(self) -> nn.Module:
+        """
+        Convenience property to access the main model of the forward group.
+        """
+        pass
+    
+    @property
+    @abstractmethod
+    def optimizer(self) -> Optional[optim.Optimizer]:
+        """
+        Convenience property to access the main optimizer of the forward group.
+        """
+        pass
 
 
 class GeneratorForwardGroup(AbstractForwardGroup):
@@ -136,9 +152,9 @@ class GeneratorForwardGroup(AbstractForwardGroup):
     ):
         super().__init__(device=device)
 
-        self.models[GENERATOR_MODEL] = generator
-        self.models[GENERATOR_MODEL].to(self.device)
-        self.optimizer[GENERATOR_MODEL] = optimizer
+        self._models[GENERATOR_MODEL] = generator
+        self._models[GENERATOR_MODEL].to(self.device)
+        self._optimizers[GENERATOR_MODEL] = optimizer
 
     def __call__(self, train: bool, **inputs: torch.Tensor) -> Context:
         """
@@ -150,9 +166,9 @@ class GeneratorForwardGroup(AbstractForwardGroup):
             whether gradients should be computed.
         :param inputs: Keyword arguments of input tensors.
         """
-        
-        fp_model = self.models[GENERATOR_MODEL]
-        fp_optimizer = self.optimizer[GENERATOR_MODEL]
+
+        fp_model = self.model
+        fp_optimizer = self.optimizer
         
         # 1) Stage and validate inputs/targets
         ctx = Context(**self._move_tensors(inputs), **{GENERATOR_MODEL: fp_model })
@@ -177,3 +193,17 @@ class GeneratorForwardGroup(AbstractForwardGroup):
 
         # 5) Return enriched context (preds available for losses/metrics)
         return ctx.add(**outputs)
+    
+    @property
+    def model(self) -> nn.Module:
+        """
+        Convenience property to access the generator model directly.
+        """
+        return self._models[GENERATOR_MODEL]
+
+    @property
+    def optimizer(self) -> Optional[optim.Optimizer]:
+        """
+        Convenience property to access the generator optimizer directly.
+        """
+        return self._optimizers[GENERATOR_MODEL]

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.2] - 2025-11-17
+
+### Added
+
+#### training infrastructure (`virtual_stain_flow/engine/...`)
+- Abstract away the forward pass and multiple loss accumulation from trainers
+#### logging trainer (`virutal_stain_flow/trainers/logging_trainer.py`)
+- New logging trainer for single generator model training using `engine`
+
+### Refactors
+
+#### abstract trainer (`virutal_stain_flow/trainers/AbstractTrainer.py`)
+- Add progress bar
+
+### Removes
+
+#### Obselete trainer classes (`virutal_stain_flow/trainers/logging_trainers/...`)
+
+---
+
 ## [0.4.1] - 2025-10-16
 
 ### Added

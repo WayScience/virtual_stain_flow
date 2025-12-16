@@ -78,7 +78,7 @@ class TestGeneratorForwardGroup:
         assert ctx[INPUTS].device == device
         assert ctx[TARGETS].device == device
         assert ctx[PREDS].device == device
-        assert next(forward_group.models[GENERATOR_MODEL].parameters()).device == device
+        assert next(forward_group._models[GENERATOR_MODEL].parameters()).device == device
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
     def test_cuda_forward(self, simple_conv_model, random_input, random_target):
@@ -97,7 +97,7 @@ class TestGeneratorForwardGroup:
         assert ctx[INPUTS].device == device
         assert ctx[TARGETS].device == device
         assert ctx[PREDS].device == device
-        assert next(forward_group.models[GENERATOR_MODEL].parameters()).device == device
+        assert next(forward_group._models[GENERATOR_MODEL].parameters()).device == device
 
     def test_forward_missing_required_input(self, simple_conv_model, random_target):
         """Test that forward raises error when required input is missing."""
