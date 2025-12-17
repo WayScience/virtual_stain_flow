@@ -336,3 +336,28 @@ class TestCropImageDatasetDataLoader:
         for inp_batch, tar_batch in loader:
             assert inp_batch.shape[0] <= 2
             assert tar_batch.shape[0] <= 2
+
+
+class TestCropImageDatasetFromBaseDataset:
+    """Test suite for CropImageDataset.from_base_dataset class method."""
+
+    def test_from_base_dataset_default_center_crops(self, basic_dataset):
+        """Test from_base_dataset creates CropImageDataset with default center crops."""
+        crop_ds = CropImageDataset.from_base_dataset(basic_dataset, crop_size=4)
+        
+        # Should have one center crop per image (3 images)
+        assert len(crop_ds) == 3
+        
+        # Should preserve channel keys
+        assert crop_ds.input_channel_keys == basic_dataset.input_channel_keys
+        assert crop_ds.target_channel_keys == basic_dataset.target_channel_keys
+        assert crop_ds.pil_image_mode == basic_dataset.pil_image_mode
+        
+        # Verify crop shape and values
+        inp_np, tar_np = crop_ds.get_raw_item(0)
+        assert inp_np.shape == (2, 4, 4)
+        assert tar_np.shape == (1, 4, 4)
+        
+        # Center crop of 10x10 image with crop_size=4 starts at (3, 3)
+        assert crop_ds.crop_info.x == 3
+        assert crop_ds.crop_info.y == 3
