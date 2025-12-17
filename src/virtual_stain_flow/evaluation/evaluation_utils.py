@@ -1,8 +1,68 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.nn import Module
+
+from ..datasets.base_dataset import BaseImageDataset
+from ..datasets.crop_dataset import CropImageDataset
+
+
+def extract_samples_from_dataset(
+    dataset: Union[BaseImageDataset, CropImageDataset],
+    indices: List[int],
+) -> Tuple[
+    List[np.ndarray],
+    List[np.ndarray],
+    Optional[List[np.ndarray]],
+    Optional[List[Tuple[int, int]]],
+]:
+    """
+    Extract input/target samples and optional raw images with patch coordinates from a dataset.
+
+    For CropImageDataset, also extracts the original (uncropped) input images and the
+    (x, y) coordinates of each crop for visualization with bounding boxes.
+
+    :param dataset: A BaseImageDataset or CropImageDataset instance.
+    :param indices: List of dataset indices to extract.
+    :return: Tuple of (inputs, targets, raw_images, patch_coords).
+        - inputs: List of numpy arrays, each with shape (C, H, W) or (H, W).
+        - targets: List of numpy arrays, each with shape (C, H, W) or (H, W).
+        - raw_images: List of numpy arrays for CropImageDataset (original uncropped images),
+          or None for BaseImageDataset.
+        - patch_coords: List of (x, y) tuples for CropImageDataset, or None for BaseImageDataset.
+    """
+    is_crop_dataset = isinstance(dataset, CropImageDataset)
+
+    inputs: List[np.ndarray] = []
+    targets: List[np.ndarray] = []
+    raw_images: Optional[List[np.ndarray]] = [] if is_crop_dataset else None
+    patch_coords: Optional[List[Tuple[int, int]]] = [] if is_crop_dataset else None
+
+    for idx in indices:
+        # Access dataset item to trigger lazy loading and state update
+        input_tensor, target_tensor = dataset[idx]
+
+        # Convert to numpy - handle both Tensor and ndarray inputs
+        if isinstance(input_tensor, torch.Tensor):
+            inputs.append(input_tensor.numpy())
+        else:
+            inputs.append(np.asarray(input_tensor))
+
+        if isinstance(target_tensor, torch.Tensor):
+            targets.append(target_tensor.numpy())
+        else:
+            targets.append(np.asarray(target_tensor))
+
+        if is_crop_dataset:
+            # Access the original uncropped image and crop coordinates
+            # These are populated after __getitem__ is called
+            raw_images.append(dataset.original_input_image[0])
+            patch_coords.append((dataset.crop_info.x, dataset.crop_info.y))
+
+    return inputs, targets, raw_images, patch_coords
+
 
 def evaluate_per_image_metric(
     predictions: torch.Tensor,
