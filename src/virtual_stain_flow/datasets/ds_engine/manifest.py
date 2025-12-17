@@ -19,7 +19,7 @@ Classes:
 from __future__ import annotations
 from pathlib import Path, PurePath
 from collections import OrderedDict
-from typing import List, Optional, Sequence, Dict, Any
+from typing import List, Optional, Sequence, Dict, Any, Tuple
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -133,6 +133,26 @@ class DatasetManifest:
         if arr.ndim not in (2, 3):
             raise ValueError(f"Unsupported image shape {arr.shape} from {path}")
         return arr
+
+    def get_image_dimensions(
+        self, 
+        idx: int,
+        channels: Optional[Sequence[str]] = None
+    ) -> Tuple[Tuple[int, ...], ...]:
+        """
+        Return the spatial dimensions (height, width) of the image at the given index.
+        """
+        channels = channels or self.channel_keys
+        row = self.file_index.iloc[idx, :].loc[channels]
+        dims = []
+        for path in row:
+            if not Path(path).exists():
+                dims.append(None)
+            else:
+                with Image.open(path) as img:
+                    dims.append(img.size)
+
+        return tuple(dims)
     
     def _serialize_file_index(self) -> pd.DataFrame:
         """Serialize file_index to pd.DataFrame"""
