@@ -2,12 +2,13 @@
 crop_dataset.py
 """
 
-from typing import Any, Dict, List, Sequence, Optional, Tuple, Union
+from typing import Any, Dict, List, Sequence, Optional, Tuple, Union, Type
 
 import pandas as pd
 
 from .base_dataset import BaseImageDataset
 from .ds_engine.crop_manifest import CropManifest, CropFileState, Crop
+from .ds_engine.crop_generator import CropGenerator, generate_center_crops
 
 
 class CropImageDataset(BaseImageDataset):
@@ -131,4 +132,33 @@ class CropImageDataset(BaseImageDataset):
                 config.get('crop_file_state', None)),
             input_channel_keys=config.get('input_channel_keys', None),
             target_channel_keys=config.get('target_channel_keys', None)
+        )
+    
+    @classmethod
+    def from_base_dataset(
+        cls,
+        base_dataset: BaseImageDataset,
+        how: Type[CropGenerator] = generate_center_crops,
+        **kwargs: Any
+    ) -> 'CropImageDataset':
+        """
+        Create a CropImageDataset from a BaseImageDataset.
+
+        :param base_dataset: The BaseImageDataset to convert.
+        :param how: A function that generates crop specifications from the base dataset.
+            Default is `generate_center_crops`.
+        :param kwargs: Additional keyword arguments for the `how` function.
+        """
+
+        crop_specs = how(
+            dataset=base_dataset,
+            **kwargs
+        )
+
+        return cls(
+            file_index=base_dataset.file_index,
+            crop_specs=crop_specs,
+            pil_image_mode=base_dataset.pil_image_mode,
+            input_channel_keys=base_dataset.input_channel_keys,
+            target_channel_keys=base_dataset.target_channel_keys,
         )
