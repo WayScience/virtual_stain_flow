@@ -4,11 +4,13 @@ crop_dataset.py
 
 from typing import Any, Dict, List, Sequence, Optional, Tuple, Union, Type
 
+import numpy as np
 import pandas as pd
 
 from .base_dataset import BaseImageDataset
 from .ds_engine.crop_manifest import CropManifest, CropFileState, Crop
 from .ds_engine.crop_generator import CropGenerator, generate_center_crops
+from ..transforms.base_transform import LoggableTransform
 
 
 class CropImageDataset(BaseImageDataset):
@@ -27,6 +29,7 @@ class CropImageDataset(BaseImageDataset):
         cache_capacity: Optional[int] = None,
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
+        transforms: Optional[Sequence[LoggableTransform]] = None,
         crop_file_state: Optional[CropFileState] = None,
     ):
         """
@@ -49,6 +52,7 @@ class CropImageDataset(BaseImageDataset):
             invalid.     
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
+        :param transforms: Optional sequence of transformations to apply to the images.
         :param crop_file_state: Optional pre-initialized CropFileState object. If provided,
             it takes precedence over `file_index` and `crop_specs`. Intended
             to be used by only .from_config class method and similar deserialization
@@ -74,6 +78,12 @@ class CropImageDataset(BaseImageDataset):
         self.input_channel_keys = input_channel_keys
         self.target_channel_keys = target_channel_keys
 
+        if not isinstance(transforms, Sequence):
+            transforms = [transforms] if transforms else []
+        if not all(isinstance(t, LoggableTransform) for t in transforms):
+            raise ValueError("All transforms must be instances of LoggableTransform.")
+        self.transforms = transforms
+
     @property
     def pil_image_mode(self) -> str:
         return self.manifest.pil_image_mode
@@ -85,6 +95,14 @@ class CropImageDataset(BaseImageDataset):
     @property
     def crop_info(self) -> Optional[Crop]:
         return self.file_state.crop_info
+    
+    @property
+    def original_input_image(self) -> Optional[np.ndarray]:
+        return self.file_state.original_input_image
+    
+    @property
+    def original_target_image(self) -> Optional[np.ndarray]:
+        return self.file_state.original_target_image
     
     def to_config(self) -> Dict[str, Any]:
         """
@@ -138,6 +156,7 @@ class CropImageDataset(BaseImageDataset):
     def from_base_dataset(
         cls,
         base_dataset: BaseImageDataset,
+        transforms: Optional[Sequence[LoggableTransform]] = None,
         how: Type[CropGenerator] = generate_center_crops,
         **kwargs: Any
     ) -> 'CropImageDataset':
@@ -157,8 +176,10 @@ class CropImageDataset(BaseImageDataset):
 
         return cls(
             file_index=base_dataset.file_index,
+            transforms=transforms,
             crop_specs=crop_specs,
             pil_image_mode=base_dataset.pil_image_mode,
             input_channel_keys=base_dataset.input_channel_keys,
             target_channel_keys=base_dataset.target_channel_keys,
+            
         )

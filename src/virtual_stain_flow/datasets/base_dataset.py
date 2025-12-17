@@ -16,6 +16,7 @@ import torch
 from torch.utils.data import Dataset
 
 from .ds_engine.manifest import DatasetManifest, IndexState, FileState
+from ..transforms.base_transform import LoggableTransform
 
 
 class BaseImageDataset(Dataset):
@@ -28,6 +29,7 @@ class BaseImageDataset(Dataset):
         pil_image_mode: str = "I;16",
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
+        transforms: Optional[Sequence[LoggableTransform]] = None,
         cache_capacity: Optional[int] = None,
         file_state: Optional[FileState] = None,
     ):
@@ -45,6 +47,8 @@ class BaseImageDataset(Dataset):
         :param check_exists: Whether to check if files exist at initialization.
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
+        :param transforms: Optional sequence of LoggableTransform objects to apply
+            to the images before returning them.
         :param cache_capacity: Optional capacity for caching loaded images. 
             When set to None, default caching behavior of caching at most
             `file_index.shape[0]` images is used. When set to -1, unbounded
@@ -75,6 +79,12 @@ class BaseImageDataset(Dataset):
 
         self.input_channel_keys = input_channel_keys
         self.target_channel_keys = target_channel_keys
+
+        if not isinstance(transforms, Sequence):
+            transforms = [transforms] if transforms else []
+        if not all(isinstance(t, LoggableTransform) for t in transforms):
+            raise ValueError("All transforms must be instances of LoggableTransform.")
+        self.transforms = transforms
 
     def get_raw_item(
         self, 
@@ -108,6 +118,20 @@ class BaseImageDataset(Dataset):
         Overridden Dataset `__len__` method so class works with torch DataLoader.
         """
         return len(self.manifest)
+    
+    def _apply_transforms(
+        self,
+        image: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Applies the sequence of transforms to the input image.
+        
+        :param image: Input image as a numpy array.
+        :return: Transformed image as a numpy array.
+        """
+        for transform in self.transforms:
+            image = transform.apply(img=image)
+        return image
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -115,8 +139,8 @@ class BaseImageDataset(Dataset):
         """        
         input_image_raw, target_image_raw = self.get_raw_item(idx)
 
-        return (torch.from_numpy(input_image_raw).float(), 
-                torch.from_numpy(target_image_raw).float())
+        return (torch.from_numpy(self._apply_transforms(input_image_raw)).float(), 
+                torch.from_numpy(self._apply_transforms(target_image_raw)).float())
 
     @property
     def pil_image_mode(self) -> str:

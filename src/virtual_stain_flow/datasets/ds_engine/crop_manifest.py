@@ -302,6 +302,14 @@ class CropFileState:
         """
         return self.crop_state._last_crop
     
+    @property
+    def original_input_image(self) -> Optional[np.ndarray]:
+        return self._file_state.input_image_raw
+    
+    @property
+    def original_target_image(self) -> Optional[np.ndarray]:
+        return self._file_state.target_image_raw
+    
     @property 
     def input_image_raw(self) -> Optional[np.ndarray]:
         return self.input_crop_raw # acronym
