@@ -8,7 +8,7 @@ Uses a `DatasetManifest` and `FileState` backbone.
 
 from typing import Dict, Sequence, Optional, Tuple, Union, Any
 import json
-from pathlib import Path, PurePath
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -16,47 +16,75 @@ import torch
 from torch.utils.data import Dataset
 
 from .ds_engine.manifest import DatasetManifest, IndexState, FileState
+from ..transforms.base_transform import LoggableTransform
 
 
 class BaseImageDataset(Dataset):
     
     def __init__(
         self,
-        file_index: pd.DataFrame,
+        *,
+        file_index: Optional[pd.DataFrame] = None,
+        check_exists: bool = False,
         pil_image_mode: str = "I;16",
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
+        transforms: Optional[Sequence[LoggableTransform]] = None,
         cache_capacity: Optional[int] = None,
+        file_state: Optional[FileState] = None,
     ):
         
         """
         Initializes the BaseImageDataset.
 
-        :param file_index: DataFrame containing exclusively file paths as pathlikes
+        :param file_index: DataFrame specifying paths to images, intended
+            to be provided by the user upon creation of the dataset.
+            Expected a dataframe with columns corresponding to the identifiers
+            of channels and rows corresponding to individual imaging positions
+            (field of view, etc.). All cells should be path-likes to tiff files.
+            Required unless `file_state` is provided (see below ).
         :param pil_image_mode: Mode for PIL images, default is "I;16".
+        :param check_exists: Whether to check if files exist at initialization.
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
+        :param transforms: Optional sequence of LoggableTransform objects to apply
+            to the images before returning them.
         :param cache_capacity: Optional capacity for caching loaded images. 
             When set to None, default caching behavior of caching at most
             `file_index.shape[0]` images is used. When set to -1, unbounded
             caching without eviction is used. When set to a positive integer,
             the cache will hold at most that many images, evicting the least recently
             used images when the cache is full (LRU cache). Other values are
-            invalid.                 
+            invalid.     
+        :param file_state: Optional pre-initialized FileState object. If provided,
+            it takes precedence over `file_index` and `pil_image_mode`. Intended
+            to be used internally by only .from_config class method and similar deserialization
+            utilities. Users should provide file_index to initialize datasets.
         """
-
-        self.manifest = DatasetManifest(
-            file_index=file_index, 
-            pil_image_mode=pil_image_mode
-        )
         self.index_state = IndexState()
+
+        if file_state is None and file_index is None:
+            raise ValueError(
+                "Either 'file_state' or 'file_index' must be provided."
+            )
         self.file_state = FileState(
-            manifest=self.manifest, 
+            DatasetManifest(
+                file_index=file_index, 
+                pil_image_mode=pil_image_mode,
+                check_exists=check_exists
+            ), 
             cache_capacity=cache_capacity
-        )
+        ) if file_state is None else file_state
+        self.manifest = self.file_state.manifest
 
         self.input_channel_keys = input_channel_keys
         self.target_channel_keys = target_channel_keys
+
+        if not isinstance(transforms, Sequence):
+            transforms = [transforms] if transforms else []
+        if not all(isinstance(t, LoggableTransform) for t in transforms):
+            raise ValueError("All transforms must be instances of LoggableTransform.")
+        self.transforms = transforms
 
     def get_raw_item(
         self, 
@@ -90,6 +118,20 @@ class BaseImageDataset(Dataset):
         Overridden Dataset `__len__` method so class works with torch DataLoader.
         """
         return len(self.manifest)
+    
+    def _apply_transforms(
+        self,
+        image: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Applies the sequence of transforms to the input image.
+        
+        :param image: Input image as a numpy array.
+        :return: Transformed image as a numpy array.
+        """
+        for transform in self.transforms:
+            image = transform.apply(img=image)
+        return image
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -97,8 +139,8 @@ class BaseImageDataset(Dataset):
         """        
         input_image_raw, target_image_raw = self.get_raw_item(idx)
 
-        return (torch.from_numpy(input_image_raw).float(), 
-                torch.from_numpy(target_image_raw).float())
+        return (torch.from_numpy(self._apply_transforms(input_image_raw)).float(), 
+                torch.from_numpy(self._apply_transforms(target_image_raw)).float())
 
     @property
     def pil_image_mode(self) -> str:
@@ -176,30 +218,12 @@ class BaseImageDataset(Dataset):
         Internal method for serializing the dataset as a configuration dictionary.        
         :return: Dictionary containing the serialized configuration.
         """
-        # Convert file_index to records format for JSON serialization
-        # Convert Path objects to strings for JSON compatibility
-        file_index_for_json = self.file_index.copy()
-        for col in file_index_for_json.columns:
-            file_index_for_json[col] = file_index_for_json[col].apply(
-                lambda x: str(x) if isinstance(x, (Path, PurePath)) else x
-            )
-        
-        file_index_records = file_index_for_json.to_dict('records')
-        file_index_columns = list(self.file_index.columns)
-        
-        config = {
-            'file_index': {
-                'records': file_index_records,
-                'columns': file_index_columns
-            },
-            'pil_image_mode': self.pil_image_mode,
+
+        return {
+            'file_state': self.file_state.to_config(),
             'input_channel_keys': self.input_channel_keys,
             'target_channel_keys': self.target_channel_keys,
-            'cache_capacity': self.file_state.cache_capacity,
-            'dataset_length': len(self)
         }
-        
-        return config
     
     def to_json_config(self, filepath: Union[str, Path]) -> None:
         """
@@ -218,66 +242,27 @@ class BaseImageDataset(Dataset):
             json.dump(config, json_config_file, indent=2, ensure_ascii=False)
 
     @classmethod
-    def _deserialize_config_core(
-        cls,
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Internal method for deserializing the core configuration
-        from a configuration dictionary.
-        Subclass deserialization methods may call this method
-            to conveniently extract the common configuration.
-        """
-        # Reconstruct file_index DataFrame
-        file_index_data = config.get('file_index', None)
-        if file_index_data is None:
-            raise ValueError(
-                "Expected 'file_index' in config, "
-                "but found none or empty."
-            )
-        
-        file_index = pd.DataFrame(file_index_data['records'])
-        # Convert string paths back to Path objects
-        for col in file_index.columns:
-            file_index[col] = file_index[col].apply(
-                lambda x: Path(x) if isinstance(x, str) else x
-            )
-
-        pil_image_mode = config.get('pil_image_mode', None)
-        if pil_image_mode is None:
-            raise ValueError(
-                "Expected 'pil_image_mode' in config, "
-                "but found none or empty."
-            )
-        
-        input_channel_keys=config.get('input_channel_keys', None)
-        target_channel_keys=config.get('target_channel_keys', None)
-        cache_capacity=config.get('cache_capacity', None)
-                    
-        return {
-            'file_index': file_index,
-            'pil_image_mode': pil_image_mode,
-            'input_channel_keys': input_channel_keys,
-            'target_channel_keys': target_channel_keys,
-            'cache_capacity': cache_capacity
-        }
-
-    @classmethod
     def from_config(
         cls,
         config: Dict[str, Any]
     ) -> 'BaseImageDataset':
         """
         Class method to instantiate a dataset from a configuration dictionary.
-        As this is the base class, only the core configuration deserialization
-            is performed here. Subclasses may override this method to handle
-            additional configuration parameters.
         
         :param config: Configuration dictionary.
         :return: An instance of BaseImageDataset or its subclass.
         """
-        core_ds_kwargs = cls._deserialize_config_core(config)
+
+        file_state_config = config.get('file_state', None)
+        if file_state_config is None:
+            raise ValueError(
+                "Configuration must include 'file_state'."
+                "Perhaps this is the wrong configuration for BaseImageDataset?"
+            )
 
         return cls(
-            **core_ds_kwargs
+            # heavy lifting handled by FileState
+            file_state=FileState.from_config(config.get('file_state', None)),
+            input_channel_keys=config.get('input_channel_keys', None),
+            target_channel_keys=config.get('target_channel_keys', None),
         )

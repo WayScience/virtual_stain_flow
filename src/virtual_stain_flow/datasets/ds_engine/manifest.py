@@ -19,13 +19,15 @@ Classes:
 from __future__ import annotations
 from pathlib import Path, PurePath
 from collections import OrderedDict
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Dict, Any, Tuple
 from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 from PIL import Image
+from pandera.errors import SchemaError, SchemaErrors
 
+from .input_validation import make_file_index_schema
 
 @dataclass(frozen=True)
 class DatasetManifest:
@@ -47,12 +49,20 @@ class DatasetManifest:
         Default is "I;16" for 16-bit grayscale images.
     """
     file_index: pd.DataFrame
+    check_exists: bool = False
     pil_image_mode: str = "I;16"
 
     def __post_init__(self) -> None:
         if not isinstance(self.file_index, pd.DataFrame) or self.file_index.empty:
             raise ValueError("file_index must be a non-empty DataFrame.")
         
+        try:
+            make_file_index_schema(
+                check_exists=self.check_exists).validate(self.file_index)
+        except (SchemaError, SchemaErrors) as e:
+            # Catch and re-raise with more context
+            # and maintain original exception type for debugging
+            raise TypeError("file_index has non-path-like entries") from e
 
         if not isinstance(self.pil_image_mode, str):
             raise ValueError("Expected pil_image_mode to be a string, "
@@ -123,6 +133,60 @@ class DatasetManifest:
         if arr.ndim not in (2, 3):
             raise ValueError(f"Unsupported image shape {arr.shape} from {path}")
         return arr
+
+    def get_image_dimensions(
+        self, 
+        idx: int,
+        channels: Optional[Sequence[str]] = None
+    ) -> Tuple[Tuple[int, ...], ...]:
+        """
+        Return the spatial dimensions (height, width) of the image at the given index.
+        """
+        channels = channels or self.channel_keys
+        row = self.file_index.iloc[idx, :].loc[channels]
+        dims = []
+        for path in row:
+            if not Path(path).exists():
+                dims.append(None)
+            else:
+                with Image.open(path) as img:
+                    dims.append(img.size)
+
+        return tuple(dims)
+    
+    def _serialize_file_index(self) -> pd.DataFrame:
+        """Serialize file_index to pd.DataFrame"""
+        return self.file_index.copy().applymap(lambda x: str(x))
+    
+    @staticmethod
+    def _deserialize_file_index(file_index: pd.DataFrame) -> pd.DataFrame:
+        """Deserialize file_index from pd.DataFrame"""
+        return file_index.applymap(lambda x: Path(x))
+    
+    def to_config(self) -> Dict[str, Any]:
+        """Serialize to dict"""
+        return { # the file_index is automatically serializable by definition
+            'file_index': self._serialize_file_index().to_dict(orient='records'),
+            'pil_image_mode': self.pil_image_mode,
+        }
+    
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> DatasetManifest:
+        """Deserialize from config dict."""
+
+        file_index = config.get('file_index', None)
+        if file_index is None:
+            raise ValueError("DatasetManifest.from_config: missing 'file_index' key in config")
+        if not isinstance(file_index, list):
+            raise TypeError(f"DatasetManifest.from_config: expected 'file_index' to be a list, got {type(file_index).__name__}")
+
+        return cls(
+            file_index=cls._deserialize_file_index(
+                pd.DataFrame(config['file_index'])
+            ),
+            pil_image_mode=config.get('pil_image_mode', 'I;16')
+        )
+
 
 @dataclass
 class IndexState:
@@ -298,3 +362,33 @@ class FileState:
         # Record the realized order
         self.input_paths = desired_input_paths
         self.target_paths = desired_target_paths
+
+    def to_config(self) -> Dict[str, Any]:
+        """
+        Serialize to dict
+        Responsible for also serializing the underlying manifest.
+        """
+        return {
+            'manifest': self.manifest.to_config(),
+            'cache_capacity': self.cache_capacity
+        }
+    
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> FileState:
+        """
+        Deserialize from config dict.
+        Responsible for also deserializing the underlying manifest.
+        """
+        if not isinstance(config, dict):
+            raise TypeError(f"FileState.from_config: expected config to be a dict, got {type(config).__name__}")
+        
+        manifest_config = config.get('manifest', None)
+        if manifest_config is None:
+            raise ValueError("FileState.from_config: missing 'manifest' key in config")
+        if not isinstance(manifest_config, dict):
+            raise TypeError(f"FileState.from_config: expected 'manifest' to be a dict, got {type(manifest_config).__name__}")
+
+        return cls(
+            manifest=DatasetManifest.from_config(manifest_config),
+            cache_capacity=config.get('cache_capacity', None)
+        )

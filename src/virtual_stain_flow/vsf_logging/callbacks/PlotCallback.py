@@ -10,7 +10,7 @@ from .LoggerCallback import (
     AbstractLoggerCallback,
     log_artifact_type
 )
-from ...evaluation.visualization_utils import plot_predictions_grid_from_model
+from ...evaluation.visualization import plot_predictions_grid_from_model
 
 class PlotPredictionCallback(AbstractLoggerCallback):
     def __init__(

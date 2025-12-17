@@ -1,10 +1,17 @@
+"""
+Tests for the DatasetManifest, IndexState, and FileState classes.
+"""
+
+from pathlib import Path
+import tempfile
+
 import pytest
 import numpy as np
 import pandas as pd
-from pathlib import Path
-import tempfile
 from unittest.mock import patch, MagicMock
+
 from virtual_stain_flow.datasets.ds_engine.manifest import DatasetManifest, IndexState, FileState
+
 
 class TestDatasetManifest:
     
@@ -14,14 +21,14 @@ class TestDatasetManifest:
             'channel1': ['/path/to/img1.tif', '/path/to/img2.tif'],
             'channel2': ['/path/to/img3.tif', '/path/to/img4.tif']
         })
-        manifest = DatasetManifest(file_index=df, pil_image_mode="RGB")
+        manifest = DatasetManifest(file_index=df, pil_image_mode="RGB", check_exists=False)
         assert manifest.file_index.equals(df)
         assert manifest.pil_image_mode == "RGB"
     
     def test_init_default_pil_mode(self):
         """Test DatasetManifest uses default PIL mode."""
         df = pd.DataFrame({'channel1': ['/path/to/img1.tif']})
-        manifest = DatasetManifest(file_index=df)
+        manifest = DatasetManifest(file_index=df, check_exists=False)
         assert manifest.pil_image_mode == "I;16"
     
     def test_init_empty_dataframe_raises(self):
@@ -344,3 +351,25 @@ class TestFileState:
         assert state.input_image_raw.shape == (1, 100, 100)
         assert state.target_image_raw.shape == (1, 100, 100)
         assert len(state._cache) == 2
+
+    def test_from_config_missing_manifest(self):
+        """Test FileState.from_config raises ValueError when manifest is missing."""
+        config = {"cache_capacity": 10, "manifest": None}
+        with pytest.raises(ValueError, match="FileState.from_config: missing 'manifest' key in config"):
+            FileState.from_config(config)
+
+
+class TestDatasetManifestSerialization:
+    """Test suite for DatasetManifest serialization methods."""
+
+    def test_from_config_missing_file_index(self):
+        """Test DatasetManifest.from_config raises ValueError when file_index is missing."""
+        config = {"pil_image_mode": "I;16", "file_index": None}
+        with pytest.raises(ValueError, match="DatasetManifest.from_config: missing 'file_index' key in config"):
+            DatasetManifest.from_config(config)
+
+    def test_from_config_invalid_file_index_type(self):
+        """Test DatasetManifest.from_config raises TypeError when file_index is not a list."""
+        config = {"pil_image_mode": "I;16", "file_index": {}}
+        with pytest.raises(TypeError, match="DatasetManifest.from_config: expected 'file_index' to be a list"):
+            DatasetManifest.from_config(config)

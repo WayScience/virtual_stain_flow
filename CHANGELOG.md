@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.3] - 2025-12-16
+
+### Added
+
+#### Crop dataset (`virtual_stain_flow/datasets/`):
+
+Allows the dataset to return user specified crops dynamically obtained from the full images. Supports serialization and reserialization to facilitate reproducibility. 
+
+- **`CropImageDataset`** (`crop_dataset.py`): Dataset class for serving image crops based on a `CropManifest`. Extends `BaseImageDataset` with crop-specific state management and lazy loading via `CropFileState`.
+- **`CropManifest`** (`ds_engine/crop_manifest.py`): Immutable collection of crop definitions wrapping a `DatasetManifest` for file access. Supports serialization/deserialization and factory construction from coordinate specifications.
+- **`Crop`** (`ds_engine/crop_manifest.py`): Dataclass defining a single crop region with manifest index, position (x, y), and dimensions (width, height).
+- **`CropIndexState`** (`ds_engine/crop_manifest.py`): Mutable state tracker for the currently active crop region.
+- **`CropFileState`** (`ds_engine/crop_manifest.py`): Lazy image loading backend that wraps `FileState` to load full images and dynamically extract crop regions on demand.
+
+### Removed
+
+#### All obselete dataset classes
+
+---
+
 ## [0.4.2] - 2025-11-17
 
 ### Added

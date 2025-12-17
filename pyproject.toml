@@ -29,6 +29,7 @@ dependencies = [
   "jupyter",
   "notebook",
   "tifffile",
+  "pandera[pandas]",
 ]
 
 [project.optional-dependencies]
