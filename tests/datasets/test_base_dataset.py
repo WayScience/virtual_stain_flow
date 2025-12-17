@@ -76,6 +76,16 @@ class TestBaseImageDataset:
         with pytest.raises(ValueError, match="Channel key 'nonexistent' not found"):
             BaseImageDataset(file_index=file_index, target_channel_keys=["nonexistent"])
 
+    def test_init_missing_file_index(self):
+        """Test BaseImageDataset raises ValueError for missing file_index."""
+        with pytest.raises(ValueError, match="Either 'file_state' or 'file_index' must be provided."):
+            BaseImageDataset(
+                file_index=None,
+                input_channel_keys=["input_ch1"],
+                target_channel_keys="target_ch1",
+                file_state=None,
+            )
+
     def test_len(self, basic_dataset, file_index):
         """Test BaseImageDataset __len__ method."""
         assert len(basic_dataset) == len(file_index)

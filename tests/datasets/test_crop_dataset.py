@@ -233,6 +233,17 @@ class TestCropImageDatasetSerialization:
         ):
             CropImageDataset.from_config(config=config)
 
+        base_dataset_like_config = {
+            "input_channel_keys": ["input_ch1"],
+            "target_channel_keys": ["target_ch1"],
+            "file_state": {}
+        }
+        with pytest.raises(
+            ValueError, 
+            match="Likely the received configuration is for BaseImageDataset"
+        ):
+            CropImageDataset.from_config(config=base_dataset_like_config)
+
     def test_to_json_config_creates_file(self, tmp_path, crop_dataset):
         """Test to_json_config creates a valid JSON file."""
         output_path = tmp_path / "crop_dataset_config.json"
