@@ -44,7 +44,20 @@ class TestMakeFileIndexSchema:
             "col2": ["path3.txt", "path4.txt"],
         })
         schema = make_file_index_schema(check_exists=False)
-        with pytest.raises(pa.errors.SchemaError, match="All file_index cells must be string/pathlib.Path objects"):
+        with pytest.raises(
+            pa.errors.SchemaError, 
+            match="All file_index cells must be string/pathlib.Path objects"):
+            schema.validate(df)
+
+    def test_whitespace_only_values_fail(self):
+        df = pd.DataFrame({
+            "col1": ["path1.txt", "   "],
+            "col2": ["path3.txt", "path4.txt"],
+        })
+        schema = make_file_index_schema(check_exists=False)
+        with pytest.raises(
+            pa.errors.SchemaError, 
+            match="All file_index cells must be string/pathlib.Path objects"):
             schema.validate(df)
     
     def test_path_objects_valid(self):
