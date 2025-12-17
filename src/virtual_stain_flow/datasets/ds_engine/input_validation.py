@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pandera as pa
+import pandera.pandas as pa
 from pandera import Check
 
 
@@ -49,7 +49,7 @@ def make_file_index_schema(*, check_exists: bool = False) -> pa.DataFrameSchema:
                 error="file_index may not contain NA values.",
             ),
             Check(
-                lambda df: df.applymap(
+                lambda df: df.map(
                     lambda x: _cell_contains_pathlike(x, check_exists=check_exists)
                 ).to_numpy().all(),
                 error=(
