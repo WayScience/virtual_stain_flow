@@ -134,3 +134,36 @@ class Context:
 
     def keys(self):
         return self._store.keys()
+    
+    def pop(self, key: str, default: ContextValue = None) -> ContextValue:
+        """Remove and return the value for key if key is in the context, else default."""
+        return self._store.pop(key, default)
+    
+    def __or__(self, other: "Context") -> "Context":
+        """
+        Merge two Context objects using the | operator.
+        Returns a new Context with items from both contexts.
+        Items from the right operand (other) take precedence in case of key conflicts.
+        
+        :param other: Another Context object to merge with.
+        :return: A new Context object containing items from both contexts.
+        """
+        if not isinstance(other, Context):
+            return NotImplemented
+        new_context = Context(**self._store)
+        new_context.add(**other._store)
+        return new_context
+    
+    def __ror__(self, other: "Context") -> "Context":
+        """
+        Reverse merge (right | operator) for Context objects.
+        Called when the left operand doesn't support __or__ with Context.
+        
+        :param other: Another Context object to merge with.
+        :return: A new Context object containing items from both contexts.
+        """
+        if not isinstance(other, Context):
+            return NotImplemented
+        new_context = Context(**other._store)
+        new_context.add(**self._store)
+        return new_context
