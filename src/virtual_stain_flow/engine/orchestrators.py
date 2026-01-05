@@ -21,7 +21,7 @@ from torch import optim
 
 from .forward_groups import GeneratorForwardGroup, DiscriminatorForwardGroup
 from .context import Context
-from .names import INPUTS, TARGETS, PREDS  # if you prefer, you can hardcode strings
+from .names import INPUTS, TARGETS, PREDS
 
 
 @dataclass
@@ -111,24 +111,16 @@ class GANOrchestrator:
         fake_stack = torch.cat([gen_ctx[INPUTS], gen_ctx[PREDS]], dim=1)
 
         # Real batch: D(x, y_true)
-        ctx_real = self._disc_fg(
-            train=train,
-            stack=real_stack,
-        )
+        ctx_real = self._disc_fg(train=train, stack=real_stack)
         ctx_real["real_stack"] = ctx_real.pop("stack")
         ctx_real["p_real_as_real"] = ctx_real.pop("p")
 
         # Fake batch: D(x, y_fake)
-        ctx_fake = self._disc_fg(
-            train=train,
-            stack=fake_stack,
-        )
+        ctx_fake = self._disc_fg(train=train, stack=fake_stack)
         ctx_fake["fake_stack"] = ctx_fake.pop("stack")
         ctx_fake["p_fake_as_real"] = ctx_fake.pop("p")
 
         # Merge: real info, fake info, and generator info
-        # Context.__or__ makes a new Context and merges underlying stores.
-        # Right-hand side wins on key conflicts (by your current definition).
         return ctx_real | ctx_fake | gen_ctx
 
     def _discriminator_forward(
@@ -139,11 +131,6 @@ class GANOrchestrator:
     ) -> Context:
         """
         Forward step to train only the discriminator.
-        1. Forward pass through generator in eval mode to produce fake images.
-        2. call _build_real_fake_contexts to forward both real and fake stacks
-            through the discriminator with train flag to obtain scores.
-        3. Return the full Context containing all outputs. The losses
-            can then be computed from the discriminator scores in the context.
 
         :param train: Whether the model is in training mode.
         :param inputs: The input tensor for the models.
@@ -151,18 +138,10 @@ class GANOrchestrator:
         :return: A Context containing discriminator outputs for both
             real and fake stacks, as well as the original generator context.    
         """
-
-        # Generator is always eval for discriminator updates:
-        # we just need fake images, no grads to generator weights.
-        gen_ctx = self._gen_fg(
-            train=False,
-            inputs=inputs,
-            targets=targets,
-        )
-
-        # Now run the discriminator on real and fake
-        full_ctx = self._build_real_fake_contexts(train=train, gen_ctx=gen_ctx)
-        return full_ctx
+        # Generator is always eval for discriminator updates
+        gen_ctx = self._gen_fg(train=False, inputs=inputs, targets=targets)
+        
+        return self._build_real_fake_contexts(train=train, gen_ctx=gen_ctx)
 
     def _generator_forward(
         self,
@@ -172,11 +151,6 @@ class GANOrchestrator:
     ) -> Context:
         """
         Forward step to train only the generator.
-        1. Forward pass through generator with train flag to produce fake images.
-        2. Forward pass through discriminator on the fake stack to obtain p_fake_as_real.
-           - When train=True, this allows gradients through D to reach G,
-             but we only call .step() on the generator optimizer.
-        3. Return a Context containing generator outputs plus p_fake_as_real.
 
         :param train: Whether the model is in training mode.
         :param inputs: The input tensor for the models.
@@ -185,24 +159,13 @@ class GANOrchestrator:
             p_fake_as_real from the discriminator.
         """
 
-        # Forward generator as usual (this builds a Context with INPUTS, TARGETS, PREDS)
-        gen_ctx = self._gen_fg(
-            train=train,
-            inputs=inputs,
-            targets=targets,
-        )
-
-        # For the generator loss, we only need D(x, G(x)) scored as "real".
-        # We still allow grad when train=True so gradients can flow to G.
-        disc_ctx = self._disc_fg(
-            train=train,
-            stack=torch.cat([gen_ctx[INPUTS], gen_ctx[PREDS]], dim=1),
-        )
-
-        p_fake_as_real = disc_ctx["p"]
+        # Generate predictions and then run discriminator on fake stack
+        gen_ctx = self._gen_fg(train=train,inputs=inputs,targets=targets)
+        fake_stack = torch.cat([gen_ctx[INPUTS], gen_ctx[PREDS]], dim=1)
+        disc_ctx = self._disc_fg(train=train, stack=fake_stack)
 
         # Attach discriminator score to the generator context and return.
-        return gen_ctx.add(p_fake_as_real=p_fake_as_real)
+        return gen_ctx.add(p_fake_as_real=disc_ctx["p"])
 
     @property
     def generator_forward_group(self) -> GeneratorForwardGroup:
