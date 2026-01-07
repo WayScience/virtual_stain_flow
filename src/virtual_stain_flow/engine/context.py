@@ -111,6 +111,13 @@ class Context:
         :param key: The name of the context item.
         :param value: The tensor/module to store.
         """
+        # Only allow torch.Tensor or torch.nn.Module values
+        if not isinstance(value, (torch.Tensor, torch.nn.Module)):
+            raise TypeError(
+                f"Context values must be torch.Tensor or torch.nn.Module, got {type(value)}"
+            )
+        
+        # Further type check matching for reserved keys
         if key in RESERVED_KEYS and not isinstance(value, torch.Tensor):
             raise ReservedKeyTypeError(
                 f"Reserved key '{key}' must be a torch.Tensor, got {type(value)}"
@@ -146,9 +153,14 @@ class Context:
     def keys(self):
         return self._store.keys()
     
-    def pop(self, key: str, default: Optional[ContextValue] = None) -> Optional[ContextValue]:
-        """Remove and return the value for key if key is in the context, else default."""
-        return self._store.pop(key, default)
+    def pop(self, key: str) -> ContextValue:
+        """
+        Remove and return the value for key if key is in the context, 
+            else raises a KeyError.
+        """
+        if key not in self._store:
+            raise KeyError(f"Key '{key}' not found in Context.")
+        return self._store.pop(key)
     
     def __or__(self, other: "Context") -> "Context":
         """

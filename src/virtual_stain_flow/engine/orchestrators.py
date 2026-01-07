@@ -119,12 +119,12 @@ class GANOrchestrator:
 
         # Real batch: D(x, y_true)
         ctx_real: Context = self._disc_fg(train=train, stack=real_stack)
-        ctx_real["real_stack"] = ctx_real.pop(key="stack")
+        ctx_real["real_stack"] = real_stack
         ctx_real["p_real_as_real"] = ctx_real.pop(key="p")
 
         # Fake batch: D(x, y_fake)
         ctx_fake: Context = self._disc_fg(train=train, stack=fake_stack)
-        ctx_fake["fake_stack"] = ctx_fake.pop(key="stack")
+        ctx_fake["fake_stack"] = fake_stack
         ctx_fake["p_fake_as_real"] = ctx_fake.pop(key="p")
 
         # Merge: real info, fake info, and generator info

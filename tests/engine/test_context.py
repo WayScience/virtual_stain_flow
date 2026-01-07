@@ -45,16 +45,29 @@ class TestContextBasics:
         retrieved = ctx[INPUTS] 
         assert torch.equal(retrieved, random_input)#type: ignore
 
-    @pytest.mark.parametrize("key,value,expected_msg", [
-        (PREDS, "not a tensor", "Reserved key 'preds' must be a torch.Tensor"),
-        (TARGETS, 42, "Reserved key 'targets' must be a torch.Tensor"),
-        (INPUTS, [1, 2, 3], "Reserved key 'inputs' must be a torch.Tensor"),
-    ])
-    def test_context_reserved_key_type_error(self, key, value, expected_msg):
-        """Test that reserved keys must be tensors."""
-        with pytest.raises(ReservedKeyTypeError, match=expected_msg):
+    def test_invalid_context_value_type(self):
+        """Test that adding invalid context value types raises TypeError."""
+        with pytest.raises(
+            TypeError, 
+            match="Context values must be torch.Tensor or torch.nn.Module"
+        ):
             ctx = Context()
-            ctx.add(**{key: value})
+            ctx.add(invalid_value=42)  # type: ignore
+
+    @pytest.mark.parametrize("key,expected_msg", [
+        (PREDS, "Reserved key 'preds' must be a torch.Tensor"),
+        (TARGETS, "Reserved key 'targets' must be a torch.Tensor"),
+        (INPUTS, "Reserved key 'inputs' must be a torch.Tensor"),
+    ])
+    def test_context_reserved_key_type_error(self, key, expected_msg, simple_conv_model):
+        """Test that reserved keys must be tensors."""
+        with pytest.raises(
+            ReservedKeyTypeError, 
+            match=expected_msg
+        ):
+            ctx = Context()
+            # try adding a module under a reserved tensor key
+            ctx.add(**{key: simple_conv_model})
 
     def test_context_generator_model_addition(self, simple_conv_model):
         """Test adding generator model with reserved key."""
@@ -63,11 +76,15 @@ class TestContextBasics:
         assert isinstance(ctx[GENERATOR_MODEL], nn.Module)
         assert ctx[GENERATOR_MODEL] is simple_conv_model
 
-    def test_context_reserved_model_key_type_error(self):
+    def test_context_reserved_model_key_type_error(self, random_input):
         """Test that reserved model keys must be torch.nn.Module."""
-        with pytest.raises(ReservedKeyTypeError, match="Reserved key 'generator' must be a torch.nn.Module"):
+        with pytest.raises(
+            ReservedKeyTypeError, 
+            match="Reserved key 'generator' must be a torch.nn.Module"
+        ):
             ctx = Context()
-            ctx.add(generator="not a module") #type: ignore
+            # try adding a tensor under a reserved model key
+            ctx.add(generator=random_input) #type: ignore
 
 
 class TestContextRequire:
