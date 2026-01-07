@@ -17,11 +17,11 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import torch
+from torch import Tensor
 from torch import optim
 
 from .forward_groups import GeneratorForwardGroup, DiscriminatorForwardGroup
 from .context import Context
-from .names import INPUTS, TARGETS, PREDS
 
 
 @dataclass
@@ -71,8 +71,12 @@ class GANOrchestrator:
         behavior; the orchestrator manages their composition.
         """
         # simple forward group storage
-        self._gen_fg = generator_fg
-        self._disc_fg = discriminator_fg
+        if not isinstance(generator_fg, GeneratorForwardGroup):
+            raise TypeError("generator_fg must be a GeneratorForwardGroup")
+        self._gen_fg: GeneratorForwardGroup = generator_fg
+        if not isinstance(discriminator_fg, DiscriminatorForwardGroup):
+            raise TypeError("discriminator_fg must be a DiscriminatorForwardGroup")
+        self._disc_fg: DiscriminatorForwardGroup = discriminator_fg
 
         # Public step-like objects that trainers can use directly
         self.discriminator_step = OrchestratedStep(
@@ -107,18 +111,21 @@ class GANOrchestrator:
             the original generator context.
         """
         # Stack along channel dim: [inputs, targets] vs [inputs, preds]
-        real_stack = torch.cat([gen_ctx[INPUTS], gen_ctx[TARGETS]], dim=1)
-        fake_stack = torch.cat([gen_ctx[INPUTS], gen_ctx[PREDS]], dim=1)
+        # Context objects handles type checking before the reserved key
+        # context values (inputs, targets, preds) are tenors, so no
+        # further type checking is needed here.
+        real_stack: Tensor = torch.cat(tensors=[gen_ctx.inputs, gen_ctx.targets], dim=1)
+        fake_stack: Tensor = torch.cat(tensors=[gen_ctx.inputs, gen_ctx.preds], dim=1)
 
         # Real batch: D(x, y_true)
-        ctx_real = self._disc_fg(train=train, stack=real_stack)
-        ctx_real["real_stack"] = ctx_real.pop("stack")
-        ctx_real["p_real_as_real"] = ctx_real.pop("p")
+        ctx_real: Context = self._disc_fg(train=train, stack=real_stack)
+        ctx_real["real_stack"] = ctx_real.pop(key="stack")
+        ctx_real["p_real_as_real"] = ctx_real.pop(key="p")
 
         # Fake batch: D(x, y_fake)
-        ctx_fake = self._disc_fg(train=train, stack=fake_stack)
-        ctx_fake["fake_stack"] = ctx_fake.pop("stack")
-        ctx_fake["p_fake_as_real"] = ctx_fake.pop("p")
+        ctx_fake: Context = self._disc_fg(train=train, stack=fake_stack)
+        ctx_fake["fake_stack"] = ctx_fake.pop(key="stack")
+        ctx_fake["p_fake_as_real"] = ctx_fake.pop(key="p")
 
         # Merge: real info, fake info, and generator info
         return ctx_real | ctx_fake | gen_ctx
@@ -139,7 +146,7 @@ class GANOrchestrator:
             real and fake stacks, as well as the original generator context.    
         """
         # Generator is always eval for discriminator updates
-        gen_ctx = self._gen_fg(train=False, inputs=inputs, targets=targets)
+        gen_ctx: Context = self._gen_fg(train=False, inputs=inputs, targets=targets)
         
         return self._build_real_fake_contexts(train=train, gen_ctx=gen_ctx)
 
@@ -160,9 +167,9 @@ class GANOrchestrator:
         """
 
         # Generate predictions and then run discriminator on fake stack
-        gen_ctx = self._gen_fg(train=train,inputs=inputs,targets=targets)
-        fake_stack = torch.cat([gen_ctx[INPUTS], gen_ctx[PREDS]], dim=1)
-        disc_ctx = self._disc_fg(train=train, stack=fake_stack)
+        gen_ctx: Context = self._gen_fg(train=train,inputs=inputs,targets=targets)
+        fake_stack: Tensor = torch.cat(tensors=[gen_ctx.inputs, gen_ctx.preds], dim=1)
+        disc_ctx: Context = self._disc_fg(train=train, stack=fake_stack)
 
         # Attach discriminator score to the generator context and return.
         return gen_ctx.add(p_fake_as_real=disc_ctx["p"])
