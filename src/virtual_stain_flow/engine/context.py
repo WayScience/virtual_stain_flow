@@ -10,7 +10,7 @@ from typing import Dict, Iterable, Tuple, Union
 
 import torch
 
-from .names import TARGETS, PREDS, RESERVED_KEYS, RESERVED_MODEL_KEYS
+from .names import INPUTS, TARGETS, PREDS, RESERVED_KEYS, RESERVED_MODEL_KEYS
 
 ContextValue = Union[torch.Tensor, torch.nn.Module]
 
@@ -47,17 +47,9 @@ class Context:
             where keys are the names of the tensors.
         """
         
-        for k, v in items.items():
-            if k in RESERVED_KEYS and not isinstance(v, torch.Tensor):
-                raise ReservedKeyTypeError(
-                    f"Reserved key '{k}' must be a torch.Tensor, got {type(v)}"
-                )
-            elif k in RESERVED_MODEL_KEYS and not isinstance(v, torch.nn.Module):
-                raise ReservedKeyTypeError(
-                    f"Reserved key '{k}' must be a torch.nn.Module, got {type(v)}"
-                )
-            
-        self._store.update(items)
+        for key, value in items.items():
+            self[key] = value
+
         return self
     
     def require(self, keys: Iterable[str]) -> None:
@@ -109,6 +101,21 @@ class Context:
     # --- Methods for dict like behavior of context class ---
     
     def __setitem__(self, key: str, value: ContextValue) -> None:
+        """
+        Sets a context item, with checks for reserved keys.
+
+        :param key: The name of the context item.
+        :param value: The tensor/module to store.
+        """
+        if key in RESERVED_KEYS and not isinstance(value, torch.Tensor):
+            raise ReservedKeyTypeError(
+                f"Reserved key '{key}' must be a torch.Tensor, got {type(value)}"
+            )
+        elif key in RESERVED_MODEL_KEYS and not isinstance(value, torch.nn.Module):
+            raise ReservedKeyTypeError(
+                f"Reserved key '{key}' must be a torch.nn.Module, got {type(value)}"
+            )
+            
         self._store[key] = value
 
     def __contains__(self, key: str) -> bool:
@@ -167,3 +174,17 @@ class Context:
         new_context = Context(**other._store)
         new_context.add(**self._store)
         return new_context
+    
+    # --- Properties for robust typing for reserved keys ---
+    # let fail if key is not present
+    @property
+    def inputs(self) -> torch.Tensor:
+        return self._store[INPUTS] # type: ignore
+    
+    @property
+    def targets(self) -> torch.Tensor:
+        return self._store[TARGETS] # type: ignore
+    
+    @property
+    def preds(self) -> torch.Tensor:
+        return self._store[PREDS] # type: ignore
