@@ -37,7 +37,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 
-from .names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL
+from .names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL, DISCRIMINATOR_MODEL
 from .context import Context
 
 
@@ -237,9 +237,9 @@ class DiscriminatorForwardGroup(AbstractForwardGroup):
     ):
         super().__init__(device=device)
 
-        self._models['discriminator'] = discriminator
-        self._models['discriminator'].to(self.device)
-        self._optimizers['discriminator'] = optimizer
+        self._models[DISCRIMINATOR_MODEL] = discriminator
+        self._models[DISCRIMINATOR_MODEL].to(self.device)
+        self._optimizers[DISCRIMINATOR_MODEL] = optimizer
 
     def __call__(self, train: bool, **inputs: torch.Tensor) -> Context:
         """
@@ -256,7 +256,7 @@ class DiscriminatorForwardGroup(AbstractForwardGroup):
         fp_optimizer = self.optimizer
         
         # 1) Stage and validate inputs/targets
-        ctx = Context(**self._move_tensors(inputs), **{'discriminator': fp_model })
+        ctx = Context(**self._move_tensors(inputs), **{DISCRIMINATOR_MODEL: fp_model })
         ctx.require(self.input_keys)
         ctx.require(self.target_keys)
 
@@ -284,11 +284,11 @@ class DiscriminatorForwardGroup(AbstractForwardGroup):
         """
         Convenience property to access the discriminator model directly.
         """
-        return self._models['discriminator']
+        return self._models[DISCRIMINATOR_MODEL]
     
     @property
     def optimizer(self) -> Optional[optim.Optimizer]:
         """
         Convenience property to access the discriminator optimizer directly.
         """
-        return self._optimizers['discriminator']
+        return self._optimizers[DISCRIMINATOR_MODEL]
