@@ -31,7 +31,7 @@ Note that forward group is only responsible for the management
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Dict
+from typing import Optional, Dict
 
 import torch
 import torch.optim as optim
@@ -52,9 +52,9 @@ class AbstractForwardGroup(ABC):
     """
 
     # Subclasses should override these with ordered tuples.
-    input_keys:  Tuple[str, ...]
-    target_keys: Tuple[str, ...]
-    output_keys: Tuple[str, ...]
+    input_keys:  tuple[str, ...]
+    target_keys: tuple[str, ...]
+    output_keys: tuple[str, ...]
 
     def __init__(
         self,
@@ -75,7 +75,7 @@ class AbstractForwardGroup(ABC):
         }
 
     @staticmethod
-    def _normalize_outputs(raw) -> Tuple[torch.Tensor, ...]:
+    def _normalize_outputs(raw) -> tuple[torch.Tensor, ...]:
         """
         Normalize model outputs to a tuple of tensors while preserving order.
 
@@ -140,9 +140,9 @@ class GeneratorForwardGroup(AbstractForwardGroup):
         metric_value = metric_fn(preds, targets)
     """
 
-    input_keys:  Tuple[str, ...] = (INPUTS,)
-    target_keys: Tuple[str, ...] = (TARGETS,)
-    output_keys: Tuple[str, ...] = (PREDS,)
+    input_keys:  tuple[str, ...] = (INPUTS,)
+    target_keys: tuple[str, ...] = (TARGETS,)
+    output_keys: tuple[str, ...] = (PREDS,)
 
     def __init__(
         self,
@@ -225,9 +225,9 @@ class DiscriminatorForwardGroup(AbstractForwardGroup):
         metric_value = metric_fn(discriminator, stack, real_or_fake_labels)
     """
 
-    input_keys:  Tuple[str, ...] = ("stack",)
-    target_keys: Tuple[str, ...] = ()
-    output_keys: Tuple[str, ...] = ("p",)
+    input_keys:  tuple[str, ...] = ("stack",)
+    target_keys: tuple[str, ...] = ()
+    output_keys: tuple[str, ...] = ("p",)
 
     def __init__(
         self,
