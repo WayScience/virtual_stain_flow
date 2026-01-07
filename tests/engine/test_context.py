@@ -42,8 +42,8 @@ class TestContextBasics:
     def test_context_getitem(self, random_input):
         """Test retrieving items from context."""
         ctx = Context(inputs=random_input)
-        retrieved = ctx[INPUTS]
-        assert torch.equal(retrieved, random_input)
+        retrieved = ctx[INPUTS] 
+        assert torch.equal(retrieved, random_input)#type: ignore
 
     @pytest.mark.parametrize("key,value,expected_msg", [
         (PREDS, "not a tensor", "Reserved key 'preds' must be a torch.Tensor"),
@@ -67,7 +67,7 @@ class TestContextBasics:
         """Test that reserved model keys must be torch.nn.Module."""
         with pytest.raises(ReservedKeyTypeError, match="Reserved key 'generator' must be a torch.nn.Module"):
             ctx = Context()
-            ctx.add(generator="not a module")
+            ctx.add(generator="not a module") #type: ignore
 
 
 class TestContextRequire:
@@ -146,7 +146,7 @@ class TestContextDictBehavior:
     def test_getitem(self, random_input):
         """Test __getitem__ retrieves stored values."""
         ctx = Context(inputs=random_input)
-        assert torch.equal(ctx[INPUTS], random_input)
+        assert torch.equal(ctx[INPUTS], random_input) #type: ignore
 
     def test_getitem_missing_key(self):
         """Test __getitem__ raises KeyError for missing key."""
@@ -203,15 +203,15 @@ class TestContextDictBehavior:
         """Test __setitem__ to add/update values."""
         ctx = Context()
         ctx[INPUTS] = random_input
-        assert torch.equal(ctx[INPUTS], random_input)
+        assert torch.equal(ctx[INPUTS], random_input) #type: ignore
         assert len(ctx) == 1
 
     def test_setitem_override(self, random_input, random_target):
         """Test __setitem__ overrides existing value."""
         ctx = Context(inputs=random_input)
         ctx[INPUTS] = random_target
-        assert torch.equal(ctx[INPUTS], random_target)
-        assert not torch.equal(ctx[INPUTS], random_input)
+        assert torch.equal(ctx[INPUTS], random_target) #type: ignore
+        assert not torch.equal(ctx[INPUTS], random_input) #type: ignore
 
     def test_contains_present_key(self, random_input):
         """Test __contains__ for present key."""
@@ -229,7 +229,7 @@ class TestContextDictBehavior:
         """Test get() with existing key."""
         ctx = Context(inputs=random_input)
         retrieved = ctx.get(INPUTS)
-        assert torch.equal(retrieved, random_input)
+        assert torch.equal(retrieved, random_input) #type: ignore
 
     def test_get_missing_key_default_none(self):
         """Test get() with missing key returns None by default."""
@@ -241,5 +241,80 @@ class TestContextDictBehavior:
         """Test get() with missing key returns custom default."""
         ctx = Context()
         default_value = "default"
-        result = ctx.get("nonexistent", default_value)
+        result = ctx.get("nonexistent", default_value) #type: ignore
         assert result == default_value
+
+
+class TestContextMerge:
+    """Test Context merge operations using | operator."""
+
+    def test_or_merge_basic(self, random_input, random_target):
+        """Test basic merge of two contexts with different keys."""
+        ctx1 = Context(inputs=random_input)
+        ctx2 = Context(targets=random_target)
+        
+        merged = ctx1 | ctx2
+        
+        assert INPUTS in merged
+        assert TARGETS in merged
+        assert torch.equal(merged[INPUTS], random_input) #type: ignore
+        assert torch.equal(merged[TARGETS], random_target) #type: ignore
+
+    def test_or_merge_precedence(self, random_input, random_target):
+        """Test that right operand takes precedence in key conflicts."""
+        ctx1 = Context(inputs=random_input)
+        ctx2 = Context(inputs=random_target)
+        
+        merged = ctx1 | ctx2
+        
+        # ctx2's value should win
+        assert torch.equal(merged[INPUTS], random_target) #type: ignore
+        assert not torch.equal(merged[INPUTS], random_input) #type: ignore
+
+    def test_or_original_unchanged(self, random_input, random_target):
+        """Test that original contexts are unchanged after merge."""
+        ctx1 = Context(inputs=random_input)
+        ctx2 = Context(targets=random_target)
+        
+        _ = ctx1 | ctx2
+        
+        # Original contexts should remain unchanged
+        assert len(ctx1) == 1
+        assert len(ctx2) == 1
+        assert TARGETS not in ctx1
+        assert INPUTS not in ctx2
+
+    def test_ror_merge_basic(self, random_input, random_target):
+        """Test reverse merge with same result as forward merge."""
+        ctx1 = Context(inputs=random_input)
+        ctx2 = Context(targets=random_target)
+        
+        # Both should produce same result for non-overlapping keys
+        merged_or = ctx1 | ctx2
+        merged_ror = ctx2.__ror__(ctx1)
+        
+        assert set(merged_or.keys()) == set(merged_ror.keys())
+        assert torch.equal(merged_or[INPUTS], merged_ror[INPUTS]) #type: ignore
+        assert torch.equal(merged_or[TARGETS], merged_ror[TARGETS]) #type: ignore
+
+    def test_or_not_implemented(self, random_input):
+        """Test __or__ returns NotImplemented for non-Context operand."""
+        ctx = Context(inputs=random_input)
+        x = {}
+        
+        with pytest.raises(
+            NotImplementedError, 
+            match="__or__ operation only supported between Context objects."
+        ):
+            _ = ctx | x  # type: ignore
+    
+    def test_ror_not_implemented(self, random_input):
+        """Test __ror__ returns NotImplemented for non-Context operand."""
+        ctx = Context(inputs=random_input)
+        x = {}
+        
+        with pytest.raises(
+            NotImplementedError, 
+            match="__or__ operation only supported between Context objects."
+        ):
+            _ = x | ctx  # type: ignore

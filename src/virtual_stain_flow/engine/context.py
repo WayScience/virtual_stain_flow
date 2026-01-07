@@ -6,9 +6,10 @@ Context class for organizing tensors and torch modules relevant to a specific
     isolated and modular computations.
 """
 
-from typing import Dict, Iterable, Tuple, Union
+from typing import Dict, Iterable, Union, Optional
 
 import torch
+from torch import Tensor
 
 from .names import INPUTS, TARGETS, PREDS, RESERVED_KEYS, RESERVED_MODEL_KEYS
 
@@ -73,15 +74,18 @@ class Context:
         """
         return self._store
 
-    def as_metric_args(self) -> Tuple[ContextValue, ContextValue]:
+    def as_metric_args(self) -> tuple[Tensor, Tensor]:
         """
         Returns the predictions and targets tensors for 
             Image quality assessment metric computation.
         Intended use: metric.update(*ctx.as_metric_args())
+
+        :return: A tuple (preds, targets) of tensors.
+        :raises ValueError: If either preds or targets is missing.
         """
-        self.require([PREDS, TARGETS])
-        preds = self._store[PREDS]
-        targs = self._store[TARGETS]
+        self.require(keys=[PREDS, TARGETS])
+        preds: Tensor = self.preds
+        targs: Tensor = self.targets
         return (preds, targs)
 
     def __repr__(self) -> str:
@@ -130,7 +134,7 @@ class Context:
     def __len__(self):
         return len(self._store)
     
-    def get(self, key: str, default: ContextValue = None) -> ContextValue:
+    def get(self, key: str, default: Optional[ContextValue] = None) -> Optional[ContextValue]:
         return self._store.get(key, default)
 
     def values(self):
@@ -142,7 +146,7 @@ class Context:
     def keys(self):
         return self._store.keys()
     
-    def pop(self, key: str, default: ContextValue = None) -> ContextValue:
+    def pop(self, key: str, default: Optional[ContextValue] = None) -> Optional[ContextValue]:
         """Remove and return the value for key if key is in the context, else default."""
         return self._store.pop(key, default)
     
@@ -156,7 +160,9 @@ class Context:
         :return: A new Context object containing items from both contexts.
         """
         if not isinstance(other, Context):
-            return NotImplemented
+            raise NotImplementedError(
+                "__or__ operation only supported between Context objects."
+            )
         new_context = Context(**self._store)
         new_context.add(**other._store)
         return new_context
@@ -170,7 +176,9 @@ class Context:
         :return: A new Context object containing items from both contexts.
         """
         if not isinstance(other, Context):
-            return NotImplemented
+            raise NotImplementedError(
+                "__or__ operation only supported between Context objects."
+            )
         new_context = Context(**other._store)
         new_context.add(**self._store)
         return new_context
@@ -178,13 +186,13 @@ class Context:
     # --- Properties for robust typing for reserved keys ---
     # let fail if key is not present
     @property
-    def inputs(self) -> torch.Tensor:
+    def inputs(self) -> Tensor:
         return self._store[INPUTS] # type: ignore
     
     @property
-    def targets(self) -> torch.Tensor:
+    def targets(self) -> Tensor:
         return self._store[TARGETS] # type: ignore
     
     @property
-    def preds(self) -> torch.Tensor:
+    def preds(self) -> Tensor:
         return self._store[PREDS] # type: ignore
