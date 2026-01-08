@@ -29,9 +29,9 @@ class MinimalTrainerRealization(AbstractTrainer):
             def set_postfix_str(self, *args, **kwargs):
                 pass
                 
-        self._epoch_pbar = DummyProgressBar()
+        self._epoch_pbar = DummyProgressBar() # type: ignore
     
-    def train_step(self, inputs: torch.tensor, targets: torch.tensor) -> dict:
+    def train_step(self, inputs: torch.Tensor, targets: torch.Tensor) -> dict:
         """
         Minimal train step that returns a dict of losses.
         Stores call information for verification.
@@ -48,7 +48,7 @@ class MinimalTrainerRealization(AbstractTrainer):
             'loss_b': torch.tensor(0.3),
         }
     
-    def evaluate_step(self, inputs: torch.tensor, targets: torch.tensor) -> dict:
+    def evaluate_step(self, inputs: torch.Tensor, targets: torch.Tensor) -> dict:
         """
         Minimal evaluate step that returns a dict of losses.
         Stores call information for verification.
@@ -152,5 +152,57 @@ def conv_trainer(conv_model, conv_optimizer, simple_loss, image_train_loader, im
         val_loader=image_val_loader,
         batch_size=4,
         early_termination_metric='MSELoss'
+    )
+    return trainer
+
+
+@pytest.fixture
+def simple_discriminator():
+    """
+    Simple discriminator model for GAN testing.
+    Takes concatenated input/target stack (B, 2, H, W) -> outputs score (B, 1)
+    """
+    import torch.nn as nn
+    
+    class SimpleDiscriminator(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(in_channels=2, out_channels=16, kernel_size=3, padding=1)
+            self.pool = nn.AdaptiveAvgPool2d(1)
+            self.fc = nn.Linear(16, 1)
+        
+        def forward(self, x):
+            x = torch.relu(self.conv(x))
+            x = self.pool(x).flatten(1)
+            return self.fc(x)
+    
+    return SimpleDiscriminator()
+
+
+@pytest.fixture
+def discriminator_optimizer(simple_discriminator):
+    """Create an optimizer for the discriminator."""
+    return torch.optim.Adam(simple_discriminator.parameters(), lr=0.0001)
+
+
+@pytest.fixture
+def wgan_trainer(conv_model, simple_discriminator, conv_optimizer, discriminator_optimizer, 
+                 simple_loss, image_train_loader, image_val_loader):
+    """
+    Create a LoggingWGANTrainer for testing.
+    """
+    from virtual_stain_flow.trainers.logging_gan_trainer import LoggingWGANTrainer
+    
+    trainer = LoggingWGANTrainer(
+        generator=conv_model,
+        discriminator=simple_discriminator,
+        generator_optimizer=conv_optimizer,
+        discriminator_optimizer=discriminator_optimizer,
+        generator_losses=simple_loss,
+        device=torch.device('cpu'),
+        train_loader=image_train_loader,
+        val_loader=image_val_loader,
+        batch_size=4,
+        n_discriminator_steps=3
     )
     return trainer

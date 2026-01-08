@@ -173,18 +173,16 @@ class Stage(nn.Module):
     def out_channels(self) -> int:
         return self._out_channels
     
-    @property
     def out_h(self, in_h: int) -> int:
         _out_h = in_h
-        for block in self.blocks:
+        for block in [self.in_block, self.comp_block]:
             if isinstance(block, Conv2DDownBlock):
                 _out_h = block.out_h(_out_h)
         return _out_h
     
-    @property
     def out_w(self, in_w: int) -> int:
         _out_w = in_w
-        for block in self.blocks:
+        for block in [self.in_block, self.comp_block]:
             if isinstance(block, Conv2DDownBlock):
                 _out_w = block.out_w(_out_w)
         return _out_w

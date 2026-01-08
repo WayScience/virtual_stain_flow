@@ -2,6 +2,7 @@
 MlflowLogger.py
 """
 
+import json
 import pathlib
 import tempfile
 from typing import Union, Dict, Optional, List, Any
@@ -9,6 +10,7 @@ from typing import Union, Dict, Optional, List, Any
 import mlflow
 from torch import nn
 
+from ..models.model import BaseModel
 from ..trainers.trainer_protocol import TrainerProtocol
 from .callbacks.LoggerCallback import (
     AbstractLoggerCallback,
@@ -41,8 +43,8 @@ class MlflowLogger:
         description: Optional[str] = None,
         target_channel_name: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
-        mlflow_start_run_args: dict = None,
-        mlflow_log_params_args: dict = None,
+        mlflow_start_run_args: Optional[Dict] = None,
+        mlflow_log_params_args: Optional[Dict] = None,
         callbacks: Optional[List[Any]] = None,
         save_model_at_train_end: bool = True,
         save_model_every_n_epochs: Optional[int] = None,
@@ -193,6 +195,33 @@ class MlflowLogger:
             raise TypeError("mlflow_log_params_args must be None or a dictionary.")
         
         self._run_id = mlflow.active_run().info.run_id
+
+        # log model config if available
+        if hasattr(self.trainer, '_models') and isinstance(self.trainer._models, List):
+            models = self.trainer._models
+        elif hasattr(self.trainer, 'model'):
+            models = [self.trainer.model]
+        else:
+            models = []
+
+        for model in models:
+
+            if isinstance(model, BaseModel) and hasattr(model, 'to_config'):
+                try:
+                    config = model.to_config() # type: ignore
+                except Exception as e:
+                    print(f"Could not get model config for logging: {e}")
+                    config = None
+                if config:
+                    try:
+                        self.log_config(
+                            tag=model.__class__.__name__,
+                            config=config, # type: ignore
+                            stage=None
+                        )
+                    except Exception as e:
+                        print(f"Fail to log model config as artifact: {e}")
+
         
         for callback in self.callbacks:
             # TODO consider if we want hasattr checks
@@ -467,11 +496,57 @@ class MlflowLogger:
                 best_model=best_model
             )
 
-            for saved_file_path in saved_file_paths:
+            for saved_file_path in (saved_file_paths or []):
                 mlflow.log_artifact(
                     str(saved_file_path), 
                     artifact_path=artifact_path
                 )
+
+    def log_config(
+        self,
+        tag: str,
+        config: Dict[str, Any],
+        stage: Optional[str] = None,
+    ) -> None:
+        """
+        Serialize a configuration dict to JSON, save it to a temporary file,
+        and log it to MLflow as an artifact.
+
+        :param tag: Name/identifier for the config (used in filename / artifact path).
+        :param config: The configuration to log (must be a dictionary).
+        :param stage: Optional stage to nest under the artifact path
+        :raises TypeError: If `config` is not a dict.
+        """
+
+        if not isinstance(config, dict):
+            raise TypeError(f"`config` must be a dict, got {type(config).__name__}")
+
+        # Where to place it inside MLflow’s artifact store (a directory path)
+        artifact_path = "/".join(p for p in ("configs", stage) if p)
+
+        # Write JSON into a temporary directory so MLflow can copy it, then clean up.
+        with tempfile.TemporaryDirectory(prefix="log_config_") as tmpdir:
+            tmpdir_path = pathlib.Path(tmpdir)
+            file_path = tmpdir_path / f"{tag}.json"
+
+            # Use default=str to avoid failures on non-JSON-serializable objects
+            # (e.g., pathlib.Path, numpy types, Enums); they'll be stringified.
+            file_path.write_text(
+                json.dumps(
+                    config,
+                    indent=2,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=str,
+                ),
+                encoding="utf-8",
+            )
+
+            # Log the JSON file as an MLflow artifact
+            mlflow.log_artifact(
+                str(file_path), 
+                artifact_path=artifact_path
+            )
     
     """
     Access point for callback to model

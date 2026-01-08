@@ -11,6 +11,7 @@ TARGETS: Final[str] = "targets" # always mean the ground truth image tensor
 PREDS: Final[str]   = "preds" # always mean the predicted image tensor predicting from inputs the targets
 
 GENERATOR_MODEL: Final[str] = "generator"
+DISCRIMINATOR_MODEL: Final[str] = "discriminator"
 
 RESERVED_KEYS: FrozenSet[str] = frozenset({INPUTS, TARGETS, PREDS})
-RESERVED_MODEL_KEYS: FrozenSet[str] = frozenset({GENERATOR_MODEL})
+RESERVED_MODEL_KEYS: FrozenSet[str] = frozenset({GENERATOR_MODEL, DISCRIMINATOR_MODEL})

@@ -177,7 +177,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         return None
 
     @abstractmethod
-    def train_step(self, inputs: torch.tensor, targets: torch.tensor)->Dict[str, torch.Tensor]:
+    def train_step(self, inputs: torch.Tensor, targets: torch.Tensor)->Dict[str, float]:
         """
         Abstract method for training the model on one batch
         Must be implemented by subclasses.
@@ -194,7 +194,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         pass
 
     @abstractmethod
-    def evaluate_step(self, inputs: torch.tensor, targets: torch.tensor)->Dict[str, torch.Tensor]:
+    def evaluate_step(self, inputs: torch.Tensor, targets: torch.Tensor)->Dict[str, float]:
         """
         Abstract method for evaluating the model on one batch
         Must be implemented by subclasses. 
@@ -361,7 +361,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         if hasattr(logger, "on_train_end"):
             logger.on_train_end()
 
-    def _collect_early_stop_metric(self) -> float:
+    def _collect_early_stop_metric(self) -> Optional[float]:
         if self._early_termination_metric is None:
             # Do not perform early stopping when no termination metric is specified
             early_term_metric = None
@@ -563,7 +563,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
             self._train_losses[loss_name].append(loss)
 
     def update_metrics(self, 
-                       metric: torch.tensor, 
+                       metric: torch.Tensor, 
                        metric_name: str, 
                        validation: bool = False):
         if validation:
