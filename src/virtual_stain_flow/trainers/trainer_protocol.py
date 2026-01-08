@@ -4,7 +4,7 @@ trainer_protocol.py
 Protocol for defining behavior and needed attributes of a trainer class.
 """
 
-from typing import Protocol, Dict, runtime_checkable
+from typing import Protocol, Dict, runtime_checkable, Any
 
 import torch
 
@@ -38,7 +38,7 @@ class TrainerProtocol(Protocol):
 
     def evaluate_epoch(self) -> Dict[str, float]: ...
 
-    def train(self, num_epochs: int) -> None: ...
+    def train(self, *args: Any, **kwargs: Any) -> None: ...
 
     @property
     def epoch(self) -> int: ...
