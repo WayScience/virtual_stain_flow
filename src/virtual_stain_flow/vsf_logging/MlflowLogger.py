@@ -43,8 +43,8 @@ class MlflowLogger:
         description: Optional[str] = None,
         target_channel_name: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
-        mlflow_start_run_args: dict = None,
-        mlflow_log_params_args: dict = None,
+        mlflow_start_run_args: Optional[Dict] = None,
+        mlflow_log_params_args: Optional[Dict] = None,
         callbacks: Optional[List[Any]] = None,
         save_model_at_train_end: bool = True,
         save_model_every_n_epochs: Optional[int] = None,
@@ -496,7 +496,7 @@ class MlflowLogger:
                 best_model=best_model
             )
 
-            for saved_file_path in saved_file_paths:
+            for saved_file_path in (saved_file_paths or []):
                 mlflow.log_artifact(
                     str(saved_file_path), 
                     artifact_path=artifact_path
