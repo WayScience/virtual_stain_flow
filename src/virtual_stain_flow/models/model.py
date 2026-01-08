@@ -88,7 +88,7 @@ class BaseModel(ABC, torch.nn.Module):
     
     @classmethod
     @abstractmethod
-    def from_config(cls, config: Dict) -> 'BaseGeneratorModel':
+    def from_config(cls, config: Dict) -> 'BaseModel':
         """
         Creates a model instance from a configuration dictionary.
         
