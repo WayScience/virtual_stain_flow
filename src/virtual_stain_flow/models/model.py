@@ -14,7 +14,7 @@ Classes:
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Union
+from typing import Optional, Dict, Union, Any
 import pathlib
 
 import torch
@@ -78,7 +78,7 @@ class BaseModel(ABC, torch.nn.Module):
         return weight_file
 
     @abstractmethod
-    def to_config(self) -> Dict:
+    def to_config(self) -> Dict[str, Any]:
         """
         Converts the model configuration to a dictionary format.
         
