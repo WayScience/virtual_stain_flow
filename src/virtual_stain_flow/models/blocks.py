@@ -49,7 +49,7 @@ class AbstractBlock(ABC, nn.Module):
     def __init__(
         self,
         in_channels: int,
-        out_channels: int,
+        out_channels: Optional[int] = None,
         num_units: int = 1,
         **kwargs: dict
     ):
@@ -63,6 +63,8 @@ class AbstractBlock(ABC, nn.Module):
         if in_channels <= 0:
             raise ValueError("Expected in_channels to be positive, "
                              f"got {in_channels}")
+        if out_channels is None:
+            out_channels = in_channels
         if not isinstance(out_channels, int):
             raise TypeError("Expected out_channels to be int, "
                             f"got {type(out_channels).__name__}")
@@ -101,10 +103,9 @@ class AbstractBlock(ABC, nn.Module):
     # These 2 below should be overriden to reflect the actual spatial dimension
     # changes the block applies. By default they indicate spatial preserving
     # blocks, i.e. the height and width of the input tensor remain unchanged.
-    @property
     def out_h(self, in_h: int) -> int:
         return in_h
-    @property
+    
     def out_w(self, in_w: int) -> int:
         return in_w    
 

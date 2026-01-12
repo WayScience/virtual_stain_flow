@@ -4,7 +4,7 @@
 Implementation of GaN discriminators to use along with UNet or FNet generator.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import torch
 from torch import nn
@@ -109,6 +109,7 @@ class GlobalDiscriminator(BaseModel):
         self,
         n_in_channels: int,
         n_in_filters: int,
+        out_activation: Optional[torch.nn.Module] = None,
         _conv_depth: int=4,
         _leaky_relu_alpha: float=0.2,
         _batch_norm: bool=False,
@@ -120,6 +121,7 @@ class GlobalDiscriminator(BaseModel):
         :param n_in_channels: (int) number of input channels
         :param n_in_filters: (int) number of filters in the first convolutional layer. 
             Every subsequent layer will double the number of filters
+        :param out_activation: output activation function
         :param _conv_depth: (int) depth of the convolutional network
         :param _leaky_relu_alpha: (float) alpha value for leaky ReLU activation. 
             ust be between 0 and 1
@@ -168,12 +170,14 @@ class GlobalDiscriminator(BaseModel):
             nn.LazyLinear(512),
             nn.LeakyReLU(_leaky_relu_alpha, inplace=True),
             nn.Linear(512, 1),
-            nn.Sigmoid()
         )
+
+        self.out_activation = out_activation or torch.nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self._conv_layers(x)
         x = self.fc(x)
+        x = self.out_activation(x)
 
         return x
     
@@ -189,7 +193,6 @@ class GlobalDiscriminator(BaseModel):
                 "_conv_depth": self._conv_depth,
                 "_leaky_relu_alpha": self._leaky_relu_alpha,
                 "_batch_norm": self._batch_norm,
-                "_pool_before_fc": self._pool_before_fc,
             },
         }
 

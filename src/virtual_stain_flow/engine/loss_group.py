@@ -26,9 +26,11 @@ from typing import Optional, Union, Tuple, Dict, Sequence, List
 
 import torch
 
-from .loss_utils import AbstractLoss, _get_loss_name, _scalar_from_ctx
-from .context import Context
+from .loss_utils import BaseLoss, _get_loss_name, _scalar_from_ctx
+from .context import Context, ContextValue
 from .names import PREDS, TARGETS
+
+Scalar = Union[int, float, bool]
 
 
 @dataclass
@@ -53,7 +55,7 @@ class LossItem:
         losses and centralizes device management. 
     )
     """
-    module: Union[torch.nn.Module, AbstractLoss]
+    module: Union[torch.nn.Module, BaseLoss]
     args: Union[str, Tuple[str, ...]] = (PREDS, TARGETS)
     key: Optional[str] = None
     weight: float = 1.0
@@ -63,7 +65,7 @@ class LossItem:
 
     def __post_init__(self):
         
-        self.key = self.key or _get_loss_name(self.module)        
+        self.key = str(self.key or _get_loss_name(self.module))        
         self.args = (self.args,) if isinstance(self.args, str) else self.args
         
         try:
@@ -94,7 +96,9 @@ class LossItem:
 
         if context is not None:
             context.require(self.args)
-            inputs = {arg: context[arg] for arg in self.args}
+            inputs: Dict[str, ContextValue] = {
+                arg: context[arg] for arg in self.args
+            }
         
         if not self.enabled or (not train and not self.compute_at_val):
             zero = _scalar_from_ctx(0.0, inputs)
@@ -127,7 +131,7 @@ class LossGroup:
     items: Sequence[LossItem]
 
     @property
-    def item_names(self) -> List[str]:
+    def item_names(self) -> List[Optional[str]]:
         return [item.key for item in self.items]
     
     def __call__(
@@ -135,7 +139,7 @@ class LossGroup:
         train: bool,
         context: Optional[Context] = None,
         **inputs: torch.Tensor
-    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+    ) -> Tuple[torch.Tensor, Dict[str, Scalar]]:
         """
         Compute the total loss and individual loss values.
 
@@ -153,7 +157,7 @@ class LossGroup:
 
         for item in self.items:
             raw, weighted = item(train, context=context, **inputs)
-            logs[item.key] = raw.item()
+            logs[item.key] = raw.item() # type: ignore
             total += weighted
         
         return total, logs
