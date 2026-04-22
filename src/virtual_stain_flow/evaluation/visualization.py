@@ -15,6 +15,7 @@ from matplotlib.patches import Rectangle
 
 from ..datasets.base_dataset import BaseImageDataset
 from ..datasets.crop_dataset import CropImageDataset
+from ..datasets.base_wrapper_dataset import BaseWrapperDataset
 from .evaluation_utils import evaluate_per_image_metric, extract_samples_from_dataset
 from .predict_utils import predict_image
 
@@ -199,7 +200,7 @@ def plot_predictions_grid(
 
 
 def plot_dataset_grid(
-    dataset: Union[BaseImageDataset, CropImageDataset],
+    dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
     indices: List[int],
     save_path: Optional[str] = None,
     **kwargs,

@@ -7,10 +7,11 @@ from torch.nn import Module
 
 from ..datasets.base_dataset import BaseImageDataset
 from ..datasets.crop_dataset import CropImageDataset
+from virtual_stain_flow.datasets.base_wrapper_dataset import BaseWrapperDataset
 
 
 def extract_samples_from_dataset(
-    dataset: Union[BaseImageDataset, CropImageDataset],
+    dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
     indices: List[int],
 ) -> Tuple[
     List[np.ndarray],
@@ -33,7 +34,20 @@ def extract_samples_from_dataset(
           or None for BaseImageDataset.
         - patch_coords: List of (x, y) tuples for CropImageDataset, or None for BaseImageDataset.
     """
-    is_crop_dataset = isinstance(dataset, CropImageDataset)
+    is_wrapper_dataset = False
+    if isinstance(dataset, BaseWrapperDataset):
+        is_crop_dataset = isinstance(dataset.original, CropImageDataset)
+        is_wrapper_dataset = True
+    elif isinstance(dataset, CropImageDataset):
+        is_crop_dataset = True
+    elif isinstance(dataset, BaseImageDataset):
+        is_crop_dataset = False
+    else:
+        raise ValueError(
+            "Unsupported dataset type. Expected BaseImageDataset, CropImageDataset, or BaseWrapperDataset.")
+    
+    if max(indices) >= len(dataset):
+        raise IndexError(f"Index out of range. Dataset length: {len(dataset)}, max index requested: {max(indices)}")
 
     inputs: List[np.ndarray] = []
     targets: List[np.ndarray] = []
@@ -58,8 +72,12 @@ def extract_samples_from_dataset(
         if is_crop_dataset:
             # Access the original uncropped image and crop coordinates
             # These are populated after __getitem__ is called
-            raw_images.append(dataset.original_input_image[0])
-            patch_coords.append((dataset.crop_info.x, dataset.crop_info.y))
+            if is_wrapper_dataset:
+                raw_images.append(dataset.original.original_input_image[0])
+                patch_coords.append((dataset.original.crop_info.x, dataset.original.crop_info.y))
+            else:
+                raw_images.append(dataset.original_input_image[0])
+                patch_coords.append((dataset.crop_info.x, dataset.crop_info.y))
 
     return inputs, targets, raw_images, patch_coords
 
