@@ -46,8 +46,14 @@ def extract_samples_from_dataset(
         raise ValueError(
             "Unsupported dataset type. Expected BaseImageDataset, CropImageDataset, or BaseWrapperDataset.")
     
+    if not indices:
+        raise ValueError("Indices list cannot be empty.")
+    
     if max(indices) >= len(dataset):
-        raise IndexError(f"Index out of range. Dataset length: {len(dataset)}, max index requested: {max(indices)}")
+        raise IndexError(
+            f"Index out of range. Dataset length: {len(dataset)}, "
+            f"max index requested: {max(indices)}"
+        )
 
     inputs: List[np.ndarray] = []
     targets: List[np.ndarray] = []

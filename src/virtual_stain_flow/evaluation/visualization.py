@@ -36,7 +36,7 @@ def plot_predictions_grid(
     show_plot: bool = True,
     wspace: float = 0.05,
     hspace: float = 0.15,
-) -> None:
+) -> plt.Figure:
     """
     Plot a grid of images comparing inputs, targets, and optionally predictions.
 
@@ -198,13 +198,15 @@ def plot_predictions_grid(
     else:
         plt.close()
 
+    return fig
+
 
 def plot_dataset_grid(
     dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
     indices: List[int],
     save_path: Optional[str] = None,
     **kwargs,
-) -> None:
+) -> plt.Figure:
     """
     Plot a grid of dataset samples (inputs and targets) without model predictions.
 
@@ -217,10 +219,12 @@ def plot_dataset_grid(
         Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace.
     """
     # Extract samples from dataset
-    inputs, targets, raw_images, patch_coords = extract_samples_from_dataset(dataset, indices)
+    (
+        inputs, targets, raw_images, patch_coords
+    ) = extract_samples_from_dataset(dataset, indices)
 
     # Plot without predictions
-    plot_predictions_grid(
+    return plot_predictions_grid(
         inputs=inputs,
         targets=targets,
         predictions=None,
@@ -241,7 +245,7 @@ def plot_predictions_grid_from_model(
     device: str = "cuda",
     save_path: Optional[str] = None,
     **kwargs,
-) -> None:
+) -> plt.Figure:
     """
     Plot predictions grid by running inference on a model.
 
@@ -276,7 +280,7 @@ def plot_predictions_grid_from_model(
     predictions = [predictions_tensor[i].numpy() for i in range(len(indices))]
 
     # Step 4: Plot
-    plot_predictions_grid(
+    return plot_predictions_grid(
         inputs=inputs,
         targets=targets,
         predictions=predictions,
