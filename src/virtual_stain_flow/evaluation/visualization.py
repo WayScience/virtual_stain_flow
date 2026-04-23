@@ -269,7 +269,7 @@ def plot_predictions_grid_from_model(
         Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace.
     """
     # Step 1: Run inference
-    targets_tensor, predictions_tensor = predict_image(
+    targets_tensor, predictions_tensor, inputs_tensor = predict_image(
         dataset, model, indices=indices, device=device
     )
 
@@ -279,7 +279,10 @@ def plot_predictions_grid_from_model(
         metrics_df = evaluate_per_image_metric(predictions_tensor, targets_tensor, metrics)
 
     # Step 3: Extract samples from dataset (need to re-access for raw images in CropImageDataset)
-    inputs, targets, raw_images, patch_coords = extract_samples_from_dataset(dataset, indices)
+    _, _, raw_images, patch_coords = extract_samples_from_dataset(dataset, indices)    
+    # use the collected input and target stack at prediction time instead of
+    # re-extract
+    inputs, targets = inputs_tensor.numpy(), targets_tensor.numpy()
 
     # Convert predictions tensor to list of numpy arrays
     predictions = [predictions_tensor[i].numpy() for i in range(len(indices))]
