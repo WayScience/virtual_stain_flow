@@ -149,7 +149,7 @@ plot_dataset_grid(
 )
 
 
-# ## Transforamtion example
+# ## Transformation example
 
 # In[5]:
 
@@ -233,7 +233,7 @@ for i in range(5):
 # # optionally, if want to use plot prediction callback
 # plot_callback = PlotPredictionCallback(
 #     name="...",
-#     dataset=crop_dataset, # non-augmented dataset recommended for consistentcy
+#     dataset=crop_dataset, # non-augmented dataset recommended for consistency
 #     # but augment datasets also work here
 #     ...
 # )
