@@ -15,7 +15,7 @@ class MonaiAdapter(BaseWrapperDataset):
         in dictionary format compatible with MONAI transforms and pipelines.
     Specifically, each sample is returned as a dictionary with keys "input" and "target",
         containing the input and target tensors respectively, then ran through
-        MONAI transforms if provided, adn finally returned back as a tuple of 
+        MONAI transforms if provided, and finally returned back as a tuple of 
         (input, target) tensors. It would be meaningless to use this adapter
         without any MONAI transforms as the data just gets wrapped and unwrapped.
     """
