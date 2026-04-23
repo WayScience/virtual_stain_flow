@@ -12,7 +12,7 @@ def predict_image(
     device: str = "cpu",
     num_workers: int = 0,
     indices: Optional[List[int]] = None
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Runs a model on a dataset, performing a forward pass on all (or a subset of) input images 
     in evaluation mode and returning a stacked tensor of predictions.
@@ -20,20 +20,13 @@ def predict_image(
 
     :param dataset: A dataset that returns (input_tensor, target_tensor) tuples, 
                     where input_tensor has shape (C, H, W).
-    :type dataset: torch.utils.data.Dataset
     :param model: A PyTorch model that is compatible with the dataset inputs.
-    :type model: torch.nn.Module
     :param batch_size: The number of samples per batch (default is 1).
-    :type batch_size: int, optional
     :param device: The device to run inference on, e.g., "cpu" or "cuda".
-    :type device: str, optional
     :param num_workers: Number of workers for the DataLoader (default is 0).
-    :type num_workers: int, optional
     :param indices: Optional list of dataset indices to subset the dataset before inference.
-    :type indices: Optional[List[int]], optional
 
-    :return: Tuple of stacked target and prediction tensors.
-    :rtype: Tuple[torch.Tensor, torch.Tensor]
+    :return: Tuple of stacked target, prediction, and input tensors.
     """
     # Subset the dataset if indices are provided
     if indices is not None:
@@ -45,20 +38,25 @@ def predict_image(
     model.to(device)
     model.eval()
 
-    predictions, targets = [], []
+    predictions, targets, inputs = [], [], []
 
     with torch.no_grad():
-        for inputs, target in dataloader:  # Unpacking (input_tensor, target_tensor)
-            inputs = inputs.to(device)  # Move input data to the specified device
+        for input, target in dataloader:  # Unpacking (input_tensor, target_tensor)
+            input = input.to(device)  # Move input data to the specified device
 
             # Forward pass
-            outputs = model(inputs)
+            prediction = model(input)
             
             # output both target and prediction tensors for metric
             targets.append(target.cpu())
-            predictions.append(outputs.cpu())  # Move to CPU for stacking
+            predictions.append(prediction.cpu())  # Move to CPU for stacking
+            inputs.append(input.cpu())
 
-    return torch.cat(targets, dim=0), torch.cat(predictions, dim=0) 
+    return (
+        torch.cat(targets, dim=0), 
+        torch.cat(predictions, dim=0), 
+        torch.cat(inputs, dim=0)
+    ) 
 
 def process_tensor_image(
     img_tensor: torch.Tensor,

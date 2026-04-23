@@ -15,6 +15,7 @@ from matplotlib.patches import Rectangle
 
 from ..datasets.base_dataset import BaseImageDataset
 from ..datasets.crop_dataset import CropImageDataset
+from ..datasets.base_wrapper_dataset import BaseWrapperDataset
 from .evaluation_utils import evaluate_per_image_metric, extract_samples_from_dataset
 from .predict_utils import predict_image
 
@@ -35,7 +36,7 @@ def plot_predictions_grid(
     show_plot: bool = True,
     wspace: float = 0.05,
     hspace: float = 0.15,
-) -> None:
+) -> plt.Figure:
     """
     Plot a grid of images comparing inputs, targets, and optionally predictions.
 
@@ -197,29 +198,35 @@ def plot_predictions_grid(
     else:
         plt.close()
 
+    return fig
+
 
 def plot_dataset_grid(
-    dataset: Union[BaseImageDataset, CropImageDataset],
+    dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
     indices: List[int],
     save_path: Optional[str] = None,
     **kwargs,
-) -> None:
+) -> plt.Figure:
     """
     Plot a grid of dataset samples (inputs and targets) without model predictions.
 
     Convenience wrapper around `plot_predictions_grid` for visualizing dataset contents.
 
-    :param dataset: BaseImageDataset or CropImageDataset to visualize.
+    :param dataset: BaseImageDataset, CropImageDataset, or BaseWrapperDataset to visualize.
+        Note that if using a wrapper dataset, the raw images and patch coordinates
+        if applicable will be based on the wrapped __get_item__ and metadata.
     :param indices: List of dataset indices to display.
     :param save_path: Optional path to save the figure.
     :param kwargs: Additional arguments passed to `plot_predictions_grid`.
         Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace.
     """
     # Extract samples from dataset
-    inputs, targets, raw_images, patch_coords = extract_samples_from_dataset(dataset, indices)
+    (
+        inputs, targets, raw_images, patch_coords
+    ) = extract_samples_from_dataset(dataset, indices)
 
     # Plot without predictions
-    plot_predictions_grid(
+    return plot_predictions_grid(
         inputs=inputs,
         targets=targets,
         predictions=None,
@@ -234,13 +241,13 @@ def plot_dataset_grid(
 
 def plot_predictions_grid_from_model(
     model: torch.nn.Module,
-    dataset: Union[BaseImageDataset, CropImageDataset],
+    dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
     indices: List[int],
     metrics: List[torch.nn.Module],
     device: str = "cuda",
     save_path: Optional[str] = None,
     **kwargs,
-) -> None:
+) -> plt.Figure:
     """
     Plot predictions grid by running inference on a model.
 
@@ -250,7 +257,10 @@ def plot_predictions_grid_from_model(
     3. Extract samples and plot using `plot_predictions_grid`.
 
     :param model: PyTorch model for inference.
-    :param dataset: BaseImageDataset or CropImageDataset to evaluate.
+    :param dataset: BaseImageDataset, CropImageDataset, or BaseWrapperDataset to visualize.
+        Note that if using a wrapper dataset, the predictions will be based on the
+        wrapper __get_item__ input whereas the raw images and patch coordinates
+        if applicable will be based on the wrapped __get_item__ and metadata.
     :param indices: List of dataset indices to evaluate and visualize.
     :param metrics: List of metric modules to compute (can be empty).
     :param device: Device for inference ("cpu" or "cuda").
@@ -259,7 +269,7 @@ def plot_predictions_grid_from_model(
         Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace.
     """
     # Step 1: Run inference
-    targets_tensor, predictions_tensor = predict_image(
+    targets_tensor, predictions_tensor, inputs_tensor = predict_image(
         dataset, model, indices=indices, device=device
     )
 
@@ -269,13 +279,16 @@ def plot_predictions_grid_from_model(
         metrics_df = evaluate_per_image_metric(predictions_tensor, targets_tensor, metrics)
 
     # Step 3: Extract samples from dataset (need to re-access for raw images in CropImageDataset)
-    inputs, targets, raw_images, patch_coords = extract_samples_from_dataset(dataset, indices)
+    _, _, raw_images, patch_coords = extract_samples_from_dataset(dataset, indices)    
+    # use the collected input and target stack at prediction time instead of
+    # re-extract
+    inputs, targets = inputs_tensor.numpy(), targets_tensor.numpy()
 
     # Convert predictions tensor to list of numpy arrays
     predictions = [predictions_tensor[i].numpy() for i in range(len(indices))]
 
     # Step 4: Plot
-    plot_predictions_grid(
+    return plot_predictions_grid(
         inputs=inputs,
         targets=targets,
         predictions=predictions,
