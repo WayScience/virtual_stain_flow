@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.4] - 2026-04-23
+
+### Added
+
+#### Dataset wrapper and MONAI augmentation adapter (`virtual_stain_flow/datasets/`):
+
+Introduces a lightweight wrapper abstraction for dataset composition and a MONAI-compatible adapter for dictionary-based augmentation pipelines. This enables augmentation workflows to be layered on top of existing dataset implementations without modifying core dataset logic.
+
+- **`BaseWrapperDataset`** (`base_wrapper_dataset.py`): Abstract wrapper base class that forwards dataset access to an underlying dataset instance and provides recursive access to the original base dataset via the `original` property. Establishes a reusable pattern for composing dataset behaviors (e.g., augmentation, caching, preprocessing) while preserving compatibility with existing dataset APIs.
+- **`MonaiAdapter`** (`monai_aug_adapter_dataset.py`): Wrapper dataset that adapts `(input, target)` tuple samples into MONAI dictionary format (`{"input": ..., "target": ...}`), applies optional MONAI `Compose` transforms, and returns transformed samples back as `(input, target)` tuples for trainer compatibility.
+
+#### MONAI augmentation usage example (`examples/`):
+
+- Added/updated **`4.data_augmentation_example.ipynb`** demonstrating:
+  - construction of a base dataset and crop dataset,
+  - application of MONAI dictionary transforms through `MonaiAdapter`,
+  - visualization of repeated stochastic augmentations,
+  - integration of the augmented dataset into a standard training dataloader/trainer workflow.
+
+### Refactored
+
+#### Visualization suite to support `BaseWrapperDataset` 
+
+---
+
 ## [0.4.3] - 2025-12-16
 
 ### Added
