@@ -212,7 +212,9 @@ def plot_dataset_grid(
 
     Convenience wrapper around `plot_predictions_grid` for visualizing dataset contents.
 
-    :param dataset: BaseImageDataset or CropImageDataset to visualize.
+    :param dataset: BaseImageDataset, CropImageDataset, or BaseWrapperDataset to visualize.
+        Note that if using a wrapper dataset, the raw images and patch coordinates
+        if applicable will be based on the wrapped __get_item__ and metadata.
     :param indices: List of dataset indices to display.
     :param save_path: Optional path to save the figure.
     :param kwargs: Additional arguments passed to `plot_predictions_grid`.
@@ -239,7 +241,7 @@ def plot_dataset_grid(
 
 def plot_predictions_grid_from_model(
     model: torch.nn.Module,
-    dataset: Union[BaseImageDataset, CropImageDataset],
+    dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
     indices: List[int],
     metrics: List[torch.nn.Module],
     device: str = "cuda",
@@ -255,7 +257,10 @@ def plot_predictions_grid_from_model(
     3. Extract samples and plot using `plot_predictions_grid`.
 
     :param model: PyTorch model for inference.
-    :param dataset: BaseImageDataset or CropImageDataset to evaluate.
+    :param dataset: BaseImageDataset, CropImageDataset, or BaseWrapperDataset to visualize.
+        Note that if using a wrapper dataset, the predictions will be based on the
+        wrapper __get_item__ input whereas the raw images and patch coordinates
+        if applicable will be based on the wrapped __get_item__ and metadata.
     :param indices: List of dataset indices to evaluate and visualize.
     :param metrics: List of metric modules to compute (can be empty).
     :param device: Device for inference ("cpu" or "cuda").
