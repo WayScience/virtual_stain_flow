@@ -187,6 +187,13 @@ class BaseGANTrainer(AbstractTrainer):
             metric.update(*ctx.as_metric_args(), validation=True)
 
         return gen_logs | disc_logs
+
+    @property
+    def loss_groups(self) -> Dict[str, LossGroup]:
+        return {
+            'generator': self._generator_loss_group,
+            'discriminator': self._discriminator_loss_group
+        }
     
     def save_model(
         self,
