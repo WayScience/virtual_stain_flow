@@ -10,6 +10,11 @@ class TestMlflowLoggerLossConfigLogging:
         patched_mlflow,
         single_generator_trainer,
     ):
+        """
+        Test for correct on start logging of loss name and weight as
+            mlflow tags and full loss group config as mlflow artifacts 
+            for a single-loss trainer.
+        """
         from virtual_stain_flow.vsf_logging.MlflowLogger import MlflowLogger
 
         captured = patched_mlflow
@@ -46,6 +51,12 @@ class TestMlflowLoggerLossConfigLogging:
         patched_mlflow,
         wgan_trainer,
     ):
+        """
+        Test for correct on start logging of loss name and weight as
+            mlflow tags and full loss group config as mlflow artifacts
+            for a WGAN trainer with multiple losses in both generator and
+            discriminator.
+        """
         from virtual_stain_flow.vsf_logging.MlflowLogger import MlflowLogger
 
         captured = patched_mlflow
