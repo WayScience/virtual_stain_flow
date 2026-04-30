@@ -2,16 +2,21 @@
 Testing fixtures meant to be shared across the whole package
 """
 
+import json
+import importlib
 import pathlib
+from types import SimpleNamespace
 
 import pytest
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+from virtual_stain_flow.trainers.AbstractTrainer import AbstractTrainer
+from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
 from virtual_stain_flow.vsf_logging import MlflowLogger
 
 
-# ----- Mock virtual_stain_flow components ----- #
+# ----- Logger test doubles ----- #
 
 class DummyLogger(MlflowLogger):
     """
@@ -75,6 +80,8 @@ def dummy_logger():
     return DummyLogger()
 
 
+# ----- Model/optimizer fixtures ----- #
+
 class MockModelWithSaveWeights(torch.nn.Module):
     """
     Mock model that implements save_weights method for testing.
@@ -115,7 +122,7 @@ def mock_optimizer(mock_model_with_save):
     return torch.optim.Adam(mock_model_with_save.parameters(), lr=0.001)
 
 
-# ----- Fixtures for simulating minimal training ----- #
+# ----- Dataset/dataloader fixtures ----- #
 
 class MinimalDataset(Dataset):
     """Minimal torch.utils.data.Dataset to test training."""
@@ -222,7 +229,6 @@ def empty_dataloader():
     return DataLoader(dataset, batch_size=2, shuffle=False)
 
 
-
 @pytest.fixture
 def image_train_loader(image_dataset):
     """Create a train dataloader with image data."""
@@ -242,6 +248,8 @@ def image_val_loader(image_dataset):
     _, val_dataset = random_split(image_dataset, [train_size, val_size])
     return DataLoader(val_dataset, batch_size=4, shuffle=False)
 
+
+# ----- Generic training fixtures ----- #
 
 @pytest.fixture
 def simple_loss():
@@ -278,3 +286,291 @@ def mock_metric():
 def dataset_for_splitting():
     """Create a larger dataset suitable for train/val/test splitting."""
     return MinimalDataset(num_samples=100, input_size=4, target_size=2)
+
+
+# ----- Trainer fixtures ----- #
+
+class MinimalTrainerRealization(AbstractTrainer):
+    """
+    Minimal concrete realization of AbstractTrainer for testing.
+    Tracks method calls and provides controllable step behavior.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.train_step_calls = []
+        self.evaluate_step_calls = []
+        self.on_epoch_start_called = False
+        self.on_epoch_end_called = False
+
+        class DummyProgressBar:
+            def set_postfix_str(self, *args, **kwargs):
+                pass
+
+        self._epoch_pbar = DummyProgressBar() # type: ignore
+
+    def train_step(self, inputs: torch.Tensor, targets: torch.Tensor) -> dict:
+        self.train_step_calls.append({
+            'inputs_shape': inputs.shape,
+            'targets_shape': targets.shape,
+        })
+
+        return {
+            'loss_a': torch.tensor(0.5),
+            'loss_b': torch.tensor(0.3),
+        }
+
+    def evaluate_step(self, inputs: torch.Tensor, targets: torch.Tensor) -> dict:
+        self.evaluate_step_calls.append({
+            'inputs_shape': inputs.shape,
+            'targets_shape': targets.shape,
+        })
+
+        return {
+            'loss_a': torch.tensor(0.4),
+            'loss_b': torch.tensor(0.2),
+        }
+
+    def save_model(self, save_path, file_name_prefix=None, file_name_suffix=None,
+                   file_ext='.pth', best_model=True):
+        return None
+
+
+@pytest.fixture
+def minimal_trainer_cls():
+    """Expose the minimal concrete trainer class for tests needing custom init."""
+    return MinimalTrainerRealization
+
+
+@pytest.fixture
+def trainer_with_loaders(minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
+    """
+    Create a MinimalTrainerRealization with train and validation loaders.
+    """
+    trainer = MinimalTrainerRealization(
+        model=minimal_model,
+        optimizer=minimal_optimizer,
+        train_loader=train_dataloader,
+        val_loader=val_dataloader,
+        batch_size=2,
+        device=torch.device('cpu')
+    )
+    return trainer
+
+
+@pytest.fixture
+def trainer_with_empty_val_loader(minimal_model, minimal_optimizer, train_dataloader, empty_dataloader):
+    """
+    Create a MinimalTrainerRealization with empty validation loader.
+    """
+    trainer = MinimalTrainerRealization(
+        model=minimal_model,
+        optimizer=minimal_optimizer,
+        train_loader=train_dataloader,
+        val_loader=empty_dataloader,
+        batch_size=2,
+        device=torch.device('cpu')
+    )
+    return trainer
+
+
+@pytest.fixture
+def single_generator_trainer(minimal_model, minimal_optimizer, simple_loss, train_dataloader, val_dataloader):
+    """
+    Create a SingleGeneratorTrainer with a single loss function.
+    """
+    trainer = SingleGeneratorTrainer(
+        model=minimal_model,
+        optimizer=minimal_optimizer,
+        losses=simple_loss,
+        device=torch.device('cpu'),
+        train_loader=train_dataloader,
+        val_loader=val_dataloader,
+        batch_size=2
+    )
+    return trainer
+
+
+@pytest.fixture
+def multi_loss_trainer(minimal_model, minimal_optimizer, multiple_losses, train_dataloader, val_dataloader):
+    """
+    Create a SingleGeneratorTrainer with multiple loss functions.
+    """
+    trainer = SingleGeneratorTrainer(
+        model=minimal_model,
+        optimizer=minimal_optimizer,
+        losses=multiple_losses,
+        device=torch.device('cpu'),
+        loss_weights=[0.5, 0.5],
+        train_loader=train_dataloader,
+        val_loader=val_dataloader,
+        batch_size=2
+    )
+    return trainer
+
+
+@pytest.fixture
+def conv_trainer(conv_model, conv_optimizer, simple_loss, image_train_loader, image_val_loader):
+    """
+    Create a SingleGeneratorTrainer with conv model for full training tests.
+    """
+    trainer = SingleGeneratorTrainer(
+        model=conv_model,
+        optimizer=conv_optimizer,
+        losses=simple_loss,
+        device=torch.device('cpu'),
+        train_loader=image_train_loader,
+        val_loader=image_val_loader,
+        batch_size=4,
+        early_termination_metric='MSELoss'
+    )
+    return trainer
+
+
+@pytest.fixture
+def simple_discriminator():
+    """
+    Simple discriminator model for GAN testing.
+    Takes concatenated input/target stack (B, 2, H, W) -> outputs score (B, 1)
+    """
+    import torch.nn as nn
+
+    class SimpleDiscriminator(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(in_channels=2, out_channels=16, kernel_size=3, padding=1)
+            self.pool = nn.AdaptiveAvgPool2d(1)
+            self.fc = nn.Linear(16, 1)
+
+        def forward(self, x):
+            x = torch.relu(self.conv(x))
+            x = self.pool(x).flatten(1)
+            return self.fc(x)
+
+    return SimpleDiscriminator()
+
+
+@pytest.fixture
+def discriminator_optimizer(simple_discriminator):
+    """Create an optimizer for the discriminator."""
+    return torch.optim.Adam(simple_discriminator.parameters(), lr=0.0001)
+
+
+@pytest.fixture
+def wgan_trainer(conv_model, simple_discriminator, conv_optimizer, discriminator_optimizer,
+                 simple_loss, image_train_loader, image_val_loader):
+    """
+    Create a LoggingWGANTrainer for testing.
+    """
+    from virtual_stain_flow.trainers.logging_gan_trainer import LoggingWGANTrainer
+
+    trainer = LoggingWGANTrainer(
+        generator=conv_model,
+        discriminator=simple_discriminator,
+        generator_optimizer=conv_optimizer,
+        discriminator_optimizer=discriminator_optimizer,
+        generator_losses=simple_loss,
+        device=torch.device('cpu'),
+        train_loader=image_train_loader,
+        val_loader=image_val_loader,
+        batch_size=4,
+        n_discriminator_steps=3
+    )
+    return trainer
+
+
+# ----- MLflow patch fixture ----- #
+
+@pytest.fixture
+def patched_mlflow(monkeypatch):
+    """Patch MLflow module methods used by MlflowLogger and capture calls."""
+
+    captured = {
+        'tags': {},
+        'artifacts': [],
+        'active_run_id': None,
+    }
+
+    mlflow_logger_module = importlib.import_module(
+        'virtual_stain_flow.vsf_logging.MlflowLogger'
+    )
+
+    def fake_get_experiment_by_name(_name):
+        return None
+
+    def fake_create_experiment(_name):
+        return 'exp-1'
+
+    def fake_start_run(*args, **kwargs):
+        run_id = 'run-123'
+        captured['active_run_id'] = run_id
+        return SimpleNamespace(info=SimpleNamespace(run_id=run_id))
+
+    def fake_active_run():
+        run_id = captured['active_run_id']
+        if run_id is None:
+            return None
+        return SimpleNamespace(info=SimpleNamespace(run_id=run_id))
+
+    def fake_end_run():
+        captured['active_run_id'] = None
+
+    def fake_set_tag(key, value):
+        captured['tags'][key] = value
+
+    def fake_log_artifact(file_path, artifact_path=None):
+        file_content = None
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                file_content = json.load(f)
+        except Exception:
+            file_content = None
+
+        captured['artifacts'].append({
+            'file_path': file_path,
+            'artifact_path': artifact_path,
+            'content': file_content,
+        })
+
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'get_experiment_by_name',
+        fake_get_experiment_by_name,
+    )
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'create_experiment',
+        fake_create_experiment,
+    )
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'start_run',
+        fake_start_run,
+    )
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'active_run',
+        fake_active_run,
+    )
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'end_run',
+        fake_end_run,
+    )
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'set_tag',
+        fake_set_tag,
+    )
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'log_artifact',
+        fake_log_artifact,
+    )
+    monkeypatch.setattr(
+        mlflow_logger_module.mlflow,
+        'log_params',
+        lambda *_args, **_kwargs: None,
+    )
+
+    return captured

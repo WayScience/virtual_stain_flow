@@ -105,7 +105,11 @@ class SingleGeneratorTrainer(AbstractTrainer):
             targets=targets
         )
 
-        weighted_total, logs = self._loss_group(train=True, context=ctx)
+        weighted_total, logs = self._loss_group(
+            train=True, 
+            progress=self.progress, 
+            context=ctx
+        )
         weighted_total.backward()
         self._forward_group.step()
 
@@ -133,12 +137,20 @@ class SingleGeneratorTrainer(AbstractTrainer):
             targets=targets
         )
 
-        _, logs = self._loss_group(train=False, context=ctx)
+        _, logs = self._loss_group(
+            train=False, 
+            progress=self.progress, 
+            context=ctx
+        )
 
         for _, metric in self.metrics.items():
             metric.update(*ctx.as_metric_args(), validation=True)
 
         return logs
+
+    @property
+    def loss_groups(self) -> Dict[str, LossGroup]:
+        return {'main': self._loss_group}
     
     def save_model(
         self,

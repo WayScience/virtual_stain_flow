@@ -110,6 +110,7 @@ class BaseGANTrainer(AbstractTrainer):
         )
         disc_weighted_total, disc_logs = self._discriminator_loss_group(
             train=True,
+            progress=self.progress,
             context=disc_ctx
         )
         disc_weighted_total.backward()
@@ -133,6 +134,7 @@ class BaseGANTrainer(AbstractTrainer):
             )
             gen_weighted_total, gen_logs = self._generator_loss_group(
                 train=True,
+                progress=self.progress,
                 context=gen_ctx
             )
             gen_weighted_total.backward()
@@ -142,12 +144,14 @@ class BaseGANTrainer(AbstractTrainer):
             gen_logs = {}
         
         self._global_step += 1
+        self._progress.set_step(self._global_step)
 
         # if generator logs are not computed this step (due to skipped update), 
         # compute from discriminator context
         if not gen_logs:
             _, gen_logs = self._generator_loss_group(
                 train=True,
+                progress=self.progress,
                 context=ctx
             )
 
@@ -176,10 +180,12 @@ class BaseGANTrainer(AbstractTrainer):
         )
         _, gen_logs = self._generator_loss_group(
             train=False,
+            progress=self.progress,
             context=ctx
         )
         _, disc_logs = self._discriminator_loss_group(
             train=False,
+            progress=self.progress,
             context=ctx
         )
 
@@ -187,6 +193,13 @@ class BaseGANTrainer(AbstractTrainer):
             metric.update(*ctx.as_metric_args(), validation=True)
 
         return gen_logs | disc_logs
+
+    @property
+    def loss_groups(self) -> Dict[str, LossGroup]:
+        return {
+            'generator': self._generator_loss_group,
+            'discriminator': self._discriminator_loss_group
+        }
     
     def save_model(
         self,

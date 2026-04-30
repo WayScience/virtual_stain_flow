@@ -5,7 +5,12 @@ Contract tests for AbstractTrainer.train_epoch and evaluate_epoch methods
 import pytest
 import torch
 
-from conftest import MinimalTrainerRealization
+
+@pytest.fixture(autouse=True)
+def _bind_minimal_trainer_cls(minimal_trainer_cls):
+    """Bind concrete trainer class from fixture to avoid direct conftest imports."""
+    global MinimalTrainerRealization
+    MinimalTrainerRealization = minimal_trainer_cls
 
 
 class TestTrainEpochBatchIteration:
