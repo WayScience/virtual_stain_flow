@@ -536,8 +536,9 @@ class MlflowLogger:
 
     def _log_loss_groups_config_and_tags(self) -> None:
         """
-        Log loss item names and weights as flat tags and full loss group
-        configuration as config artifacts.
+        Log loss item names and weights as flattened string mlflow tags and 
+            full loss group configuration (loss name, loss weight, whether loss
+            is active during validation etc.) as mlflow config artifacts.
         """
 
         loss_groups = self._get_loss_groups()
