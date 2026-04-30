@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
+from ..engine.progress import Progress
 from ..datasets.data_split import default_random_split
 
 
@@ -113,6 +114,9 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
         # Epoch state
         self._epoch = 0
+        
+        # Progress tracking for loss weight scheduling
+        self._progress = Progress(epoch=0, step=0)
 
         # Loss and metrics state
         self._train_losses = defaultdict(list)
@@ -231,6 +235,8 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 num_batches=len(self._train_loader),
                 phase="Train"
             )
+
+            self._progress.set_step(self._progress.step + 1)
 
             batch_loss = self.train_step(inputs, targets)
             for key, value in batch_loss.items():
@@ -513,6 +519,11 @@ class AbstractTrainer(TrainerProtocol, ABC):
         return self._epoch
     
     @property
+    def progress(self) -> Progress:
+        """Returns the Progress object tracking training state (epoch, step, etc.)"""
+        return self._progress
+    
+    @property
     def train_losses(self):
         return self._train_losses
     
@@ -548,6 +559,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
     @epoch.setter
     def epoch(self, value: int):
         self._epoch = value
+        self._progress.set_epoch(value)
 
     """
     Update loss and metrics

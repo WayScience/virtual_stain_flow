@@ -107,7 +107,7 @@ class SingleGeneratorTrainer(AbstractTrainer):
 
         weighted_total, logs = self._loss_group(
             train=True, 
-            epoch=self.epoch, 
+            progress=self.progress, 
             context=ctx
         )
         weighted_total.backward()
@@ -139,7 +139,7 @@ class SingleGeneratorTrainer(AbstractTrainer):
 
         _, logs = self._loss_group(
             train=False, 
-            epoch=self.epoch, 
+            progress=self.progress, 
             context=ctx
         )
 

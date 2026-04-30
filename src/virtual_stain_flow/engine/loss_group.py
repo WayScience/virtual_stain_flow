@@ -29,6 +29,7 @@ import torch
 from .loss_utils import BaseLoss, _get_loss_name, _scalar_from_ctx
 from .context import Context, ContextValue
 from .names import PREDS, TARGETS
+from .progress import Progress
 
 Scalar = Union[int, float, bool]
 
@@ -79,7 +80,7 @@ class LossItem:
     def __call__(
         self,
         train: bool,
-        epoch: Optional[int] = None,
+        progress: Optional[Progress] = None,
         context: Optional[Context] = None,
         **inputs: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -89,7 +90,8 @@ class LossItem:
         skipped during validation.
 
         :param train: Whether the model is in training mode.
-        :param epoch: Optional epoch number to determine the weight from the schedule.
+        :param progress: Optional Progress object containing scheduling state (epoch, step, etc.)
+            for dynamic weight scheduling.
         :param context: Optional Context object containing tensors.
         :param inputs: Keyword arguments containing all necessary inputs for the
             loss computation.
@@ -154,7 +156,7 @@ class LossGroup:
     def __call__(
         self,
         train: bool,
-        epoch: Optional[int] = None,
+        progress: Optional[Progress] = None,
         context: Optional[Context] = None,
         **inputs: torch.Tensor
     ) -> Tuple[torch.Tensor, Dict[str, Scalar]]:
@@ -162,7 +164,8 @@ class LossGroup:
         Compute the total loss and individual loss values.
 
         :param train: Whether the model is in training mode.
-        :param epoch: Optional epoch number to determine the weight from the schedule.
+        :param progress: Optional Progress object containing scheduling state (epoch, step, etc.)
+            for dynamic weight scheduling.
         :param context: Optional Context object containing tensors.
         :input inputs: Keyword arguments containing all necessary inputs for the
             loss computations.
@@ -177,7 +180,7 @@ class LossGroup:
         for item in self.items:
             raw, weighted = item(
                 train, 
-                epoch=epoch, 
+                progress=progress, 
                 context=context, 
                 **inputs
             )
