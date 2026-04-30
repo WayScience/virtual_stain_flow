@@ -204,7 +204,7 @@ class MlflowLogger:
         else:
             models = []
 
-        for model in models:
+        for idx, model in enumerate(models):
 
             if isinstance(model, BaseModel) and hasattr(model, 'to_config'):
                 try:
@@ -213,6 +213,12 @@ class MlflowLogger:
                     print(f"Could not get model config for logging: {e}")
                     config = None
                 if config:
+                    class_path = config.get("class_path")
+                    if class_path:
+                        mlflow.set_tag(
+                            f"model.{idx}.class_path",
+                            str(class_path)
+                        )
                     try:
                         self.log_config(
                             tag=model.__class__.__name__,

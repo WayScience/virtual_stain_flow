@@ -103,6 +103,9 @@ def test_on_train_start_logs_wgan_unet_model_configs_and_loss_items(
     )
     assert "init" in discriminator_config
 
+    assert captured["tags"]["model.0.class_path"].endswith("UNet")
+    assert captured["tags"]["model.1.class_path"].endswith("GlobalDiscriminator")
+
     assert captured["tags"]["loss.generator.0.name"] == "MSELoss"
     assert captured["tags"]["loss.generator.0.weight"] == "1.0"
     assert captured["tags"]["loss.generator.1.name"] == "AdversarialLoss"

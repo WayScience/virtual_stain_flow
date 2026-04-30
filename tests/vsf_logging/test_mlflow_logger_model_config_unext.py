@@ -75,6 +75,8 @@ def test_on_train_start_logs_unext_model_config_and_loss_items(
     )
     assert "init" in model_config
 
+    assert captured["tags"]["model.0.class_path"].endswith("ConvNeXtUNet")
+
     assert captured["tags"]["loss.main.0.name"] == "MSELoss"
     assert captured["tags"]["loss.main.0.weight"] == "1.0"
 
