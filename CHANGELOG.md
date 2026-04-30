@@ -5,6 +5,18 @@ All notable chagnes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+---
+
+## [0.4.5] - 2026-04-30
+
+### Added
+
+#### MLflow auto logging enhancements (`virtual_stain_flow/vsf_logging/`):
+
+- The logger now records model architecture tags by capturing each model config's `class_path` and setting `model.<idx>.class_path` at train start.
+- The loss-group auto logging routine `_log_loss_groups_config_and_tags` logs loss item names and weights as MLflow tags and persists the full loss group configuration as a JSON config artifact.
+
 ---
 
 ## [0.4.4] - 2026-04-23
