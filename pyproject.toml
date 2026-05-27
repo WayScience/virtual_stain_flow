@@ -30,6 +30,7 @@ dependencies = [
   "notebook",
   "tifffile",
   "pandera[pandas]",
+  "boto3"
 ]
 
 [project.optional-dependencies]
