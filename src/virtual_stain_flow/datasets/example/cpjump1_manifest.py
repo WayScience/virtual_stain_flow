@@ -97,10 +97,9 @@ def _write_manifest(df: pd.DataFrame, output: str, fmt: str) -> None:
 
 def main(argv: Optional[list[str]] = None) -> int:
     """
-    Command-line interface to building and ouputting the CPJUMP1 manifest.
+    Command-line interface to building and outputting the CPJUMP1 manifest.
     By default, it prints a summary and preview of the manifest. 
     Use --output or --stdout to write the full manifest to a file or stdout.
-    May or may not be useful. 
     """
     parser = argparse.ArgumentParser(description="Build CPJUMP1 enriched manifest.")
     parser.add_argument(
