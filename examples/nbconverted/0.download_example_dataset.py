@@ -98,21 +98,21 @@ MANIFEST.head()
 # In[5]:
 
 
-negcon_u2os_24_manifest = MANIFEST[
-    (MANIFEST["Batch"] == "2020_11_04_CPJUMP1") &
-    (MANIFEST["control_type"] == "negcon") &
-    (MANIFEST["Cell_type"] == "U2OS") &
-    (MANIFEST["Time"] == 24)
+negcon_a549_48_manifest = MANIFEST[
+    (MANIFEST["Cell_type"] == "A549") &
+    (MANIFEST["Anomaly"] == "none") &
+    (MANIFEST["control_type"] == 'negcon') &
+    (MANIFEST["Time"] == 48)
 ]
-negcon_u2os_24_manifest.head()
+negcon_a549_48_manifest.head()
 
 
-# ## Arrange as wide to be in anticipated format dor virtual stain flow datasets and also the format the download helper expects
+# ## Arrange as wide is the anticipated format in virtual stain flow datasets and also the format the download helper expects this format
 
 # In[6]:
 
 
-wide_manifest = arrange_manifest_channels(negcon_u2os_24_manifest)
+wide_manifest = arrange_manifest_channels(negcon_a549_48_manifest)
 wide_manifest.head()
 
 
@@ -120,6 +120,9 @@ wide_manifest.head()
 
 # In[7]:
 
+
+a549_data_dir = DATA_DOWNLOAD_DIR / "cpjump1_a549_48h"
+a549_data_dir.mkdir(exist_ok=True, parents=True)
 
 # Get unique plates
 unique_plates = wide_manifest['Metadata_Plate'].unique()
@@ -138,32 +141,22 @@ test_manifest_wide = wide_manifest[wide_manifest['Metadata_Plate'].isin(test_pla
 print(f"Train plates: {len(train_plates)}, Test plates: {len(test_plates)}")
 print(f"Train samples: {len(train_manifest_wide)}, Test samples: {len(test_manifest_wide)}")
 
-
-# ## Write final splitted download manifest with metadata and download all needed data
-
-# In[8]:
-
-
-train_manifest_wide.to_csv(DATA_DOWNLOAD_DIR/ "train_manifest.csv", index=False)
-test_manifest_wide.to_csv(DATA_DOWNLOAD_DIR / "test_manifest.csv", index=False)
+negcon_a549_48_manifest.to_csv(a549_data_dir / "raw_manifest.csv", index=False)
+train_manifest_wide.to_csv(a549_data_dir/ "train_manifest.csv", index=False)
+test_manifest_wide.to_csv(a549_data_dir / "test_manifest.csv", index=False)
 
 
-# In[9]:
+# ## Download all data
+
+# In[ ]:
 
 
-train_download_summary = download_wide_manifest_channels(
+_ = download_wide_manifest_channels(
     train_manifest_wide,
-    dest_dir = DATA_DOWNLOAD_DIR / "cpjump1_u2os_train"    
+    dest_dir = a549_data_dir / "train"    
 )
-train_download_summary.head()
-
-
-# In[10]:
-
-
-test_download_summary =download_wide_manifest_channels(
+_ = download_wide_manifest_channels(
     test_manifest_wide,
-    dest_dir = DATA_DOWNLOAD_DIR / "cpjump1_u2os_test"    
+    dest_dir = a549_data_dir / "test"    
 )
-test_download_summary.head()
 
