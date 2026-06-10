@@ -1,18 +1,26 @@
-from typing import Optional, List, Tuple, Callable
+from typing import Optional, List, Tuple, Callable, Union, Any
 
 import torch
 import numpy as np
 from torch.utils.data import DataLoader, Dataset, Subset
 from albumentations import ImageOnlyTransform, Compose
 
+def _move_to_device(value: Any, device: Union[str, torch.device]) -> Any:
+    if isinstance(value, torch.Tensor):
+        return value.to(device)
+    if isinstance(value, (list, tuple)):
+        return type(value)(_move_to_device(item, device) for item in value)
+    return value
+
+
 def predict_image(
     dataset: Dataset,
     model: torch.nn.Module,
     batch_size: int = 1,
-    device: str = "cpu",
+    device: Union[str, torch.device] = "cpu",
     num_workers: int = 0,
-    indices: Optional[List[int]] = None
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    indices: Optional[List[int]] = None,
+) -> Tuple[torch.Tensor, torch.Tensor, Union[torch.Tensor, List[torch.Tensor]]]:
     """
     Runs a model on a dataset, performing a forward pass on all (or a subset of) input images 
     in evaluation mode and returning a stacked tensor of predictions.
@@ -27,6 +35,7 @@ def predict_image(
     :param indices: Optional list of dataset indices to subset the dataset before inference.
 
     :return: Tuple of stacked target, prediction, and input tensors.
+        For multi-input datasets, the third element is a list of stacked input tensors.
     """
     # Subset the dataset if indices are provided
     if indices is not None:
@@ -38,25 +47,41 @@ def predict_image(
     model.to(device)
     model.eval()
 
-    predictions, targets, inputs = [], [], []
+    predictions, targets = [], []
+    inputs: Union[List[torch.Tensor], List[List[torch.Tensor]]] = []
 
     with torch.no_grad():
         for input, target in dataloader:  # Unpacking (input_tensor, target_tensor)
-            input = input.to(device)  # Move input data to the specified device
+            input = _move_to_device(input, device)
 
             # Forward pass
-            prediction = model(input)
-            
+            if isinstance(input, (list, tuple)):
+                prediction = model(*input)
+            else:
+                prediction = model(input)
+
             # output both target and prediction tensors for metric
             targets.append(target.cpu())
             predictions.append(prediction.cpu())  # Move to CPU for stacking
-            inputs.append(input.cpu())
+
+            if isinstance(input, (list, tuple)):
+                if not inputs:
+                    inputs = [[] for _ in range(len(input))]
+                for idx, item in enumerate(input):
+                    inputs[idx].append(item.cpu())
+            else:
+                inputs.append(input.cpu())
+
+    if inputs and isinstance(inputs[0], list):
+        inputs_stacked = [torch.cat(batch_list, dim=0) for batch_list in inputs]  # type: ignore[arg-type]
+    else:
+        inputs_stacked = torch.cat(inputs, dim=0)  # type: ignore[arg-type]
 
     return (
-        torch.cat(targets, dim=0), 
-        torch.cat(predictions, dim=0), 
-        torch.cat(inputs, dim=0)
-    ) 
+        torch.cat(targets, dim=0),
+        torch.cat(predictions, dim=0),
+        inputs_stacked,
+    )
 
 def process_tensor_image(
     img_tensor: torch.Tensor,

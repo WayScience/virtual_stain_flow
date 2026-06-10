@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Any
 
 import numpy as np
 import pandas as pd
@@ -10,13 +10,25 @@ from ..datasets.crop_dataset import CropImageDataset
 from virtual_stain_flow.datasets.base_wrapper_dataset import BaseWrapperDataset
 
 
+def _to_numpy_image(value: Any) -> np.ndarray:
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu().numpy()
+    return np.asarray(value)
+
+
+def _normalize_to_list(sample: Any) -> List[np.ndarray]:
+    if isinstance(sample, (list, tuple)):
+        return [_to_numpy_image(item) for item in sample]
+    return [_to_numpy_image(sample)]
+
+
 def extract_samples_from_dataset(
     dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
     indices: List[int],
 ) -> Tuple[
-    List[np.ndarray],
-    List[np.ndarray],
-    Optional[List[np.ndarray]],
+    List[Union[np.ndarray, List[np.ndarray]]],
+    List[Union[np.ndarray, List[np.ndarray]]],
+    Optional[List[Union[np.ndarray, List[np.ndarray]]]],
     Optional[List[Tuple[int, int]]],
 ]:
     """
@@ -26,13 +38,15 @@ def extract_samples_from_dataset(
     (x, y) coordinates of each crop for visualization with bounding boxes.
 
     :param dataset: A BaseImageDataset or CropImageDataset instance.
-    :param indices: List of dataset indices to extract.
-    :return: Tuple of (inputs, targets, raw_images, patch_coords).
-        - inputs: List of numpy arrays, each with shape (C, H, W) or (H, W).
-        - targets: List of numpy arrays, each with shape (C, H, W) or (H, W).
-        - raw_images: List of numpy arrays for CropImageDataset (original uncropped images),
-          or None for BaseImageDataset.
-        - patch_coords: List of (x, y) tuples for CropImageDataset, or None for BaseImageDataset.
+        :param indices: List of dataset indices to extract.
+        :return: Tuple of (inputs, targets, raw_images, patch_coords).
+                - inputs: List of numpy arrays, each with shape (C, H, W) or (H, W).
+                    Multi-input samples can be provided as a list of arrays per sample.
+                - targets: List of numpy arrays, each with shape (C, H, W) or (H, W).
+                    Multi-target samples can be provided as a list of arrays per sample.
+                - raw_images: List of numpy arrays for CropImageDataset (original uncropped images),
+                    or None for BaseImageDataset.
+                - patch_coords: List of (x, y) tuples for CropImageDataset, or None for BaseImageDataset.
     """
     is_wrapper_dataset = False
     if isinstance(dataset, BaseWrapperDataset):
@@ -55,9 +69,9 @@ def extract_samples_from_dataset(
             f"max index requested: {max(indices)}"
         )
 
-    inputs: List[np.ndarray] = []
-    targets: List[np.ndarray] = []
-    raw_images: Optional[List[np.ndarray]] = [] if is_crop_dataset else None
+    inputs: List[Union[np.ndarray, List[np.ndarray]]] = []
+    targets: List[Union[np.ndarray, List[np.ndarray]]] = []
+    raw_images: Optional[List[Union[np.ndarray, List[np.ndarray]]]] = [] if is_crop_dataset else None
     patch_coords: Optional[List[Tuple[int, int]]] = [] if is_crop_dataset else None
 
     for idx in indices:
@@ -65,15 +79,11 @@ def extract_samples_from_dataset(
         input_tensor, target_tensor = dataset[idx]
 
         # Convert to numpy - handle both Tensor and ndarray inputs
-        if isinstance(input_tensor, torch.Tensor):
-            inputs.append(input_tensor.numpy())
-        else:
-            inputs.append(np.asarray(input_tensor))
+        input_list = _normalize_to_list(input_tensor)
+        target_list = _normalize_to_list(target_tensor)
 
-        if isinstance(target_tensor, torch.Tensor):
-            targets.append(target_tensor.numpy())
-        else:
-            targets.append(np.asarray(target_tensor))
+        inputs.append(input_list[0] if len(input_list) == 1 else input_list)
+        targets.append(target_list[0] if len(target_list) == 1 else target_list)
 
         if is_crop_dataset:
             # Access the original uncropped image and crop coordinates
