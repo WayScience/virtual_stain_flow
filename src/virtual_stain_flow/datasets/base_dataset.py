@@ -30,6 +30,8 @@ class BaseImageDataset(Dataset):
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         transforms: Optional[Sequence[LoggableTransform]] = None,
+        input_transforms: Optional[Sequence[LoggableTransform]] = None,
+        target_transforms: Optional[Sequence[LoggableTransform]] = None,
         cache_capacity: Optional[int] = None,
         file_state: Optional[FileState] = None,
     ):
@@ -49,6 +51,10 @@ class BaseImageDataset(Dataset):
         :param target_channel_keys: Keys for target channels in the file index.
         :param transforms: Optional sequence of LoggableTransform objects to apply
             to the images before returning them.
+        :param input_transforms: Optional sequence of LoggableTransform objects to
+            apply to the input image only, after `transforms`.
+        :param target_transforms: Optional sequence of LoggableTransform objects to
+            apply to the target image only, after `transforms`.
         :param cache_capacity: Optional capacity for caching loaded images. 
             When set to None, default caching behavior of caching at most
             `file_index.shape[0]` images is used. When set to -1, unbounded
@@ -85,6 +91,26 @@ class BaseImageDataset(Dataset):
         if not all(isinstance(t, LoggableTransform) for t in transforms):
             raise ValueError("All transforms must be instances of LoggableTransform.")
         self.transforms = transforms
+
+        self.input_transforms = self._normalize_transforms(
+            input_transforms, "input_transforms"
+        )
+        self.target_transforms = self._normalize_transforms(
+            target_transforms, "target_transforms"
+        )
+
+    def _normalize_transforms(
+        self,
+        transforms: Optional[Sequence[LoggableTransform]],
+        name: str,
+    ) -> Sequence[LoggableTransform]:
+        if not isinstance(transforms, Sequence):
+            transforms = [transforms] if transforms else []
+        if not all(isinstance(t, LoggableTransform) for t in transforms):
+            raise ValueError(
+                f"All {name} must be instances of LoggableTransform."
+            )
+        return transforms
 
     def get_raw_item(
         self, 
@@ -133,14 +159,38 @@ class BaseImageDataset(Dataset):
             image = transform.apply(img=image)
         return image
 
+    def _apply_input_transforms(
+        self,
+        image: np.ndarray,
+    ) -> np.ndarray:
+        for transform in self.input_transforms:
+            image = transform.apply(img=image)
+        return image
+
+    def _apply_target_transforms(
+        self,
+        image: np.ndarray,
+    ) -> np.ndarray:
+        for transform in self.target_transforms:
+            image = transform.apply(img=image)
+        return image
+
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Overridden Dataset `__getitem__` method so class works with torch DataLoader.
         """        
         input_image_raw, target_image_raw = self.get_raw_item(idx)
 
-        return (torch.from_numpy(self._apply_transforms(input_image_raw)).float(), 
-                torch.from_numpy(self._apply_transforms(target_image_raw)).float())
+        input_image = self._apply_transforms(input_image_raw)
+        target_image = self._apply_transforms(target_image_raw)
+
+        input_image = self._apply_input_transforms(input_image)
+        target_image = self._apply_target_transforms(target_image)
+
+        return (
+            torch.from_numpy(input_image).float(),
+            torch.from_numpy(target_image).float()
+        )
 
     @property
     def pil_image_mode(self) -> str:
