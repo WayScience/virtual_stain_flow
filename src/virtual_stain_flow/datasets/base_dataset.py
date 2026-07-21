@@ -152,47 +152,19 @@ class BaseImageDataset(Dataset):
         """
         return len(self.manifest)
     
-    def _apply_transforms(
-        self,
-        image: np.ndarray,
-    ) -> np.ndarray:
-        """
-        Applies the sequence of transforms to the input image.
-        
-        :param image: Input image as a numpy array.
-        :return: Transformed image as a numpy array.
-        """
-        for transform in self.transforms:
-            image = transform.apply(img=image)
-        return image
-
-    def _apply_input_transforms(
-        self,
-        image: np.ndarray,
-    ) -> np.ndarray:
-        for transform in self.input_transforms:
-            image = transform.apply(img=image)
-        return image
-
-    def _apply_target_transforms(
-        self,
-        image: np.ndarray,
-    ) -> np.ndarray:
-        for transform in self.target_transforms:
-            image = transform.apply(img=image)
-        return image
-
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Overridden Dataset `__getitem__` method so class works with torch DataLoader.
         """        
         input_image_raw, target_image_raw = self.get_raw_item(idx)
 
-        input_image = self._apply_transforms(input_image_raw)
-        target_image = self._apply_transforms(target_image_raw)
+        input_image = input_image_raw
+        for transform in (*self.transforms, *self.input_transforms):
+            input_image = transform.apply(img=input_image)
 
-        input_image = self._apply_input_transforms(input_image)
-        target_image = self._apply_target_transforms(target_image)
+        target_image = target_image_raw
+        for transform in (*self.transforms, *self.target_transforms):
+            target_image = transform.apply(img=target_image)
 
         return (
             torch.from_numpy(input_image).float(),
