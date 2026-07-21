@@ -2,7 +2,7 @@
 crop_dataset.py
 """
 
-from typing import Any, Dict, List, Sequence, Optional, Tuple, Union, Type
+from typing import Any, Dict, List, Sequence, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -157,7 +157,7 @@ class CropImageDataset(BaseImageDataset):
         cls,
         base_dataset: BaseImageDataset,
         transforms: Optional[Sequence[LoggableTransform]] = None,
-        how: Type[CropGenerator] = generate_center_crops,
+        how: CropGenerator = generate_center_crops,
         **kwargs: Any
     ) -> 'CropImageDataset':
         """
