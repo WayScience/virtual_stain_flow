@@ -104,6 +104,13 @@ class BaseImageDataset(Dataset):
         transforms: Optional[Sequence[LoggableTransform]],
         name: str,
     ) -> Sequence[LoggableTransform]:
+        """
+        Normalize and validate a sequence of transforms.
+
+        :param transforms: Sequence of LoggableTransform objects or None.
+        :param name: Name of the transform sequence for error messages.
+        :return: Normalized sequence of LoggableTransform objects.
+        """
         if not isinstance(transforms, Sequence):
             transforms = [transforms] if transforms else []
         if not all(isinstance(t, LoggableTransform) for t in transforms):

@@ -2,6 +2,8 @@
 channelwise.py
 
 Defines channel-specific transform wrappers.
+Useful if the values of different channels take different ranges or distributions
+and needs separate transformations/normalizations for each channel.
 """
 
 from typing import List, Optional, Sequence
@@ -14,6 +16,15 @@ from .base_transform import LoggableTransform
 class ChannelwiseTransform(LoggableTransform):
 	"""
 	Apply a list of transforms to a channel-first image, one transform per channel.
+
+	A potential use case of this transform would be two modal input combining 
+		two channels of different images (image augmentations). 
+		An example would be brightfield image + phase retrieved image from brightfield z-stacks.
+		The former would take the range of a grayscale image, while the latter
+		would be in unit of radians for phase delay, centered around zero. 
+		A reasonable channelwise transform would be a bitdepth max normalization
+		applied to the brightfield image channel and a z-score/radian normalization
+		applied to the phase retrieved image channel.	
 	"""
 
 	def __init__(
@@ -80,6 +91,12 @@ class ChannelwiseTransform(LoggableTransform):
 		)
 
 	def to_config(self) -> dict:
+		"""
+		Returns a dictionary containing the configuration of the transform.
+
+		Helps with training reproducibility by allowing the logger to export
+			the configuration of the transform for later use.
+		"""
 		return {
 			"class": self.__class__.__name__,
 			"name": self._name,
