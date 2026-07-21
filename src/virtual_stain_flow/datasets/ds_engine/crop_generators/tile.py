@@ -1,4 +1,6 @@
 """
+tile.py
+
 Crop generator module for creating non-overlapping tile crops centered within
 images in a BaseImageDataset. Provides a best-effort tiling approach that 
 maximizes the number of full tiles while centering the grid within the image
@@ -7,6 +9,7 @@ boundaries.
 
 from typing import List
 
+from .crop_summary import warn_formatted_crop_summary
 from .protocol import CropMap, CropSpec
 from ...base_dataset import BaseImageDataset
 from ..ds_utils import (
@@ -75,6 +78,7 @@ def _compute_centered_tile_crops(
 def generate_tile_crops(
 	dataset: BaseImageDataset,
 	crop_size: int,
+	verbose: bool = False,
 ) -> CropMap:
 	"""
 	Generate best-effort centered, non-overlapping tiling crops
@@ -87,6 +91,7 @@ def generate_tile_crops(
 	:param dataset: A BaseImageDataset instance (or compatible object with
 		`file_state.manifest` attribute supporting `get_image_dimensions()`).
 	:param crop_size: Size of the square crop tile (same width and height).
+	:param verbose: If True, emit summary statistics for crop generation.
 	:return: Dictionary mapping manifest indices to lists of crop specs.
 		Format: {manifest_idx: [((x, y), width, height), ...]}
 	:raises ValueError: If crop_size is non-positive, if no active channels
@@ -104,8 +109,10 @@ def generate_tile_crops(
 
 	manifest = dataset.file_state.manifest
 	crop_specs: CropMap = {}
+	tile_count_distribution: dict[int, int] = {}
+	total_samples = len(dataset)
 
-	for idx in range(len(dataset)):
+	for idx in range(total_samples):
 		dims = manifest.get_image_dimensions(idx, channels=active_channels)
 
 		width, height = _validate_same_dimensions_across_channels(
@@ -114,6 +121,27 @@ def generate_tile_crops(
 
 		crop_specs[idx] = _compute_centered_tile_crops(
 			width, height, crop_size
+		)
+		tile_count = len(crop_specs[idx])
+		tile_count_distribution[tile_count] = (
+			tile_count_distribution.get(tile_count, 0) + 1
+		)
+
+	if verbose:
+		distribution_metrics = {
+			f"Tiles per FOV = {tile_count}": full_fov_count
+			for tile_count, full_fov_count in sorted(tile_count_distribution.items())
+		}
+		warn_formatted_crop_summary(
+			title="Tile crop generation statistics:",
+			detail_line=(
+				"Tiling criterion: each FOV receives as many full, non-overlapping "
+				"tiles as fit along width and height, centered within remaining margins."
+			),
+			metrics={
+				"Total dataset count": total_samples,
+				**distribution_metrics,
+			},
 		)
 
 	return crop_specs

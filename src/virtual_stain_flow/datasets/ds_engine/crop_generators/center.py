@@ -1,8 +1,12 @@
 """
+center.py
+
+Helper module for generating crops centered at FOV
 """
 
 from typing import Dict, List, Tuple
 
+from .crop_summary import warn_formatted_crop_summary
 from .protocol import CropMap
 from ...base_dataset import BaseImageDataset
 from ..ds_utils import (
@@ -39,6 +43,7 @@ def _compute_center_crop(
 def generate_center_crops(
     dataset: BaseImageDataset,
     crop_size: int,
+    verbose: bool = False,
 ) -> CropMap:
     """
     Generate center crop coordinates for each sample in a BaseImageDataset.
@@ -46,6 +51,7 @@ def generate_center_crops(
     :param dataset: A BaseImageDataset instance (or compatible object with
         `file_state.manifest` attribute supporting `get_image_dimensions()`).
     :param crop_size: Size of the square crop (same width and height).
+    :param verbose: If True, emit summary statistics for crop generation.
     :return: Dictionary mapping manifest indices to lists of crop specs.
         Format: {manifest_idx: [((x, y), width, height), ...]}
     :raises ValueError: If crop_size is non-positive, if no active channels
@@ -63,8 +69,9 @@ def generate_center_crops(
     
     manifest = dataset.file_state.manifest
     crop_specs: Dict[int, List[Tuple[Tuple[int, int], int, int]]] = {}
+    total_samples = len(dataset)
     
-    for idx in range(len(dataset)):
+    for idx in range(total_samples):
         # Get dimensions for all active channels
         dims = manifest.get_image_dimensions(idx, channels=active_channels)
         
@@ -78,5 +85,20 @@ def generate_center_crops(
         
         # Store as crop_specs format: {idx: [((x, y), w, h), ...]}
         crop_specs[idx] = [((x, y), crop_size, crop_size)]
+
+    if verbose:
+        successful_center_crops = len(crop_specs)
+        warn_formatted_crop_summary(
+            title="Center crop generation statistics:",
+            detail_line=(
+                "Generation criterion: exactly one centered crop is generated "
+                "per sample when crop size fits within image bounds."
+            ),
+            metrics={
+                "Success count / total dataset count": (
+                    f"{successful_center_crops}/{total_samples}"
+                ),
+            },
+        )
     
     return crop_specs
