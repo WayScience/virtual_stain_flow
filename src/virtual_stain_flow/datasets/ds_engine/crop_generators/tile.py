@@ -5,6 +5,12 @@ Crop generator module for creating non-overlapping tile crops centered within
 images in a BaseImageDataset. Provides a best-effort tiling approach that 
 maximizes the number of full tiles while centering the grid within the image
 boundaries.
+
+The non-overlapping decision is motivated by the property of convolutional
+neural networks being translation-invariant, that it learns the same
+information from a blob of pixels whether it is located at the center, the
+left/right/top/down edge/corner. Having non-overlapping tiles ensures
+minimal redundancy in the information captured across tiles. 
 """
 
 from typing import List
