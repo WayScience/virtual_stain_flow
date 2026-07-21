@@ -89,6 +89,8 @@ def generate_point_centered_crops(
             "mapping must be provided for point-centered crop generation."
         )
 
+    if not isinstance(crop_size, int):
+        raise ValueError(f"crop_size must be an integer, got {type(crop_size).__name__}.")
     if crop_size <= 0:
         raise ValueError(f"crop_size must be positive, got {crop_size}.")
     
