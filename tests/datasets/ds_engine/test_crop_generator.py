@@ -9,6 +9,9 @@ from virtual_stain_flow.datasets.ds_engine.crop_generator import (
     _compute_center_crop,
     generate_center_crops,
 )
+from virtual_stain_flow.datasets.ds_engine.crop_generators.crop_summary import (
+    CropSummaryWarning,
+)
 
 
 class TestComputeCenterCrop:
@@ -87,3 +90,11 @@ class TestGenerateCenterCrops:
         # Images are 10x10, so crop_size=20 should fail
         with pytest.raises(ValueError, match="exceeds image dimensions"):
             generate_center_crops(basic_dataset, crop_size=20)
+
+    def test_verbose_emits_summary_warning(self, basic_dataset):
+        """Should emit one summary warning in verbose mode."""
+        with pytest.warns(CropSummaryWarning, match="Center crop generation statistics") as record:
+            generate_center_crops(basic_dataset, crop_size=4, verbose=True)
+
+        message = str(record[0].message)
+        assert "Success count / total dataset count" in message
