@@ -7,7 +7,7 @@ To facilitate reproducible experiments, the transformations are also made serial
 
 ## Overview
 
-This subpackage consists of four modules: 
+This subpackage consists of the following modules: 
 1. **`transform_utils.py`**: Contains type definitions and validation utilities for transform objects, defining acceptable transform types and providing runtime type checking capabilities for both standard Albumentations transforms and custom LoggableTransform classes.
 
 2. **`base_transform.py`**: Defines the abstract `LoggableTransform` base class that extends Albumentations' `ImageOnlyTransform`, adding serialization capabilities, naming conventions, and standardized logging interfaces for scientific reproducibility.
