@@ -1,9 +1,8 @@
-from typing import Optional, List, Tuple, Callable, Union, Any
+from typing import Any, List, Optional, Tuple, Union
 
 import torch
-import numpy as np
 from torch.utils.data import DataLoader, Dataset, Subset
-from albumentations import ImageOnlyTransform, Compose
+
 
 def _move_to_device(value: Any, device: Union[str, torch.device]) -> Any:
     if isinstance(value, torch.Tensor):
@@ -11,6 +10,48 @@ def _move_to_device(value: Any, device: Union[str, torch.device]) -> Any:
     if isinstance(value, (list, tuple)):
         return type(value)(_move_to_device(item, device) for item in value)
     return value
+
+
+def _validate_image_tensor(value: Any, name: str) -> torch.Tensor:
+    if not isinstance(value, torch.Tensor):
+        raise TypeError(f"{name} must be a torch.Tensor, received {type(value).__name__}.")
+    if value.ndim != 4:
+        raise ValueError(
+            f"{name} must have shape (N, C, H, W), received {tuple(value.shape)}."
+        )
+    if value.shape[0] == 0:
+        raise ValueError(f"{name} cannot have an empty batch dimension.")
+    return value
+
+
+def _validate_batch(
+    input_batch: Any,
+    target_batch: Any,
+    expected_multi_input: Optional[bool],
+    expected_input_count: Optional[int],
+) -> Tuple[bool, int]:
+    _validate_image_tensor(target_batch, "Target batch")
+
+    if isinstance(input_batch, (list, tuple)):
+        if not input_batch:
+            raise ValueError("Multi-input batches cannot be empty.")
+        if expected_multi_input is False:
+            raise ValueError("Input structure changed from single-input to multi-input during prediction.")
+        if expected_input_count is not None and expected_input_count != len(input_batch):
+            raise ValueError("Multi-input batch count changed during prediction.")
+
+        for input_index, input_tensor in enumerate(input_batch):
+            _validate_image_tensor(input_tensor, f"Input batch {input_index}")
+            if input_tensor.shape[0] != target_batch.shape[0]:
+                raise ValueError("Input and target batch sizes must match.")
+        return True, len(input_batch)
+
+    _validate_image_tensor(input_batch, "Input batch")
+    if input_batch.shape[0] != target_batch.shape[0]:
+        raise ValueError("Input and target batch sizes must match.")
+    if expected_multi_input is True:
+        raise ValueError("Input structure changed from multi-input to single-input during prediction.")
+    return False, 1
 
 
 def predict_image(
@@ -34,12 +75,29 @@ def predict_image(
     :param num_workers: Number of workers for the DataLoader (default is 0).
     :param indices: Optional list of dataset indices to subset the dataset before inference.
 
-    :return: Tuple of stacked target, prediction, and input tensors.
-        For multi-input datasets, the third element is a list of stacked input tensors.
+    :return: Tuple of stacked target, prediction, and input tensors. For multi-input
+        datasets, the third element is a list of stacked input tensors.
+    :raises ValueError: If the selected dataset is empty, a batch is malformed, or
+        its input structure changes during prediction.
+    :raises TypeError: If inputs, targets, or model predictions are not tensors.
     """
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive.")
+    if num_workers < 0:
+        raise ValueError("num_workers cannot be negative.")
+
     # Subset the dataset if indices are provided
     if indices is not None:
+        if not indices:
+            raise ValueError("indices cannot be empty.")
+        if min(indices) < 0 or max(indices) >= len(dataset):
+            raise IndexError(
+                f"Index out of range. Dataset length: {len(dataset)}, "
+                f"requested indices: {indices}"
+            )
         dataset = Subset(dataset, indices)
+    elif len(dataset) == 0:
+        raise ValueError("dataset cannot be empty.")
 
     # Create DataLoader for efficient batch processing
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
@@ -47,80 +105,56 @@ def predict_image(
     model.to(device)
     model.eval()
 
-    predictions, targets = [], []
-    inputs: Union[List[torch.Tensor], List[List[torch.Tensor]]] = []
+    predictions: List[torch.Tensor] = []
+    targets: List[torch.Tensor] = []
+    input_batches: List[torch.Tensor] = []
+    multi_input_batches: Optional[List[List[torch.Tensor]]] = None
+    expected_multi_input: Optional[bool] = None
+    expected_input_count: Optional[int] = None
 
     with torch.no_grad():
-        for input, target in dataloader:  # Unpacking (input_tensor, target_tensor)
-            input = _move_to_device(input, device)
+        for input_batch, target_batch in dataloader:
+            is_multi_input, input_count = _validate_batch(
+                input_batch, target_batch, expected_multi_input, expected_input_count
+            )
+            expected_multi_input = is_multi_input
+            if is_multi_input:
+                expected_input_count = input_count
+
+            input_batch = _move_to_device(input_batch, device)
 
             # Forward pass
-            if isinstance(input, (list, tuple)):
-                prediction = model(*input)
+            if is_multi_input:
+                prediction = model(*input_batch)
             else:
-                prediction = model(input)
+                prediction = model(input_batch)
+            _validate_image_tensor(prediction, "Model prediction")
+            if prediction.shape[0] != target_batch.shape[0]:
+                raise ValueError("Prediction and target batch sizes must match.")
 
-            # output both target and prediction tensors for metric
-            targets.append(target.cpu())
-            predictions.append(prediction.cpu())  # Move to CPU for stacking
+            targets.append(target_batch.cpu())
+            predictions.append(prediction.cpu())
 
-            if isinstance(input, (list, tuple)):
-                if not inputs:
-                    inputs = [[] for _ in range(len(input))]
-                for idx, item in enumerate(input):
-                    inputs[idx].append(item.cpu())
+            if is_multi_input:
+                if multi_input_batches is None:
+                    multi_input_batches = [[] for _ in range(input_count)]
+                for input_index, input_tensor in enumerate(input_batch):
+                    multi_input_batches[input_index].append(input_tensor.cpu())
             else:
-                inputs.append(input.cpu())
+                input_batches.append(input_batch.cpu())
 
-    if inputs and isinstance(inputs[0], list):
-        inputs_stacked = [torch.cat(batch_list, dim=0) for batch_list in inputs]  # type: ignore[arg-type]
+    if not targets or not predictions:
+        raise RuntimeError("Prediction did not retrieve any batches.")
+
+    if multi_input_batches is not None:
+        inputs_stacked = [torch.cat(batch, dim=0) for batch in multi_input_batches]
     else:
-        inputs_stacked = torch.cat(inputs, dim=0)  # type: ignore[arg-type]
+        if not input_batches:
+            raise RuntimeError("Prediction did not accumulate any input batches.")
+        inputs_stacked = torch.cat(input_batches, dim=0)
 
     return (
         torch.cat(targets, dim=0),
         torch.cat(predictions, dim=0),
         inputs_stacked,
     )
-
-def process_tensor_image(
-    img_tensor: torch.Tensor,
-    dtype: Optional[np.dtype] = None,
-    dataset: Optional[Dataset] = None,
-    invert_function: Optional[Callable] = None
-) -> np.ndarray:
-    """
-    Processes model output/other image tensor by casting to numpy, applying an optional dtype casting, 
-    and inverting target transformations if a dataset with `target_transform` is provided.
-
-    :param img_tensor: Tensor stack of model-predicted images with shape (N, C, H, W).
-    :type img_tensor: torch.Tensor
-    :param dtype: Optional numpy dtype to cast the output array (default: None).
-    :type dtype: Optional[np.dtype], optional
-    :param dataset: Optional dataset object with `target_transform` to invert transformations.
-    :type dataset: Optional[torch.utils.data.Dataset], optional
-    :param invert_function: Optional function to invert transformations applied to the images.
-        If provided, overrides the invert function call from dataset transform.
-    :type invert_function: Optional[Callable], optional
-
-    :return: Processed numpy array of images with shape (N, C, H, W).
-    :rtype: np.ndarray
-    """
-    # Convert img_tensor to CPU and NumPy
-    output_images = img_tensor.cpu().numpy()
-
-    # Optionally cast to specified dtype
-    if dtype is not None:
-        output_images = output_images.astype(dtype)
-
-    # Apply invert function when supplied or transformation if invert function is supplied
-    if invert_function is not None and isinstance(invert_function, Callable):
-        output_images = np.array([invert_function(img) for img in output_images])
-    elif dataset is not None and hasattr(dataset, "target_transform"):
-        # Apply inverted target transformation if available
-        target_transform = dataset.target_transform
-        if isinstance(target_transform, (ImageOnlyTransform, Compose)):
-            # Apply the transformation on each image
-            output_images = np.array([target_transform.invert(img) for img in output_images])
-
-    return output_images
