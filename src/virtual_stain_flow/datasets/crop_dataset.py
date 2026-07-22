@@ -2,7 +2,7 @@
 crop_dataset.py
 """
 
-from typing import Any, Dict, List, Sequence, Optional, Tuple, Union, Type
+from typing import Any, Dict, List, Sequence, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -30,6 +30,8 @@ class CropImageDataset(BaseImageDataset):
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         transforms: Optional[Sequence[LoggableTransform]] = None,
+        input_transforms: Optional[Sequence[LoggableTransform]] = None,
+        target_transforms: Optional[Sequence[LoggableTransform]] = None,
         crop_file_state: Optional[CropFileState] = None,
     ):
         """
@@ -53,6 +55,10 @@ class CropImageDataset(BaseImageDataset):
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
         :param transforms: Optional sequence of transformations to apply to the images.
+        :param input_transforms: Optional sequence of LoggableTransform objects to
+            apply to the input image only, after `transforms`.
+        :param target_transforms: Optional sequence of LoggableTransform objects to
+            apply to the target image only, after `transforms`.
         :param crop_file_state: Optional pre-initialized CropFileState object. If provided,
             it takes precedence over `file_index` and `crop_specs`. Intended
             to be used by only .from_config class method and similar deserialization
@@ -83,6 +89,13 @@ class CropImageDataset(BaseImageDataset):
         if not all(isinstance(t, LoggableTransform) for t in transforms):
             raise ValueError("All transforms must be instances of LoggableTransform.")
         self.transforms = transforms
+
+        self.input_transforms = self._normalize_transforms(
+            input_transforms, "input_transforms"
+        )
+        self.target_transforms = self._normalize_transforms(
+            target_transforms, "target_transforms"
+        )
 
     @property
     def pil_image_mode(self) -> str:
@@ -157,7 +170,9 @@ class CropImageDataset(BaseImageDataset):
         cls,
         base_dataset: BaseImageDataset,
         transforms: Optional[Sequence[LoggableTransform]] = None,
-        how: Type[CropGenerator] = generate_center_crops,
+        input_transforms: Optional[Sequence[LoggableTransform]] = None,
+        target_transforms: Optional[Sequence[LoggableTransform]] = None,
+        how: CropGenerator = generate_center_crops,
         **kwargs: Any
     ) -> 'CropImageDataset':
         """
@@ -166,6 +181,10 @@ class CropImageDataset(BaseImageDataset):
         :param base_dataset: The BaseImageDataset to convert.
         :param how: A function that generates crop specifications from the base dataset.
             Default is `generate_center_crops`.
+        :param input_transforms: Optional sequence of LoggableTransform objects to
+            apply to the input image only, after `transforms`.
+        :param target_transforms: Optional sequence of LoggableTransform objects to
+            apply to the target image only, after `transforms`.
         :param kwargs: Additional keyword arguments for the `how` function.
         """
 
@@ -177,6 +196,8 @@ class CropImageDataset(BaseImageDataset):
         return cls(
             file_index=base_dataset.file_index,
             transforms=transforms,
+            input_transforms=input_transforms,
+            target_transforms=target_transforms,
             crop_specs=crop_specs,
             pil_image_mode=base_dataset.pil_image_mode,
             input_channel_keys=base_dataset.input_channel_keys,
