@@ -1,3 +1,11 @@
+"""
+evaluation_utils.py
+
+Evaluation utilities 
+ - interaction with dataset to obtain normalized images and annotations
+ - evaluation of per-image metrics
+"""
+
 from typing import List, Optional, Tuple, Union, Any
 
 import numpy as np
