@@ -8,9 +8,13 @@ import pathlib
 from types import SimpleNamespace
 
 import pytest
+import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+from virtual_stain_flow.datasets.base_dataset import BaseImageDataset
+from virtual_stain_flow.datasets.crop_dataset import CropImageDataset
 from virtual_stain_flow.trainers.AbstractTrainer import AbstractTrainer
 from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
 from virtual_stain_flow.vsf_logging import MlflowLogger
@@ -173,6 +177,59 @@ def image_dataset():
             )
     
     return ImageDataset(num_samples=20)
+
+
+@pytest.fixture
+def file_index(tmp_path):
+    from PIL import Image
+
+    test_data_dir = tmp_path / "test_data"
+    test_data_dir.mkdir()
+    paths = {
+        "input_ch1": [test_data_dir / f"img_{index}_in1.tif" for index in range(3)],
+        "input_ch2": [test_data_dir / f"img_{index}_in2.tif" for index in range(3)],
+        "target_ch1": [test_data_dir / f"img_{index}_target.tif" for index in range(3)],
+    }
+
+    for index in range(3):
+        for channel, start_value in (("input_ch1", 1), ("input_ch2", 2), ("target_ch1", 1)):
+            value = start_value + index * (2 if channel.startswith("input") else 1)
+            Image.fromarray(np.full((10, 10), value, dtype=np.uint16), mode="I;16").save(
+                paths[channel][index]
+            )
+
+    return pd.DataFrame(paths)
+
+
+@pytest.fixture
+def basic_dataset(file_index):
+    return BaseImageDataset(
+        file_index=file_index,
+        pil_image_mode="I;16",
+        input_channel_keys=["input_ch1", "input_ch2"],
+        target_channel_keys="target_ch1",
+        cache_capacity=8,
+    )
+
+
+@pytest.fixture
+def crop_specs():
+    return {
+        index: [((0, 0), 4, 4), ((5, 5), 4, 4)]
+        for index in range(3)
+    }
+
+
+@pytest.fixture
+def crop_dataset(file_index, crop_specs):
+    return CropImageDataset(
+        file_index=file_index,
+        crop_specs=crop_specs,
+        pil_image_mode="I;16",
+        input_channel_keys=["input_ch1", "input_ch2"],
+        target_channel_keys="target_ch1",
+        cache_capacity=8,
+    )
 
 
 @pytest.fixture

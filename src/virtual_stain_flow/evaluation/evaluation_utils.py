@@ -1,91 +1,14 @@
-from typing import List, Optional, Tuple, Union
+"""
+evaluation_utils.py
 
-import numpy as np
+Utilities for evaluating model predictions.
+"""
+
+from typing import List, Optional
+
 import pandas as pd
 import torch
 from torch.nn import Module
-
-from ..datasets.base_dataset import BaseImageDataset
-from ..datasets.crop_dataset import CropImageDataset
-from virtual_stain_flow.datasets.base_wrapper_dataset import BaseWrapperDataset
-
-
-def extract_samples_from_dataset(
-    dataset: Union[BaseImageDataset, CropImageDataset, BaseWrapperDataset],
-    indices: List[int],
-) -> Tuple[
-    List[np.ndarray],
-    List[np.ndarray],
-    Optional[List[np.ndarray]],
-    Optional[List[Tuple[int, int]]],
-]:
-    """
-    Extract input/target samples and optional raw images with patch coordinates from a dataset.
-
-    For CropImageDataset, also extracts the original (uncropped) input images and the
-    (x, y) coordinates of each crop for visualization with bounding boxes.
-
-    :param dataset: A BaseImageDataset or CropImageDataset instance.
-    :param indices: List of dataset indices to extract.
-    :return: Tuple of (inputs, targets, raw_images, patch_coords).
-        - inputs: List of numpy arrays, each with shape (C, H, W) or (H, W).
-        - targets: List of numpy arrays, each with shape (C, H, W) or (H, W).
-        - raw_images: List of numpy arrays for CropImageDataset (original uncropped images),
-          or None for BaseImageDataset.
-        - patch_coords: List of (x, y) tuples for CropImageDataset, or None for BaseImageDataset.
-    """
-    is_wrapper_dataset = False
-    if isinstance(dataset, BaseWrapperDataset):
-        is_crop_dataset = isinstance(dataset.original, CropImageDataset)
-        is_wrapper_dataset = True
-    elif isinstance(dataset, CropImageDataset):
-        is_crop_dataset = True
-    elif isinstance(dataset, BaseImageDataset):
-        is_crop_dataset = False
-    else:
-        raise ValueError(
-            "Unsupported dataset type. Expected BaseImageDataset, CropImageDataset, or BaseWrapperDataset.")
-    
-    if not indices:
-        raise ValueError("Indices list cannot be empty.")
-    
-    if max(indices) >= len(dataset):
-        raise IndexError(
-            f"Index out of range. Dataset length: {len(dataset)}, "
-            f"max index requested: {max(indices)}"
-        )
-
-    inputs: List[np.ndarray] = []
-    targets: List[np.ndarray] = []
-    raw_images: Optional[List[np.ndarray]] = [] if is_crop_dataset else None
-    patch_coords: Optional[List[Tuple[int, int]]] = [] if is_crop_dataset else None
-
-    for idx in indices:
-        # Access dataset item to trigger lazy loading and state update
-        input_tensor, target_tensor = dataset[idx]
-
-        # Convert to numpy - handle both Tensor and ndarray inputs
-        if isinstance(input_tensor, torch.Tensor):
-            inputs.append(input_tensor.numpy())
-        else:
-            inputs.append(np.asarray(input_tensor))
-
-        if isinstance(target_tensor, torch.Tensor):
-            targets.append(target_tensor.numpy())
-        else:
-            targets.append(np.asarray(target_tensor))
-
-        if is_crop_dataset:
-            # Access the original uncropped image and crop coordinates
-            # These are populated after __getitem__ is called
-            if is_wrapper_dataset:
-                raw_images.append(dataset.original.original_input_image[0])
-                patch_coords.append((dataset.original.crop_info.x, dataset.original.crop_info.y))
-            else:
-                raw_images.append(dataset.original_input_image[0])
-                patch_coords.append((dataset.crop_info.x, dataset.crop_info.y))
-
-    return inputs, targets, raw_images, patch_coords
 
 
 def evaluate_per_image_metric(

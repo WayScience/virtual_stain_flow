@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
+import tifffile as tiff
 from PIL import Image
 from pandera.errors import SchemaError, SchemaErrors
 
@@ -123,12 +124,24 @@ class DatasetManifest:
         """
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
+        
         try:
             with Image.open(path) as img:
                 img = img.convert(self.pil_image_mode)
                 arr = np.asarray(img)
-        except Exception as e:
-            raise RuntimeError(f"Error reading image from {path}: {e}") from e
+        
+        except Exception as e_pil:
+            
+            try:
+                # fallback to tifffile for potentially more robust reading of TIFF
+                arr = tiff.imread(path)
+                
+            except Exception:
+
+                raise RuntimeError(
+                    f"Error reading image from {path}: {e_pil}"
+                ) from e_pil
+
 
         if arr.ndim not in (2, 3):
             raise ValueError(f"Unsupported image shape {arr.shape} from {path}")
@@ -149,8 +162,18 @@ class DatasetManifest:
             if not Path(path).exists():
                 dims.append(None)
             else:
-                with Image.open(path) as img:
-                    dims.append(img.size)
+                try:
+                    with Image.open(path) as img:
+                        dims.append(img.size)
+                except Exception as e_pil:
+                    try:
+                        with tiff.TiffFile(path) as tif:
+                            page = tif.pages[0]
+                            dims.append((page.imagelength, page.imagewidth))
+                    except Exception:
+                        raise RuntimeError(
+                            f"Error reading image dimensions from {path}: {e_pil}"
+                        ) from e_pil
 
         return tuple(dims)
     
