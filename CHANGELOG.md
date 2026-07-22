@@ -5,6 +5,34 @@ All notable chagnes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+---
+
+## [0.4.6] - 2026-07-22
+
+### Added 
+
+#### MLflow auto logging enhancements (`virtual_stain_flow/vsf_logging/`):
+- The logger now records model optimizer parameters.
+
+#### Channel-specific normalization/transformation specification (`virtual_stain_flow/transforms/`):
+- Allows separate normalizations applied to different channels.
+
+#### Support for visualization of multi-channel input/target/prediction (`virtual_stain_flow/evaluation/`):
+- Displays channels as additional columns in visualization grid.
+- Allows selection of which channels to display vias indexing.
+
+### Refactored
+
+#### Crop generation module as subpackage (`virtual_stain_flow/datasets/ds_engine/crop_generators/`):
+- Reduce size of module by breaking into subpackage.
+- Added tiling crop.
+
+#### Logger auto-logging functionalities isolated (`virtual_stain_flow/transforms/`):
+- Moved auto-logging of optimizer, model and loss group configs outside to reduce size of main logger module and facilitate testing.
+
+#### Data access during plotting (`virtual_stain_flow/evaluation/`):
+- Now images are retrieved from dataset and uniformly normalized as (N, C, H, W) before passed to plotting functions.
+
 
 ---
 
