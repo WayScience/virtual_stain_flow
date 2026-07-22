@@ -5,7 +5,7 @@ Core visualization tools for plotting model predictions alongside inputs and tar
 Supports both BaseImageDataset and CropImageDataset with optional metrics display.
 """
 
-from typing import List, Optional, Tuple, Union, Any
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -16,61 +16,63 @@ from matplotlib.patches import Rectangle
 from ..datasets.base_dataset import BaseImageDataset
 from ..datasets.crop_dataset import CropImageDataset
 from ..datasets.base_wrapper_dataset import BaseWrapperDataset
-from .evaluation_utils import evaluate_per_image_metric, extract_samples_from_dataset
+from .evaluation_utils import evaluate_per_image_metric
 from .predict_utils import predict_image
+from .visualization_utils import extract_samples_from_dataset
 
 
-def _to_numpy_image(value: Any) -> np.ndarray:
-    if isinstance(value, torch.Tensor):
-        return value.detach().cpu().numpy()
-    return np.asarray(value)
+def _select_channels(
+        images: np.ndarray, channel_indices: Optional[List[int]], name: str
+    ) -> Tuple[np.ndarray, List[int]]:
+    """
+    Helper for selecting channel by index working with (N, C, H, W) image stacks.
+
+    :param images: Image stack with shape (N, C, H, W).
+    :param channel_indices: Optional list of channel indices to select.
+        If None, all channels are selected.
+    :param name: Name of the image stack for error messages.
+    :return: Image stack with selected channels and their original channel indices.
+    """
+
+    if images.ndim != 4:
+        raise ValueError(f"{name} must have shape (N, C, H, W), received {images.shape}.")
+
+    indices = channel_indices if channel_indices is not None else list(range(images.shape[1]))
+    if not indices:
+        raise ValueError(f"{name} channel indices cannot be empty.")
+    if any(index < 0 or index >= images.shape[1] for index in indices):
+        raise ValueError(
+            f"Channel indices out of range for {name} with {images.shape[1]} channels."
+        )
+
+    return images[:, indices, :, :], indices
 
 
-def _normalize_to_list(sample: Any) -> List[np.ndarray]:
-    if isinstance(sample, (list, tuple)):
-        return [_to_numpy_image(item) for item in sample]
-    return [_to_numpy_image(sample)]
-
-
-def _split_channels(img: np.ndarray, channel_indices: Optional[List[int]]) -> List[np.ndarray]:
-    if img.ndim == 2:
-        if channel_indices is not None and any(idx != 0 for idx in channel_indices):
-            raise ValueError("Channel indices out of range for 2D image.")
-        return [img]
-
-    if img.ndim == 3:
-        total_channels = img.shape[0]
-        indices = channel_indices if channel_indices is not None else list(range(total_channels))
-        for idx in indices:
-            if idx < 0 or idx >= total_channels:
-                raise ValueError(
-                    f"Channel index {idx} out of range for image with {total_channels} channels."
-                )
-        return [img[idx] for idx in indices]
-
-    raise ValueError(f"Unsupported image shape for visualization: {img.shape}")
-
-
-def _split_sample_channels(sample: Any, channel_indices: Optional[List[int]]) -> List[np.ndarray]:
-    split_images: List[np.ndarray] = []
-    for item in _normalize_to_list(sample):
-        split_images.extend(_split_channels(item, channel_indices))
-    return split_images
-
-
-def _build_titles(prefix: str, count: int) -> List[str]:
-    return [f"{prefix} {i + 1}" for i in range(count)]
+def _build_titles(
+    prefix: str,
+    channel_indices: List[int],
+    channel_names: Optional[List[str]],
+) -> List[str]:
+    """
+    Build display titles with optional dataset channel names.
+    """
+    return [
+        f"{channel_names[channel_index]} ({prefix} {channel_index + 1})"
+        if channel_names is not None and channel_index < len(channel_names)
+        else f"{prefix} {position + 1}"
+        for position, channel_index in enumerate(channel_indices)
+    ]
 
 
 def plot_predictions_grid(
-    inputs: List[Union[np.ndarray, List[np.ndarray]]],
-    targets: List[Union[np.ndarray, List[np.ndarray]]],
-    predictions: Optional[List[Union[np.ndarray, List[np.ndarray]]]] = None,
+    inputs: np.ndarray,
+    targets: np.ndarray,
+    predictions: Optional[np.ndarray] = None,
     *,
     sample_indices: Optional[List[int]] = None,
     row_label_prefix: str = "",
-    raw_images: Optional[List[Union[np.ndarray, List[np.ndarray]]]] = None,
-    patch_coords: Optional[List[Tuple[int, int]]] = None,
+    raw_images: Optional[np.ndarray] = None,
+    patch_coords: Optional[List[Tuple[int, int, int, int]]] = None,
     metrics_df: Optional[pd.DataFrame] = None,
     save_path: Optional[str] = None,
     cmap: str = "gray",
@@ -78,12 +80,17 @@ def plot_predictions_grid(
     show_plot: bool = True,
     wspace: float = 0.05,
     hspace: float = 0.15,
+    raw_channel_names: Optional[List[str]] = None,
+    input_channel_names: Optional[List[str]] = None,
+    target_channel_names: Optional[List[str]] = None,
+    prediction_channel_names: Optional[List[str]] = None,
     raw_channel_indices: Optional[List[int]] = None,
     input_channel_indices: Optional[List[int]] = None,
     target_channel_indices: Optional[List[int]] = None,
     prediction_channel_indices: Optional[List[int]] = None,
 ) -> plt.Figure:
     """
+    Core visualization function for visualizing grid of input/target and predictions. 
     Plot a grid of images comparing inputs, targets, and optionally predictions.
 
     Each row represents one sample. Columns are:
@@ -92,19 +99,16 @@ def plot_predictions_grid(
     - Target
     - [Prediction] (only if predictions provided, with optional metrics in title)
 
-    :param inputs: List of input images, each (C, H, W) or (H, W).
-        Multi-input samples can be provided as a list of arrays per sample.
-    :param targets: List of target images, each (C, H, W) or (H, W).
-        Multi-target samples can be provided as a list of arrays per sample.
-    :param predictions: Optional list of prediction images, each (C, H, W) or (H, W).
-        Multi-output samples can be provided as a list of arrays per sample.
+    :param inputs: Input images with shape (N, C, H, W).
+    :param targets: Target images with shape (N, C, H, W).
+    :param predictions: Optional prediction images with shape (N, C, H, W).
         If None, only inputs and targets are displayed.
     :param sample_indices: Optional list of indices to display as row labels.
         If None, uses 0-based sequential indices.
     :param row_label_prefix: Prefix for row labels (default: "").
         E.g., "Sample " would give labels "Sample 0", "Sample 1", etc.
-    :param raw_images: Optional list of original uncropped images for CropImageDataset.
-    :param patch_coords: Optional list of (x, y) crop coordinates for bounding boxes.
+    :param raw_images: Optional original uncropped images with shape (N, C, H, W).
+    :param patch_coords: Optional list of (x, y, width, height) crop rectangles.
         Only used when raw_images is provided.
     :param metrics_df: Optional DataFrame with per-image metrics to display.
         Each row corresponds to a sample; column names become metric labels.
@@ -115,31 +119,45 @@ def plot_predictions_grid(
     :param show_plot: Whether to display the plot (default: True).
     :param wspace: Horizontal spacing between subplots (default: 0.05).
     :param hspace: Vertical spacing between subplots (default: 0.15).
+    :param raw_channel_names: Optional names for raw image channels.
+    :param input_channel_names: Optional names for input image channels.
+    :param target_channel_names: Optional names for target image channels.
+    :param prediction_channel_names: Optional names for prediction image channels.
     :param raw_channel_indices: Optional list of channel indices to display for raw images.
     :param input_channel_indices: Optional list of channel indices to display for inputs.
     :param target_channel_indices: Optional list of channel indices to display for targets.
     :param prediction_channel_indices: Optional list of channel indices to display for predictions.
     """
-    num_samples = len(inputs)
+    if inputs.ndim != 4:
+        raise ValueError(f"Inputs must have shape (N, C, H, W), received {inputs.shape}.")
+
+    num_samples = inputs.shape[0]
     if num_samples == 0:
         raise ValueError("No samples provided to plot.")
 
-    # Validate lengths match
-    if len(targets) != num_samples:
+    if targets.ndim != 4 or targets.shape[0] != num_samples:
         raise ValueError(
-            f"Length mismatch: inputs ({num_samples}), targets ({len(targets)})"
-        )
-    
-    has_predictions = predictions is not None and len(predictions) > 0
-    if has_predictions and len(predictions) != num_samples:
-        raise ValueError(
-            f"Length mismatch: inputs ({num_samples}), predictions ({len(predictions)})"
+            f"Inputs and targets must have matching batch sizes; received "
+            f"{inputs.shape} and {targets.shape}."
         )
 
-    has_raw_images = raw_images is not None and len(raw_images) > 0
-    if has_raw_images and len(raw_images) != num_samples:
+    has_predictions = predictions is not None
+    if has_predictions and (predictions.ndim != 4 or predictions.shape[0] != num_samples):
         raise ValueError(
-            f"Length mismatch: inputs ({num_samples}), raw_images ({len(raw_images)})"
+            f"Inputs and predictions must have matching batch sizes; received "
+            f"{inputs.shape} and {predictions.shape}."
+        )
+
+    has_raw_images = raw_images is not None
+    if has_raw_images and (raw_images.ndim != 4 or raw_images.shape[0] != num_samples):
+        raise ValueError(
+            f"Inputs and raw images must have matching batch sizes; received "
+            f"{inputs.shape} and {raw_images.shape}."
+        )
+
+    if has_raw_images and patch_coords is not None and len(patch_coords) != num_samples:
+        raise ValueError(
+            f"Length mismatch: inputs ({num_samples}), patch_coords ({len(patch_coords)})"
         )
 
     if sample_indices is not None and len(sample_indices) != num_samples:
@@ -149,26 +167,31 @@ def plot_predictions_grid(
 
     if has_predictions and prediction_channel_indices is None:
         prediction_channel_indices = target_channel_indices
-    
-    # Determine columns based on channel splits in the first sample
-    raw_first = _split_sample_channels(raw_images[0], raw_channel_indices) if has_raw_images else []
-    input_first = _split_sample_channels(inputs[0], input_channel_indices)
-    target_first = _split_sample_channels(targets[0], target_channel_indices)
-    pred_first = (
-        _split_sample_channels(predictions[0], prediction_channel_indices)
+    if has_predictions and prediction_channel_names is None:
+        prediction_channel_names = target_channel_names
+
+    raw_images, raw_indices = (
+        _select_channels(raw_images, raw_channel_indices, "Raw images")
+        if has_raw_images
+        else (None, [])
+    )
+    inputs, input_indices = _select_channels(inputs, input_channel_indices, "Inputs")
+    targets, target_indices = _select_channels(targets, target_channel_indices, "Targets")
+    predictions, prediction_indices = (
+        _select_channels(predictions, prediction_channel_indices, "Predictions")
         if has_predictions
-        else []
+        else (None, [])
     )
 
-    if has_predictions and len(pred_first) != len(target_first):
+    if has_predictions and predictions.shape[1] != targets.shape[1]:
         raise ValueError(
             "Target and prediction channel counts must match for paired display."
         )
 
-    raw_titles = _build_titles("Raw Input", len(raw_first))
-    input_titles = _build_titles("Input", len(input_first))
-    target_titles = _build_titles("Target", len(target_first))
-    pred_titles = _build_titles("Prediction", len(pred_first))
+    raw_titles = _build_titles("Raw Input", raw_indices, raw_channel_names)
+    input_titles = _build_titles("Input", input_indices, input_channel_names)
+    target_titles = _build_titles("Target", target_indices, target_channel_names)
+    pred_titles = _build_titles("Prediction", prediction_indices, prediction_channel_names)
 
     if has_predictions:
         interleaved_titles = [
@@ -196,28 +219,16 @@ def plot_predictions_grid(
         axes = axes.reshape(1, -1)
 
     for row_idx in range(num_samples):
-        raw_row = _split_sample_channels(raw_images[row_idx], raw_channel_indices) if has_raw_images else []
-        input_row = _split_sample_channels(inputs[row_idx], input_channel_indices)
-        target_row = _split_sample_channels(targets[row_idx], target_channel_indices)
-        pred_row = (
-            _split_sample_channels(predictions[row_idx], prediction_channel_indices)
-            if has_predictions
-            else []
-        )
+        raw_row = list(raw_images[row_idx]) if has_raw_images else []
+        input_row = list(inputs[row_idx])
+        target_row = list(targets[row_idx])
+        pred_row = list(predictions[row_idx]) if has_predictions else []
 
-        if has_predictions and len(pred_row) != len(target_row):
-            raise ValueError(
-                f"Row {row_idx} has mismatched target/prediction channel counts."
-            )
-
-        if has_predictions:
-            target_pred_row = [
-                img
-                for i in range(len(target_row))
-                for img in (target_row[i], pred_row[i])
-            ]
-        else:
-            target_pred_row = target_row
+        target_pred_row = [
+            image
+            for target_image, prediction_image in zip(target_row, pred_row)
+            for image in (target_image, prediction_image)
+        ] if has_predictions else target_row
 
         img_set = raw_row + input_row + target_pred_row
 
@@ -241,10 +252,7 @@ def plot_predictions_grid(
 
             # Draw bounding box on raw image
             if has_raw_images and col_idx < len(raw_titles) and patch_coords is not None:
-                patch_x, patch_y = patch_coords[row_idx]
-                # Infer patch size from target shape
-                target_shape = np.squeeze(target_row[0]).shape
-                patch_h, patch_w = target_shape[-2], target_shape[-1]
+                patch_x, patch_y, patch_w, patch_h = patch_coords[row_idx]
                 rect = Rectangle(
                     (patch_x, patch_y),
                     patch_w,
@@ -325,11 +333,12 @@ def plot_dataset_grid(
     :param save_path: Optional path to save the figure.
     :param kwargs: Additional arguments passed to `plot_predictions_grid`.
         Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace,
-        raw_channel_indices, input_channel_indices, target_channel_indices, prediction_channel_indices.
+        raw_channel_indices, input_channel_indices, target_channel_indices, prediction_channel_indices,
+        raw_channel_names, input_channel_names, target_channel_names, prediction_channel_names.
     """
     # Extract samples from dataset
     (
-        inputs, targets, raw_images, patch_coords
+        inputs, targets, raw_images, patch_coords, input_channel_names, target_channel_names
     ) = extract_samples_from_dataset(dataset, indices)
 
     # Plot without predictions
@@ -340,6 +349,9 @@ def plot_dataset_grid(
         sample_indices=indices,
         raw_images=raw_images,
         patch_coords=patch_coords,
+        raw_channel_names=input_channel_names,
+        input_channel_names=input_channel_names,
+        target_channel_names=target_channel_names,
         metrics_df=None,
         save_path=save_path,
         **kwargs,
@@ -374,7 +386,8 @@ def plot_predictions_grid_from_model(
     :param save_path: Optional path to save the figure.
     :param kwargs: Additional arguments passed to `plot_predictions_grid`.
         Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace,
-        raw_channel_indices, input_channel_indices, target_channel_indices, prediction_channel_indices.
+        raw_channel_indices, input_channel_indices, target_channel_indices, prediction_channel_indices,
+        raw_channel_names, input_channel_names, target_channel_names, prediction_channel_names.
     """
     # Step 1: Run inference
     targets_tensor, predictions_tensor, inputs_tensor = predict_image(
@@ -386,22 +399,19 @@ def plot_predictions_grid_from_model(
     if metrics:
         metrics_df = evaluate_per_image_metric(predictions_tensor, targets_tensor, metrics)
 
-    # Step 3: Extract samples from dataset (need to re-access for raw images in CropImageDataset)
-    _, _, raw_images, patch_coords = extract_samples_from_dataset(dataset, indices)    
-    # use the collected input and target stack at prediction time instead of
-    # re-extract
+    # Step 3: Re-access the dataset for CropImageDataset raw images and crop metadata.
+    (
+        _, _, raw_images, patch_coords, input_channel_names, target_channel_names
+    ) = extract_samples_from_dataset(dataset, indices)
     if isinstance(inputs_tensor, list):
-        inputs = [
-            [inputs_tensor[i][row_idx].numpy() for i in range(len(inputs_tensor))]
-            for row_idx in range(len(indices))
-        ]
-    else:
-        inputs = inputs_tensor.numpy()
+        raise ValueError(
+            "Visualization requires a single batched input tensor with shape (N, C, H, W); "
+            "multi-input sequences are not supported."
+        )
 
-    targets = targets_tensor.numpy()
-
-    # Convert predictions tensor to list of numpy arrays
-    predictions = [predictions_tensor[i].numpy() for i in range(len(indices))]
+    inputs = inputs_tensor.detach().cpu().numpy()
+    targets = targets_tensor.detach().cpu().numpy()
+    predictions = predictions_tensor.detach().cpu().numpy()
 
     # Step 4: Plot
     return plot_predictions_grid(
@@ -411,6 +421,10 @@ def plot_predictions_grid_from_model(
         sample_indices=indices,
         raw_images=raw_images,
         patch_coords=patch_coords,
+        raw_channel_names=input_channel_names,
+        input_channel_names=input_channel_names,
+        target_channel_names=target_channel_names,
+        prediction_channel_names=target_channel_names,
         metrics_df=metrics_df,
         save_path=save_path,
         **kwargs,
