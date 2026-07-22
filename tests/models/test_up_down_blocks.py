@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from virtual_stain_flow.models.up_down_blocks import (
+from virtual_stain_flow.models.blocks import (
 	Bilinear2DUpsampleBlock,
 	Conv2DDownBlock,
 	ConvTrans2DUpBlock,
