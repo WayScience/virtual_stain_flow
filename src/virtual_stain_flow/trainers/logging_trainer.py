@@ -16,6 +16,8 @@ from .AbstractTrainer import AbstractTrainer
 from ..engine.loss_group import LossGroup, LossItem
 from ..engine.forward_groups import GeneratorForwardGroup
 
+Scalar = Union[int, float]
+
 
 class SingleGeneratorTrainer(AbstractTrainer):
     """
@@ -28,7 +30,7 @@ class SingleGeneratorTrainer(AbstractTrainer):
         optimizer: torch.optim.Optimizer,
         losses: Union[torch.nn.Module, List[torch.nn.Module]],
         device: torch.device,
-        loss_weights: Optional[Union[float, List[float]]] = None,
+        loss_weights: Optional[Union[Scalar, List[Scalar]]] = None,
         **kwargs
     ):
         """
@@ -42,6 +44,9 @@ class SingleGeneratorTrainer(AbstractTrainer):
         :kwargs: Additional arguments for the AbstractTrainer (for data/metric and more)
         """
         
+        # Registry for logging model parameters
+        self._models: List[torch.nn.Module] = [model]
+        
         self._forward_group = GeneratorForwardGroup(
             generator=model,
             optimizer=optimizer,
@@ -51,11 +56,16 @@ class SingleGeneratorTrainer(AbstractTrainer):
         losses = losses if isinstance(losses, list) else [losses]
         if loss_weights is None:
             loss_weights = [1.0] * len(losses)
-        elif isinstance(loss_weights, float):
+        elif isinstance(loss_weights, Scalar):
             loss_weights = [loss_weights] * len(losses)
-        elif len(loss_weights) != len(losses):
-            raise ValueError(
-                "Length of loss_weights must match length of losses."
+        elif isinstance(loss_weights, List):
+            if len(loss_weights) != len(losses):
+                raise ValueError(
+                    "Length of loss_weights must match length of losses."
+                )
+        else:
+            raise TypeError(
+                "loss_weights must be a float or list of floats."
             )
 
         self._loss_group = LossGroup(
@@ -72,7 +82,7 @@ class SingleGeneratorTrainer(AbstractTrainer):
 
         super().__init__(
             model=self._forward_group.model,
-            optimizer=self._forward_group.optimizer,
+            optimizer=self._forward_group.optimizer, # type: ignore
             **kwargs
         )
 
@@ -95,7 +105,11 @@ class SingleGeneratorTrainer(AbstractTrainer):
             targets=targets
         )
 
-        weighted_total, logs = self._loss_group(train=True, context=ctx)
+        weighted_total, logs = self._loss_group(
+            train=True, 
+            progress=self.progress, 
+            context=ctx
+        )
         weighted_total.backward()
         self._forward_group.step()
 
@@ -123,12 +137,20 @@ class SingleGeneratorTrainer(AbstractTrainer):
             targets=targets
         )
 
-        _, logs = self._loss_group(train=False, context=ctx)
+        _, logs = self._loss_group(
+            train=False, 
+            progress=self.progress, 
+            context=ctx
+        )
 
         for _, metric in self.metrics.items():
             metric.update(*ctx.as_metric_args(), validation=True)
 
         return logs
+
+    @property
+    def loss_groups(self) -> Dict[str, LossGroup]:
+        return {'main': self._loss_group}
     
     def save_model(
         self,
@@ -138,8 +160,6 @@ class SingleGeneratorTrainer(AbstractTrainer):
         file_ext: str = '.pth',
         best_model: bool = True
     ) -> Optional[List[pathlib.Path]]:
-        pass
-
 
         if file_name_prefix is None:
             file_name_prefix = 'generator'

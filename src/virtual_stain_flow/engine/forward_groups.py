@@ -31,13 +31,13 @@ Note that forward group is only responsible for the management
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Dict
+from typing import Optional, Dict
 
 import torch
 import torch.optim as optim
 import torch.nn as nn
 
-from .names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL
+from .names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL, DISCRIMINATOR_MODEL
 from .context import Context
 
 
@@ -52,9 +52,9 @@ class AbstractForwardGroup(ABC):
     """
 
     # Subclasses should override these with ordered tuples.
-    input_keys:  Tuple[str, ...]
-    target_keys: Tuple[str, ...]
-    output_keys: Tuple[str, ...]
+    input_keys:  tuple[str, ...]
+    target_keys: tuple[str, ...]
+    output_keys: tuple[str, ...]
 
     def __init__(
         self,
@@ -75,7 +75,7 @@ class AbstractForwardGroup(ABC):
         }
 
     @staticmethod
-    def _normalize_outputs(raw) -> Tuple[torch.Tensor, ...]:
+    def _normalize_outputs(raw) -> tuple[torch.Tensor, ...]:
         """
         Normalize model outputs to a tuple of tensors while preserving order.
 
@@ -140,9 +140,9 @@ class GeneratorForwardGroup(AbstractForwardGroup):
         metric_value = metric_fn(preds, targets)
     """
 
-    input_keys:  Tuple[str, ...] = (INPUTS,)
-    target_keys: Tuple[str, ...] = (TARGETS,)
-    output_keys: Tuple[str, ...] = (PREDS,)
+    input_keys:  tuple[str, ...] = (INPUTS,)
+    target_keys: tuple[str, ...] = (TARGETS,)
+    output_keys: tuple[str, ...] = (PREDS,)
 
     def __init__(
         self,
@@ -207,3 +207,88 @@ class GeneratorForwardGroup(AbstractForwardGroup):
         Convenience property to access the generator optimizer directly.
         """
         return self._optimizers[GENERATOR_MODEL]
+
+
+class DiscriminatorForwardGroup(AbstractForwardGroup):
+    """
+    Forward group for a simple single (GAN/wGAN) discriminator workflow.
+    The discriminator is assumed to take in a "stack" of input and target
+    images concatenated along the channel dimension, and output a score/probability.
+    Relevant context values are input_keys, target_keys, output_keys for a
+        single-discriminator model, where:
+    - the forward is called as:
+        p = discriminator(stack)
+    - the evaluation is less straightforward, but typically involves
+      computing losses/metrics based on p and real/fake labels:
+        metric_value = metric_fn(p, real_or_fake_labels)
+      or perhaps involving the discrminator model itself for wasserstein distance:
+        metric_value = metric_fn(discriminator, stack, real_or_fake_labels)
+    """
+
+    input_keys:  tuple[str, ...] = ("stack",)
+    target_keys: tuple[str, ...] = ()
+    output_keys: tuple[str, ...] = ("p",)
+
+    def __init__(
+        self,
+        discriminator: nn.Module,
+        optimizer: Optional[optim.Optimizer] = None,
+        device: torch.device = torch.device("cpu"),
+    ):
+        super().__init__(device=device)
+
+        self._models[DISCRIMINATOR_MODEL] = discriminator
+        self._models[DISCRIMINATOR_MODEL].to(self.device)
+        self._optimizers[DISCRIMINATOR_MODEL] = optimizer
+
+    def __call__(self, train: bool, **inputs: torch.Tensor) -> Context:
+        """
+        Executes the forward pass, managing training/eval modes and optimizer steps.
+        Subclasses may override this method if needed.
+
+        :param train: Whether to run in training mode. Meant to be specified
+            by the trainer to switch between train/eval modes and determine
+            whether gradients should be computed.
+        :param inputs: Keyword arguments of input tensors.
+        """
+
+        fp_model = self.model
+        fp_optimizer = self.optimizer
+        
+        # 1) Stage and validate inputs/targets
+        ctx = Context(**self._move_tensors(inputs), **{DISCRIMINATOR_MODEL: fp_model })
+        ctx.require(self.input_keys)
+        ctx.require(self.target_keys)
+
+        # 2) Forward, with grad only when training
+        fp_model.train(mode=train)
+        train and fp_optimizer is not None and fp_optimizer.zero_grad(set_to_none=True)
+        with torch.set_grad_enabled(train):
+            model_inputs = [ctx[k] for k in self.input_keys]  # ordered
+            raw = fp_model(*model_inputs)
+            y_tuple = self._normalize_outputs(raw)
+
+        # 3) Arity check + map outputs to names
+        if len(y_tuple) != len(self.output_keys):
+            raise ValueError(
+                f"Model returned {len(y_tuple)} outputs, "
+                f"but output_keys expects {len(self.output_keys)}"
+            )
+        outputs = {k: v for k, v in zip(self.output_keys, y_tuple)}
+
+        # 5) Return enriched context (preds available for losses/metrics)
+        return ctx.add(**outputs)
+    
+    @property
+    def model(self) -> nn.Module:
+        """
+        Convenience property to access the discriminator model directly.
+        """
+        return self._models[DISCRIMINATOR_MODEL]
+    
+    @property
+    def optimizer(self) -> Optional[optim.Optimizer]:
+        """
+        Convenience property to access the discriminator optimizer directly.
+        """
+        return self._optimizers[DISCRIMINATOR_MODEL]

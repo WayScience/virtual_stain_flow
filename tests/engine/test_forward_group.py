@@ -5,7 +5,8 @@ import torch
 
 from virtual_stain_flow.engine.forward_groups import (
     AbstractForwardGroup,
-    GeneratorForwardGroup
+    GeneratorForwardGroup,
+    DiscriminatorForwardGroup
 )
 from virtual_stain_flow.engine.names import INPUTS, TARGETS, PREDS, GENERATOR_MODEL
 
@@ -128,3 +129,52 @@ class TestGeneratorForwardGroup:
         
         with pytest.raises(ValueError, match="Model returned 2 outputs.*output_keys expects 1"):
             forward_group(train=False, inputs=random_input, targets=random_target)
+
+
+class TestDiscriminatorForwardGroup:
+    """Test DiscriminatorForwardGroup functionality."""
+
+    def test_forward_train_mode(self, simple_discriminator, random_stack):
+        """Test that discriminator is set to train mode when train=True."""
+        forward_group = DiscriminatorForwardGroup(
+            device=torch.device("cpu"),
+            discriminator=simple_discriminator
+        )
+        
+        ctx = forward_group(train=True, stack=random_stack)
+        
+        assert forward_group.model.training is True
+        assert ctx["p"].requires_grad is True
+
+    def test_forward_eval_mode(self, simple_discriminator, random_stack):
+        """Test that discriminator is set to eval mode when train=False."""
+        forward_group = DiscriminatorForwardGroup(
+            device=torch.device("cpu"),
+            discriminator=simple_discriminator
+        )
+        
+        ctx = forward_group(train=False, stack=random_stack)
+        
+        assert forward_group.model.training is False
+        assert ctx["p"].requires_grad is False
+
+    def test_optimizer_zero_grad(self, simple_discriminator, disc_optimizer, random_stack):
+        """Test that optimizer.zero_grad() is called when train=True."""
+        forward_group = DiscriminatorForwardGroup(
+            device=torch.device("cpu"),
+            discriminator=simple_discriminator,
+            optimizer=disc_optimizer
+        )
+        
+        # Manually create some gradients
+        dummy_loss = sum(p.sum() for p in forward_group.model.parameters())
+        dummy_loss.backward()
+        
+        # Check that gradients exist
+        assert any(p.grad is not None for p in forward_group.model.parameters())
+        
+        # Forward should zero gradients
+        _ = forward_group(train=True, stack=random_stack)
+        
+        # Gradients should be None (set_to_none=True)
+        assert all(p.grad is None for p in forward_group.model.parameters())

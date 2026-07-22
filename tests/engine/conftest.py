@@ -113,6 +113,43 @@ def multi_output_model():
 
 
 @pytest.fixture
+def simple_discriminator():
+    """
+    Simple discriminator model for GAN testing.
+    Takes concatenated input/target stack (B, 6, H, W) -> outputs score (B, 1)
+    Uses conv + global average pooling + linear layer.
+    """
+    class SimpleDiscriminator(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(
+                in_channels=6,  # stacked input + target
+                out_channels=16,
+                kernel_size=3,
+                padding=1,
+                bias=True
+            )
+            self.pool = nn.AdaptiveAvgPool2d(1)  # Global average pooling
+            self.fc = nn.Linear(16, 1)  # Output single score
+        
+        def forward(self, x):
+            x = self.conv(x)
+            x = torch.relu(x)
+            x = self.pool(x)  # (B, 16, 1, 1)
+            x = x.flatten(1)  # (B, 16)
+            x = self.fc(x)    # (B, 1)
+            return x
+    
+    return SimpleDiscriminator()
+
+
+@pytest.fixture
+def random_stack():
+    """Random stack tensor (batch=2, channels=6, height=8, width=8) for discriminator."""
+    return torch.randn(2, 6, 8, 8)
+
+
+@pytest.fixture
 def sample_inputs():
     """Create sample inputs for loss computation."""
     return {
@@ -207,4 +244,32 @@ def forward_pass_context_eval(forward_group, random_input, random_target, torch_
         train=False,
         inputs=random_input.to(torch_device),
         targets=random_target.to(torch_device),
+    )
+
+
+@pytest.fixture
+def disc_optimizer(simple_discriminator):
+    """Create an Adam optimizer for the discriminator model."""
+    import torch.optim as optim
+    return optim.Adam(simple_discriminator.parameters(), lr=1e-3)
+
+
+@pytest.fixture
+def discriminator_forward_group(simple_discriminator, disc_optimizer, torch_device):
+    """Create a DiscriminatorForwardGroup with the simple discriminator and optimizer."""
+    from virtual_stain_flow.engine.forward_groups import DiscriminatorForwardGroup
+    return DiscriminatorForwardGroup(
+        discriminator=simple_discriminator,
+        optimizer=disc_optimizer,
+        device=torch_device,
+    )
+
+
+@pytest.fixture
+def gan_orchestrator(forward_group, discriminator_forward_group):
+    """Create a GANOrchestrator with generator and discriminator forward groups."""
+    from virtual_stain_flow.engine.orchestrators import GANOrchestrator
+    return GANOrchestrator(
+        generator_fg=forward_group,
+        discriminator_fg=discriminator_forward_group,
     )

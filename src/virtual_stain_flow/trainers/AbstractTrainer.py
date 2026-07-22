@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from .trainer_protocol import TrainerProtocol
 from ..metrics.AbstractMetrics import AbstractMetrics
+from ..engine.progress import Progress
 from ..datasets.data_split import default_random_split
 
 
@@ -113,6 +114,9 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
         # Epoch state
         self._epoch = 0
+        
+        # Progress tracking for loss weight scheduling
+        self._progress = Progress(epoch=0, step=0)
 
         # Loss and metrics state
         self._train_losses = defaultdict(list)
@@ -177,7 +181,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         return None
 
     @abstractmethod
-    def train_step(self, inputs: torch.tensor, targets: torch.tensor)->Dict[str, torch.Tensor]:
+    def train_step(self, inputs: torch.Tensor, targets: torch.Tensor)->Dict[str, float]:
         """
         Abstract method for training the model on one batch
         Must be implemented by subclasses.
@@ -194,7 +198,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         pass
 
     @abstractmethod
-    def evaluate_step(self, inputs: torch.tensor, targets: torch.tensor)->Dict[str, torch.Tensor]:
+    def evaluate_step(self, inputs: torch.Tensor, targets: torch.Tensor)->Dict[str, float]:
         """
         Abstract method for evaluating the model on one batch
         Must be implemented by subclasses. 
@@ -231,6 +235,8 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 num_batches=len(self._train_loader),
                 phase="Train"
             )
+
+            self._progress.set_step(self._progress.step + 1)
 
             batch_loss = self.train_step(inputs, targets)
             for key, value in batch_loss.items():
@@ -361,7 +367,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         if hasattr(logger, "on_train_end"):
             logger.on_train_end()
 
-    def _collect_early_stop_metric(self) -> float:
+    def _collect_early_stop_metric(self) -> Optional[float]:
         if self._early_termination_metric is None:
             # Do not perform early stopping when no termination metric is specified
             early_term_metric = None
@@ -513,6 +519,11 @@ class AbstractTrainer(TrainerProtocol, ABC):
         return self._epoch
     
     @property
+    def progress(self) -> Progress:
+        """Returns the Progress object tracking training state (epoch, step, etc.)"""
+        return self._progress
+    
+    @property
     def train_losses(self):
         return self._train_losses
     
@@ -548,6 +559,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
     @epoch.setter
     def epoch(self, value: int):
         self._epoch = value
+        self._progress.set_epoch(value)
 
     """
     Update loss and metrics
@@ -563,7 +575,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
             self._train_losses[loss_name].append(loss)
 
     def update_metrics(self, 
-                       metric: torch.tensor, 
+                       metric: torch.Tensor, 
                        metric_name: str, 
                        validation: bool = False):
         if validation:

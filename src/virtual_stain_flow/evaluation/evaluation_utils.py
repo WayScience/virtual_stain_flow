@@ -1,8 +1,15 @@
+"""
+evaluation_utils.py
+
+Utilities for evaluating model predictions.
+"""
+
 from typing import List, Optional
 
 import pandas as pd
 import torch
 from torch.nn import Module
+
 
 def evaluate_per_image_metric(
     predictions: torch.Tensor,

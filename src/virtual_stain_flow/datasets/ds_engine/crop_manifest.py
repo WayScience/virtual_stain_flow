@@ -11,7 +11,7 @@ Engine for datasets defined by not full images, but crops extracted
 """
 
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional, Sequence
+from typing import Dict, List, Any, Optional, Sequence, Tuple
 from dataclasses import dataclass, asdict
 
 import pandas as pd
@@ -59,6 +59,8 @@ class CropManifest:
         :param manifest: Optional pre-initialized DatasetManifest. If provided,
             it takes precedence over `file_index`. Intended to be used by only
             .from_config class method and similar deserialization utilities.
+        :param kwargs: Additional arguments other than file_index to pass
+            to DatasetManifest. See DatasetManifest docstring for details.
         """
         if not crops:
             raise ValueError("crops list cannot be empty.")
@@ -116,8 +118,23 @@ class CropManifest:
         Deserialize from dict.
         Also deserializes the underlying DatasetManifest.
         """
-        crops = [Crop.from_dict(c) for c in config['crops']]
-        manifest = DatasetManifest.from_config(config['manifest'])
+        if not isinstance(config, dict):
+            raise TypeError(f"CropManifest.from_config: expected config to be a dict, got {type(config).__name__}")
+        
+        crops_config = config.get('crops', None)
+        if crops_config is None:
+            raise ValueError("CropManifest.from_config: missing 'crops' key in config")
+        if not isinstance(crops_config, list):
+            raise TypeError(f"CropManifest.from_config: expected 'crops' to be a list, got {type(crops_config).__name__}")
+        
+        manifest_config = config.get('manifest', None)
+        if manifest_config is None:
+            raise ValueError("CropManifest.from_config: missing 'manifest' key in config")
+        if not isinstance(manifest_config, dict):
+            raise TypeError(f"CropManifest.from_config: expected 'manifest' to be a dict, got {type(manifest_config).__name__}")
+        
+        crops = [Crop.from_dict(c) for c in crops_config]
+        manifest = DatasetManifest.from_config(manifest_config)
         return cls(crops, manifest=manifest)
     
     @classmethod
@@ -285,6 +302,14 @@ class CropFileState:
         """
         return self.crop_state._last_crop
     
+    @property
+    def original_input_image(self) -> Optional[np.ndarray]:
+        return self._file_state.input_image_raw
+    
+    @property
+    def original_target_image(self) -> Optional[np.ndarray]:
+        return self._file_state.target_image_raw
+    
     @property 
     def input_image_raw(self) -> Optional[np.ndarray]:
         return self.input_crop_raw # acronym
@@ -309,7 +334,15 @@ class CropFileState:
         Deserialize from config dict.
         Also deserializes the underlying CropManifest.
         """
+        if not isinstance(config, dict):
+            raise TypeError(f"CropFileState.from_config: expected config to be a dict, got {type(config).__name__}")
+        crop_collection_config = config.get('crop_collection', None)
+        if crop_collection_config is None:
+            raise ValueError("CropFileState.from_config: missing 'crop_collection' key in config")
+        if not isinstance(crop_collection_config, dict):
+            raise TypeError(f"CropFileState.from_config: expected 'crop_collection' to be a dict, got {type(crop_collection_config).__name__}")
+
         return cls(
-            crop_collection=CropManifest.from_config(config['crop_collection']),
+            crop_collection=CropManifest.from_config(crop_collection_config),
             cache_capacity=config.get('cache_capacity', None)
         )

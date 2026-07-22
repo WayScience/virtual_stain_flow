@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "virtual_stain_flow"
-version = "0.4.0"
+version = "0.4.5"
 description = "For developing virtual staining models"
 requires-python = ">=3.9"
 dependencies = [
@@ -29,6 +29,9 @@ dependencies = [
   "jupyter",
   "notebook",
   "tifffile",
+  "pandera[pandas]",
+  "boto3",
+  "imagecodecs"
 ]
 
 [project.optional-dependencies]

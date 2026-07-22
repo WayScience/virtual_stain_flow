@@ -22,13 +22,16 @@ Note that this module is only responsible for loss computation and
 """
 
 from dataclasses import dataclass
-from typing import Optional, Union, Tuple, Dict, Sequence, List
+from typing import Optional, Union, Tuple, Dict, Sequence, List, Any
 
 import torch
 
-from .loss_utils import AbstractLoss, _get_loss_name, _scalar_from_ctx
-from .context import Context
+from .loss_utils import BaseLoss, _get_loss_name, _scalar_from_ctx
+from .context import Context, ContextValue
 from .names import PREDS, TARGETS
+from .progress import Progress
+
+Scalar = Union[int, float, bool]
 
 
 @dataclass
@@ -53,7 +56,7 @@ class LossItem:
         losses and centralizes device management. 
     )
     """
-    module: Union[torch.nn.Module, AbstractLoss]
+    module: Union[torch.nn.Module, BaseLoss]
     args: Union[str, Tuple[str, ...]] = (PREDS, TARGETS)
     key: Optional[str] = None
     weight: float = 1.0
@@ -63,7 +66,7 @@ class LossItem:
 
     def __post_init__(self):
         
-        self.key = self.key or _get_loss_name(self.module)        
+        self.key = str(self.key or _get_loss_name(self.module))        
         self.args = (self.args,) if isinstance(self.args, str) else self.args
         
         try:
@@ -77,6 +80,7 @@ class LossItem:
     def __call__(
         self,
         train: bool,
+        progress: Optional[Progress] = None,
         context: Optional[Context] = None,
         **inputs: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -86,6 +90,8 @@ class LossItem:
         skipped during validation.
 
         :param train: Whether the model is in training mode.
+        :param progress: Optional Progress object containing scheduling state (epoch, step, etc.)
+            for dynamic weight scheduling.
         :param context: Optional Context object containing tensors.
         :param inputs: Keyword arguments containing all necessary inputs for the
             loss computation.
@@ -94,7 +100,9 @@ class LossItem:
 
         if context is not None:
             context.require(self.args)
-            inputs = {arg: context[arg] for arg in self.args}
+            inputs: Dict[str, ContextValue] = {
+                arg: context[arg] for arg in self.args
+            }
         
         if not self.enabled or (not train and not self.compute_at_val):
             zero = _scalar_from_ctx(0.0, inputs)
@@ -113,6 +121,21 @@ class LossItem:
 
         return raw, raw * _scalar_from_ctx(self.weight, inputs)
     
+    def get_config(self) -> Dict[str, Any]:
+        """
+        Get the configuration of the LossItem for logging or checkpointing.
+        """
+        return {
+            'module': self.module.__class__.__name__,
+            'args': self.args,
+            'key': self.key,
+            'weight': self.weight,
+            'enabled': self.enabled,
+            'compute_at_val': self.compute_at_val,
+            'device': str(self.device)
+        }
+
+
 @dataclass
 class LossGroup:
     """
@@ -127,19 +150,22 @@ class LossGroup:
     items: Sequence[LossItem]
 
     @property
-    def item_names(self) -> List[str]:
+    def item_names(self) -> List[Optional[str]]:
         return [item.key for item in self.items]
     
     def __call__(
         self,
         train: bool,
+        progress: Optional[Progress] = None,
         context: Optional[Context] = None,
         **inputs: torch.Tensor
-    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+    ) -> Tuple[torch.Tensor, Dict[str, Scalar]]:
         """
         Compute the total loss and individual loss values.
 
         :param train: Whether the model is in training mode.
+        :param progress: Optional Progress object containing scheduling state (epoch, step, etc.)
+            for dynamic weight scheduling.
         :param context: Optional Context object containing tensors.
         :input inputs: Keyword arguments containing all necessary inputs for the
             loss computations.
@@ -152,8 +178,20 @@ class LossGroup:
         logs: Dict[str, float] = {}
 
         for item in self.items:
-            raw, weighted = item(train, context=context, **inputs)
-            logs[item.key] = raw.item()
+            raw, weighted = item(
+                train, 
+                progress=progress, 
+                context=context, 
+                **inputs
+            )
+            logs[item.key] = raw.item() # type: ignore
             total += weighted
         
         return total, logs
+    
+    def get_config(self) -> List[Dict[str, Any]]:
+        """
+        Get the configuration of the LossGroup for logging or checkpointing.
+        """
+        
+        return [item.get_config() for item in self.items]

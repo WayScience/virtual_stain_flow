@@ -4,10 +4,13 @@ crop_dataset.py
 
 from typing import Any, Dict, List, Sequence, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 
 from .base_dataset import BaseImageDataset
 from .ds_engine.crop_manifest import CropManifest, CropFileState, Crop
+from .ds_engine.crop_generator import CropGenerator, generate_center_crops
+from ..transforms.base_transform import LoggableTransform
 
 
 class CropImageDataset(BaseImageDataset):
@@ -20,18 +23,24 @@ class CropImageDataset(BaseImageDataset):
         self,
         *,
         file_index: Optional[pd.DataFrame] = None,
+        check_exists: bool = False,
         crop_specs: Optional[Dict[int, List[Tuple[Tuple[int, int], int, int]]]] = None,
         pil_image_mode: str = "I;16",
         cache_capacity: Optional[int] = None,
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
+        transforms: Optional[Sequence[LoggableTransform]] = None,
+        input_transforms: Optional[Sequence[LoggableTransform]] = None,
+        target_transforms: Optional[Sequence[LoggableTransform]] = None,
         crop_file_state: Optional[CropFileState] = None,
     ):
         """
         Initialize the CropImageDataset.
 
         :param file_index: Optional DataFrame containing exclusively file paths as pathlikes.
-            Must be provided if `crop_file_state` is not provided.
+            Must be provided if `crop_file_state` is not provided. See
+            `BaseImageDataset` for more details on schema and requirements.
+        :param check_exists: Whether to check if the files exist. Default is False.
         :param crop_specs: Optional dictionary mapping file index positions to lists of crop
             specifications. Each crop specification is a tuple of ((x, y), width, height).
             Must be provided if `crop_file_state` is not provided.
@@ -45,6 +54,11 @@ class CropImageDataset(BaseImageDataset):
             invalid.     
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
+        :param transforms: Optional sequence of transformations to apply to the images.
+        :param input_transforms: Optional sequence of LoggableTransform objects to
+            apply to the input image only, after `transforms`.
+        :param target_transforms: Optional sequence of LoggableTransform objects to
+            apply to the target image only, after `transforms`.
         :param crop_file_state: Optional pre-initialized CropFileState object. If provided,
             it takes precedence over `file_index` and `crop_specs`. Intended
             to be used by only .from_config class method and similar deserialization
@@ -59,7 +73,8 @@ class CropImageDataset(BaseImageDataset):
             CropManifest.from_coord_size(
                 crop_specs=crop_specs,
                 file_index=file_index,
-                pil_image_mode=pil_image_mode
+                pil_image_mode=pil_image_mode,
+                check_exists=check_exists
             ),
             cache_capacity=cache_capacity
         )
@@ -68,6 +83,19 @@ class CropImageDataset(BaseImageDataset):
 
         self.input_channel_keys = input_channel_keys
         self.target_channel_keys = target_channel_keys
+
+        if not isinstance(transforms, Sequence):
+            transforms = [transforms] if transforms else []
+        if not all(isinstance(t, LoggableTransform) for t in transforms):
+            raise ValueError("All transforms must be instances of LoggableTransform.")
+        self.transforms = transforms
+
+        self.input_transforms = self._normalize_transforms(
+            input_transforms, "input_transforms"
+        )
+        self.target_transforms = self._normalize_transforms(
+            target_transforms, "target_transforms"
+        )
 
     @property
     def pil_image_mode(self) -> str:
@@ -80,6 +108,14 @@ class CropImageDataset(BaseImageDataset):
     @property
     def crop_info(self) -> Optional[Crop]:
         return self.file_state.crop_info
+    
+    @property
+    def original_input_image(self) -> Optional[np.ndarray]:
+        return self.file_state.original_input_image
+    
+    @property
+    def original_target_image(self) -> Optional[np.ndarray]:
+        return self.file_state.original_target_image
     
     def to_config(self) -> Dict[str, Any]:
         """
@@ -102,11 +138,69 @@ class CropImageDataset(BaseImageDataset):
         Deserialize from dict.
         Mirrors design of BaseImageDataset.from_config().
         Deserializes the underlying CropFileState.
+
+        :param config: Dict containing the configuration produced
+            by `CropImageDataset.to_config()`.
         """
+
+        crop_file_state_config = config.get('crop_file_state', None)
+        if crop_file_state_config is None:
+
+            if "file_state" in config:
+                raise ValueError(
+                    "Expected configuration for CropImageDataset. "
+                    "Likely the received configuration is for BaseImageDataset "
+                    "or other subclasses and not CropImageDataset."
+                )
+
+            raise ValueError(
+                "Configuration missing required field 'crop_file_state'. "
+                "Perhaps this is the wrong configuration for CropImageDataset?"
+            )
+        
         return cls(
             crop_file_state=CropFileState.from_config(
-                config['crop_file_state']
-            ),
+                config.get('crop_file_state', None)),
             input_channel_keys=config.get('input_channel_keys', None),
             target_channel_keys=config.get('target_channel_keys', None)
+        )
+    
+    @classmethod
+    def from_base_dataset(
+        cls,
+        base_dataset: BaseImageDataset,
+        transforms: Optional[Sequence[LoggableTransform]] = None,
+        input_transforms: Optional[Sequence[LoggableTransform]] = None,
+        target_transforms: Optional[Sequence[LoggableTransform]] = None,
+        how: CropGenerator = generate_center_crops,
+        **kwargs: Any
+    ) -> 'CropImageDataset':
+        """
+        Create a CropImageDataset from a BaseImageDataset.
+
+        :param base_dataset: The BaseImageDataset to convert.
+        :param how: A function that generates crop specifications from the base dataset.
+            Default is `generate_center_crops`.
+        :param input_transforms: Optional sequence of LoggableTransform objects to
+            apply to the input image only, after `transforms`.
+        :param target_transforms: Optional sequence of LoggableTransform objects to
+            apply to the target image only, after `transforms`.
+        :param kwargs: Additional keyword arguments for the `how` function.
+        """
+
+        crop_specs = how(
+            dataset=base_dataset,
+            **kwargs
+        )
+
+        return cls(
+            file_index=base_dataset.file_index,
+            transforms=transforms,
+            input_transforms=input_transforms,
+            target_transforms=target_transforms,
+            crop_specs=crop_specs,
+            pil_image_mode=base_dataset.pil_image_mode,
+            input_channel_keys=base_dataset.input_channel_keys,
+            target_channel_keys=base_dataset.target_channel_keys,
+            
         )

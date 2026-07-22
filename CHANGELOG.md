@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.6] - 2026-07-22
+
+### Added 
+
+#### MLflow auto logging enhancements (`virtual_stain_flow/vsf_logging/`):
+- The logger now records model optimizer parameters.
+
+#### Channel-specific normalization/transformation specification (`virtual_stain_flow/transforms/`):
+- Allows separate normalizations applied to different channels.
+
+#### Support for visualization of multi-channel input/target/prediction (`virtual_stain_flow/evaluation/`):
+- Displays channels as additional columns in visualization grid.
+- Allows selection of which channels to display vias indexing.
+
+### Refactored
+
+#### Crop generation module as subpackage (`virtual_stain_flow/datasets/ds_engine/crop_generators/`):
+- Reduce size of module by breaking into subpackage.
+- Added tiling crop.
+
+#### Logger auto-logging functionalities isolated (`virtual_stain_flow/transforms/`):
+- Moved auto-logging of optimizer, model and loss group configs outside to reduce size of main logger module and facilitate testing.
+
+#### Data access during plotting (`virtual_stain_flow/evaluation/`):
+- Now images are retrieved from dataset and uniformly normalized as (N, C, H, W) before passed to plotting functions.
+
+
+---
+
+## [0.4.5] - 2026-04-30
+
+### Added
+
+#### MLflow auto logging enhancements (`virtual_stain_flow/vsf_logging/`):
+
+- The logger now records model architecture tags by capturing each model config's `class_path` and setting `model.<idx>.class_path` at train start.
+- The loss-group auto logging routine `_log_loss_groups_config_and_tags` logs loss item names and weights as MLflow tags and persists the full loss group configuration as a JSON config artifact.
+
+---
+
+## [0.4.4] - 2026-04-23
+
+### Added
+
+#### Dataset wrapper and MONAI augmentation adapter (`virtual_stain_flow/datasets/`):
+
+Introduces a lightweight wrapper abstraction for dataset composition and a MONAI-compatible adapter for dictionary-based augmentation pipelines. This enables augmentation workflows to be layered on top of existing dataset implementations without modifying core dataset logic.
+
+- **`BaseWrapperDataset`** (`base_wrapper_dataset.py`): Abstract wrapper base class that forwards dataset access to an underlying dataset instance and provides recursive access to the original base dataset via the `original` property. Establishes a reusable pattern for composing dataset behaviors (e.g., augmentation, caching, preprocessing) while preserving compatibility with existing dataset APIs.
+- **`MonaiAdapter`** (`monai_aug_adapter_dataset.py`): Wrapper dataset that adapts `(input, target)` tuple samples into MONAI dictionary format (`{"input": ..., "target": ...}`), applies optional MONAI `Compose` transforms, and returns transformed samples back as `(input, target)` tuples for trainer compatibility.
+
+#### MONAI augmentation usage example (`examples/`):
+
+- Added/updated **`4.data_augmentation_example.ipynb`** demonstrating:
+  - construction of a base dataset and crop dataset,
+  - application of MONAI dictionary transforms through `MonaiAdapter`,
+  - visualization of repeated stochastic augmentations,
+  - integration of the augmented dataset into a standard training dataloader/trainer workflow.
+
+### Refactored
+
+#### Visualization suite to support `BaseWrapperDataset` 
+
+---
+
+## [0.4.3] - 2025-12-16
+
+### Added
+
+#### Crop dataset (`virtual_stain_flow/datasets/`):
+
+Allows the dataset to return user specified crops dynamically obtained from the full images. Supports serialization and reserialization to facilitate reproducibility. 
+
+- **`CropImageDataset`** (`crop_dataset.py`): Dataset class for serving image crops based on a `CropManifest`. Extends `BaseImageDataset` with crop-specific state management and lazy loading via `CropFileState`.
+- **`CropManifest`** (`ds_engine/crop_manifest.py`): Immutable collection of crop definitions wrapping a `DatasetManifest` for file access. Supports serialization/deserialization and factory construction from coordinate specifications.
+- **`Crop`** (`ds_engine/crop_manifest.py`): Dataclass defining a single crop region with manifest index, position (x, y), and dimensions (width, height).
+- **`CropIndexState`** (`ds_engine/crop_manifest.py`): Mutable state tracker for the currently active crop region.
+- **`CropFileState`** (`ds_engine/crop_manifest.py`): Lazy image loading backend that wraps `FileState` to load full images and dynamically extract crop regions on demand.
+
+### Removed
+
+#### All obselete dataset classes
+
+---
+
 ## [0.4.2] - 2025-11-17
 
 ### Added

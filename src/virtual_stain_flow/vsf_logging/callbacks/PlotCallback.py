@@ -6,11 +6,12 @@ import tempfile
 import torch.nn as nn
 from torch.utils.data import Dataset
 
+from...datasets.base_wrapper_dataset import BaseWrapperDataset
 from .LoggerCallback import (
     AbstractLoggerCallback,
     log_artifact_type
 )
-from ...evaluation.visualization_utils import plot_predictions_grid_from_model
+from ...evaluation.visualization import plot_predictions_grid_from_model
 
 class PlotPredictionCallback(AbstractLoggerCallback):
     def __init__(
@@ -54,8 +55,8 @@ class PlotPredictionCallback(AbstractLoggerCallback):
             self.__tmpdir = tempfile.TemporaryDirectory()
             self._path = pathlib.Path(self.__tmpdir.name)
 
-        if not isinstance(dataset, Dataset):
-            raise TypeError(f"Expected Dataset, got {type(dataset)}")
+        if not isinstance(dataset, (Dataset, BaseWrapperDataset)):
+            raise TypeError(f"Expected Dataset or BaseWrapperDataset, got {type(dataset)}")
 
         self._dataset = dataset
 

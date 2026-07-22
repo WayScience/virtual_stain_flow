@@ -12,25 +12,27 @@
 
 
 import re
-import json
 import pathlib
-from typing import List, Tuple
+from typing import List
 
 
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from PIL import Image
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from PIL import Image
 from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure
 from mlflow.tracking import MlflowClient
 
+from virtual_stain_flow.datasets.base_dataset import BaseImageDataset
+from virtual_stain_flow.datasets.crop_dataset import CropImageDataset
+from virtual_stain_flow.transforms.normalizations import MaxScaleNormalize
 from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
 from virtual_stain_flow.vsf_logging.MlflowLogger import MlflowLogger
 from virtual_stain_flow.vsf_logging.callbacks.PlotCallback import PlotPredictionCallback
 from virtual_stain_flow.models.unet import UNet
+from virtual_stain_flow.evaluation.visualization import plot_dataset_grid
 
 
 # ## Pathing and Additional utils
@@ -74,216 +76,101 @@ def _collect_field_prefixes(
                 break
     return prefixes
 
-
-def _load_single_channel(
+def build_file_index(
     plate_dir: pathlib.Path,
-    field_prefix: str,
-    channel: int,
-    normalize: bool = True,
-) -> np.ndarray:
+    max_fields: int = 16,
+) -> pd.DataFrame:
     """
-    Load a single channel image for a given field prefix and channel index.
-
-    :param plate_dir: Directory containing TIFF files for one JUMP plate
-    :param field_prefix: Prefix like 'r01c01f01p01'.
-    :param channel: Channel index, e.g. 5 for Hoechst, 7 for BF mid-z.
-    :param normalize: If True, convert to float32 and divide by dtype max
-    :return: Image array of shape (H, W), float32.
+    Helper function to build a file index that specifies
+        the relationship of images across channels and field/fovs.
+    The result can directly be supplied to BaseImageDataset to create a
+        dataset with the correct image pairs.
     """
-    fname = f"{field_prefix}-ch{channel:d}sk1fk1fl1.tiff"
-    path = plate_dir / fname
-    if not path.exists():
-        raise FileNotFoundError(f"Expected file not found: {path}")
 
-    arr = np.array(Image.open(path))  # typically uint16
+    fields = _collect_field_prefixes(
+        plate_dir,
+        max_fields=max_fields,
+    )
 
-    if normalize:
-        if np.issubdtype(arr.dtype, np.integer):
-            info = np.iinfo(arr.dtype)
-            arr = arr.astype("float32") / float(info.max)
-        else:
-            arr = arr.astype("float32")
-    else:
-        arr = arr.astype("float32")
+    file_index_list = []
+    for field in fields:
+        sample = {}
+        for chan in DATA_PATH.glob(f"**/{field}*.tiff"):
+            match = FIELD_RE.match(chan.name)
+            if match and match.groups()[1]:
+                sample[f"ch{match.groups()[1]}"] = str(chan)
 
-    return arr  # (H, W), float32
+        file_index_list.append(sample)
 
+    file_index = pd.DataFrame(file_index_list)
+    file_index.dropna(how='all', inplace=True)
+    if file_index.empty:
+        raise ValueError(f"No files found in {plate_dir} matching the expected pattern.")
 
-def load_jump_bf_hoechst(
-    plate_dir: str | pathlib.Path,
-    max_fields: int = 32,
-    bf_channel: int = 7,
-    dna_channel: int = 5,
-    normalize: bool = True,
-) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-    """
-    Load a small BF->Hoechst subset from a CPJUMP1 plate.
+    return file_index.loc[:, sorted(file_index.columns)]
 
-    :param plate_dir: Directory containing TIFF files for one JUMP plate
-    :param max_fields: Maximum number of fields to load
-    :param bf_channel: Channel index for BF mid-z (default 7)
-    :param dna_channel: Channel index for Hoechst (default 5)
-    :param normalize: If True, convert to float32 and divide by dtype max
-    """
-    plate_dir = pathlib.Path(plate_dir)
-
-    if not plate_dir.exists() or not plate_dir.is_dir():
-        raise FileNotFoundError(
-            f"Plate directory {plate_dir} does not exist or is not a directory."
-        )
-
-    prefixes = _collect_field_prefixes(plate_dir, max_fields=max_fields)
-    if not prefixes:
-        raise RuntimeError(f"No valid JUMP image files found in {plate_dir}")
-
-    bf_list: list[np.ndarray] = []
-    dna_list: list[np.ndarray] = []
-    used_prefixes: list[str] = []
-
-    for prefix in prefixes:
-        try:
-            bf = _load_single_channel(
-                plate_dir, prefix, bf_channel, normalize=normalize
-            )
-            dna = _load_single_channel(
-                plate_dir, prefix, dna_channel, normalize=normalize
-            )
-        except FileNotFoundError:
-            # Skip incomplete fields (missing channels)
-            continue
-
-        # Add channel axis: (1, H, W)
-        bf_list.append(bf[None, ...])
-        dna_list.append(dna[None, ...])
-        used_prefixes.append(prefix)
-
-    if not bf_list:
-        raise RuntimeError(
-            f"No complete BF + DNA pairs found in {plate_dir} "
-            f"for bf_channel={bf_channel}, dna_channel={dna_channel}"
-        )
-
-    X = np.stack(bf_list, axis=0)   # (N, 1, H, W)
-    Y = np.stack(dna_list, axis=0)  # (N, 1, H, W)
-
-    return X, Y, used_prefixes
-
-
-# Dataset object for training
 
 # In[3]:
-
-
-class SimpleDataset(Dataset):
-    """
-    Simple dataset for demo purposes.
-    Loads images from disk, crops the center, and returns as tensors.
-    """
-    def __init__(self, X: np.ndarray, Y: np.ndarray, crop_size: int = 256):
-        self.X = X
-        self.Y = Y
-        self.crop_size = crop_size
-
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        x = self.X[idx, 0, :, :]
-        y = self.Y[idx, 0, :, :]
-
-        # Get image dimensions
-        height, width = x.shape
-
-        # Calculate crop coordinates for center
-        left = (width - self.crop_size) // 2
-        top = (height - self.crop_size) // 2
-        right = left + self.crop_size
-        bottom = top + self.crop_size
-
-        # Crop center
-        x_crop = x[top:bottom,left:right]
-        y_crop = y[top:bottom,left:right]
-
-        # Convert to tensor
-        x_tensor = torch.from_numpy(x_crop).unsqueeze(0)  # Add channel dimension
-        y_tensor = torch.from_numpy(y_crop).unsqueeze(0)  # Add channel dimension
-
-        return x_tensor, y_tensor
-
-
-# ## Load subsetted demo data
-
-# In[ ]:
 
 
 # Load very small subset of CJUMP1, BF and Hoechst channel as input-target pairs
 # for demo purposes
 # See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1 for details
-X, Y, prefixes = load_jump_bf_hoechst(
-    plate_dir=DATA_PATH,
-    # retrieve up to 64 fields (different positions of images)
-    # this results in a very small sample size good for demo purposes
-    # for better training results, increase this number/load the full dataset
-    max_fields=64,   
-    bf_channel=7,    # mid-z BF for CPJUMP1
-    dna_channel=5,   # Hoechst
-)
-
-# Print and visualize first 3 images from the loaded data
-print("X (BF):", X.shape, X.dtype)   # (N, 1, H, W)
-print("Y (DNA):", Y.shape, Y.dtype)  # (N, 1, H, W)
-print("First few fields:", prefixes[:5])
-
-panel_width = 3
-indices = [1, 2, 3]
-fig, ax = plt.subplots(len(indices), 2, figsize=(panel_width * 2, panel_width * len(indices)))
-
-for i, j in enumerate(indices):
-    input, target = X[j], Y[j]
-    ax[i][0].imshow(input[0], cmap='gray')
-    ax[i][0].set_title(f'No.{j} Input')
-    ax[i][0].axis('off')
-    ax[i][1].imshow(target[0], cmap='gray')
-    ax[i][1].set_title(f'No.{j} Target')
-    ax[i][1].axis('off')
-plt.tight_layout()
-plt.show()
+file_index = build_file_index(DATA_PATH, max_fields=64)
+print(file_index.head())
 
 
 # ## Create dataset that returns tensors needed for training, and visualize several patches
 
+# In[4]:
+
+
+# Create a dataset with Brightfield as input and Hoechst as target
+# See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1
+# for which channel codes correspond to which channel
+dataset = BaseImageDataset(
+    file_index=file_index,
+    check_exists=True,
+    pil_image_mode="I;16",
+    input_channel_keys=["ch7"],
+    target_channel_keys=["ch5"],
+)
+print(f"Dataset length: {len(dataset)}")
+print(
+    f"Input channels: {dataset.input_channel_keys}, target channels: {dataset._target_channel_keys}"
+)
+plot_dataset_grid(
+    dataset=dataset,
+    indices=[0,1,2,3],
+    wspace=0.025,
+    hspace=0.05
+)
+
+
+# ## Generate cropped dataset by taking the center 256 x 256 square using built in utilities.
+# Also visualize the first few crops
+
 # In[5]:
 
 
-# Create dataset instance
-dataset = SimpleDataset(X, Y, crop_size=256)
-print(f"Dataset created with {len(dataset)} samples")
-
-# Plot the first 5 samples from the dataset
-fig, axes = plt.subplots(5, 2, figsize=(8, 16))
-
-for i in range(5):
-    brightfield, dna = dataset[i]
-    brightfield = brightfield.numpy().squeeze()
-    dna = dna.numpy().squeeze()
-
-    # Plot brightfield image
-    axes[i, 0].imshow(brightfield.squeeze(), cmap='gray')
-    axes[i, 0].set_title(f'Sample {i} - Brightfield')
-    axes[i, 0].axis('off')
-
-    # Plot DNA image
-    axes[i, 1].imshow(dna.squeeze(), cmap='gray')
-    axes[i, 1].set_title(f'Sample {i} - DNA')
-    axes[i, 1].axis('off')
-
-plt.tight_layout()
-plt.show()
+cropped_dataset = CropImageDataset.from_base_dataset(
+    dataset,
+    crop_size=256,    
+    transforms=MaxScaleNormalize(
+        normalization_factor='16bit'
+    )
+)
+plot_dataset_grid(
+    dataset=cropped_dataset,
+    indices=[0,1,2,3],
+    wspace=0.025,
+    hspace=0.05
+)
 
 
 # ## Configure and train
 
-# In[ ]:
+# In[6]:
 
 
 ## Hyperparameters
@@ -303,7 +190,7 @@ learning_rate = 0.001
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Batch with DataLoader
-train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(cropped_dataset, batch_size=batch_size, shuffle=True)
 
 # Model & Optimizer
 fully_conv_unet = UNet(
@@ -325,11 +212,14 @@ optimizer = torch.optim.Adam(fully_conv_unet.parameters(), lr=learning_rate)
 # plots to the training. 
 plot_callback = PlotPredictionCallback(
     name="plot_callback_with_train_data",
-    dataset=dataset,
+    dataset=cropped_dataset,
     indices=[0,1,2,3,4], # first 5 samples
     plot_metrics=[torch.nn.L1Loss()],
     every_n_epochs=5,
-    show_plot=False
+    # kwargs passed to plotting backend
+    show_plot=False, # don't show plot in notebook
+    wspace=0.025, # small spacing between subplots
+    hspace=0.05 # small spacing between subplots
 )
 
 # MLflow Logger
@@ -381,7 +271,7 @@ trainer.train(logger=logger, epochs=epochs)
 
 # ### Display the last logged prediction plot artifact
 
-# In[ ]:
+# In[7]:
 
 
 # Create MLflow client

@@ -16,6 +16,7 @@ import torch
 from torch.utils.data import Dataset
 
 from .ds_engine.manifest import DatasetManifest, IndexState, FileState
+from ..transforms.base_transform import LoggableTransform
 
 
 class BaseImageDataset(Dataset):
@@ -24,9 +25,13 @@ class BaseImageDataset(Dataset):
         self,
         *,
         file_index: Optional[pd.DataFrame] = None,
+        check_exists: bool = False,
         pil_image_mode: str = "I;16",
         input_channel_keys: Optional[Union[str, Sequence[str]]] = None,
         target_channel_keys: Optional[Union[str, Sequence[str]]] = None,
+        transforms: Optional[Sequence[LoggableTransform]] = None,
+        input_transforms: Optional[Sequence[LoggableTransform]] = None,
+        target_transforms: Optional[Sequence[LoggableTransform]] = None,
         cache_capacity: Optional[int] = None,
         file_state: Optional[FileState] = None,
     ):
@@ -34,11 +39,22 @@ class BaseImageDataset(Dataset):
         """
         Initializes the BaseImageDataset.
 
-        :param file_index: Optional DataFrame containing exclusively file paths as pathlikes
-            Must be provided if `file_state` is not provided.
+        :param file_index: DataFrame specifying paths to images, intended
+            to be provided by the user upon creation of the dataset.
+            Expected a dataframe with columns corresponding to the identifiers
+            of channels and rows corresponding to individual imaging positions
+            (field of view, etc.). All cells should be path-likes to tiff files.
+            Required unless `file_state` is provided (see below ).
         :param pil_image_mode: Mode for PIL images, default is "I;16".
+        :param check_exists: Whether to check if files exist at initialization.
         :param input_channel_keys: Keys for input channels in the file index.
         :param target_channel_keys: Keys for target channels in the file index.
+        :param transforms: Optional sequence of LoggableTransform objects to apply
+            to the images before returning them.
+        :param input_transforms: Optional sequence of LoggableTransform objects to
+            apply to the input image only, after `transforms`.
+        :param target_transforms: Optional sequence of LoggableTransform objects to
+            apply to the target image only, after `transforms`.
         :param cache_capacity: Optional capacity for caching loaded images. 
             When set to None, default caching behavior of caching at most
             `file_index.shape[0]` images is used. When set to -1, unbounded
@@ -48,8 +64,8 @@ class BaseImageDataset(Dataset):
             invalid.     
         :param file_state: Optional pre-initialized FileState object. If provided,
             it takes precedence over `file_index` and `pil_image_mode`. Intended
-            to be used by only .from_config class method and similar deserialization
-            utilities.         
+            to be used internally by only .from_config class method and similar deserialization
+            utilities. Users should provide file_index to initialize datasets.
         """
         self.index_state = IndexState()
 
@@ -60,7 +76,8 @@ class BaseImageDataset(Dataset):
         self.file_state = FileState(
             DatasetManifest(
                 file_index=file_index, 
-                pil_image_mode=pil_image_mode
+                pil_image_mode=pil_image_mode,
+                check_exists=check_exists
             ), 
             cache_capacity=cache_capacity
         ) if file_state is None else file_state
@@ -68,6 +85,39 @@ class BaseImageDataset(Dataset):
 
         self.input_channel_keys = input_channel_keys
         self.target_channel_keys = target_channel_keys
+
+        if not isinstance(transforms, Sequence):
+            transforms = [transforms] if transforms else []
+        if not all(isinstance(t, LoggableTransform) for t in transforms):
+            raise ValueError("All transforms must be instances of LoggableTransform.")
+        self.transforms = transforms
+
+        self.input_transforms = self._normalize_transforms(
+            input_transforms, "input_transforms"
+        )
+        self.target_transforms = self._normalize_transforms(
+            target_transforms, "target_transforms"
+        )
+
+    def _normalize_transforms(
+        self,
+        transforms: Optional[Sequence[LoggableTransform]],
+        name: str,
+    ) -> Sequence[LoggableTransform]:
+        """
+        Normalize and validate a sequence of transforms.
+
+        :param transforms: Sequence of LoggableTransform objects or None.
+        :param name: Name of the transform sequence for error messages.
+        :return: Normalized sequence of LoggableTransform objects.
+        """
+        if not isinstance(transforms, Sequence):
+            transforms = [transforms] if transforms else []
+        if not all(isinstance(t, LoggableTransform) for t in transforms):
+            raise ValueError(
+                f"All {name} must be instances of LoggableTransform."
+            )
+        return transforms
 
     def get_raw_item(
         self, 
@@ -101,15 +151,25 @@ class BaseImageDataset(Dataset):
         Overridden Dataset `__len__` method so class works with torch DataLoader.
         """
         return len(self.manifest)
-
+    
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Overridden Dataset `__getitem__` method so class works with torch DataLoader.
         """        
         input_image_raw, target_image_raw = self.get_raw_item(idx)
 
-        return (torch.from_numpy(input_image_raw).float(), 
-                torch.from_numpy(target_image_raw).float())
+        input_image = input_image_raw
+        for transform in (*self.transforms, *self.input_transforms):
+            input_image = transform.apply(img=input_image)
+
+        target_image = target_image_raw
+        for transform in (*self.transforms, *self.target_transforms):
+            target_image = transform.apply(img=target_image)
+
+        return (
+            torch.from_numpy(input_image).float(),
+            torch.from_numpy(target_image).float()
+        )
 
     @property
     def pil_image_mode(self) -> str:
@@ -221,10 +281,17 @@ class BaseImageDataset(Dataset):
         :param config: Configuration dictionary.
         :return: An instance of BaseImageDataset or its subclass.
         """
+
+        file_state_config = config.get('file_state', None)
+        if file_state_config is None:
+            raise ValueError(
+                "Configuration must include 'file_state'."
+                "Perhaps this is the wrong configuration for BaseImageDataset?"
+            )
+
         return cls(
-            file_state=FileState.from_config( # heavy lifting handled by FileState
-                config['file_state']
-            ),
+            # heavy lifting handled by FileState
+            file_state=FileState.from_config(config.get('file_state', None)),
             input_channel_keys=config.get('input_channel_keys', None),
             target_channel_keys=config.get('target_channel_keys', None),
         )

@@ -4,27 +4,28 @@ loss_utils.py
 Utility functions for loss handling.
 """
 
-from typing import Union, Dict
+from typing import Union, Mapping
 
 import torch
 
-from ..losses.AbstractLoss import AbstractLoss
+from ..losses.BaseLoss import BaseLoss
+from .context import Context, ContextValue
 
 
 def _get_loss_name(
-        loss_fn: Union[torch.nn.Module, AbstractLoss]
+        loss_fn: Union[torch.nn.Module, BaseLoss]
 ) -> str:
     """
     Helper method to get the name of the loss function.
     """
-    if isinstance(loss_fn, AbstractLoss) and hasattr(loss_fn, "metric_name"):
+    if isinstance(loss_fn, BaseLoss) and hasattr(loss_fn, "metric_name"):
         return loss_fn.metric_name
     elif isinstance(loss_fn, torch.nn.Module):
         return type(loss_fn).__name__
     else:
         raise TypeError(
             "Expected loss_fn to be either a torch.nn.Module or "
-            "an AbstractLoss instance."
+            "a BaseLoss instance."
             f"Got {type(loss_fn)} instead."
         )
     
@@ -40,7 +41,7 @@ def _scalar_from_device(
 
 def _scalar_from_ctx(
     value: float,
-    ctx: Dict[str, torch.Tensor]
+    ctx: Union[Mapping[str, ContextValue], Context]
 ):
     """
     Helper method to convert a scalar value on the same device and 

@@ -4,7 +4,8 @@ trainer_protocol.py
 Protocol for defining behavior and needed attributes of a trainer class.
 """
 
-from typing import Protocol, Dict, runtime_checkable
+import pathlib
+from typing import Protocol, Dict, runtime_checkable, Any, List, Optional
 
 import torch
 
@@ -38,7 +39,7 @@ class TrainerProtocol(Protocol):
 
     def evaluate_epoch(self) -> Dict[str, float]: ...
 
-    def train(self, num_epochs: int) -> None: ...
+    def train(self, *args: Any, **kwargs: Any) -> None: ...
 
     @property
     def epoch(self) -> int: ...
@@ -54,3 +55,13 @@ class TrainerProtocol(Protocol):
 
     @property
     def best_model(self) -> torch.nn.Module: ...
+
+    def save_model(
+        self, 
+        save_path: pathlib.Path, 
+        file_name_prefix: Optional[str], 
+        file_name_suffix: Optional[str], 
+        file_ext: str = '.pth',
+        best_model: bool = True,
+    ) -> Optional[List[pathlib.Path]]:
+        ...
