@@ -51,11 +51,9 @@ class AbstractDownBlock(AbstractBlock):
     def __init__(self, in_channels, out_channels, num_units, **kwargs):
         super().__init__(in_channels, out_channels, num_units, **kwargs)
 
-    @property
     def out_h(self, in_h: int) -> int:
         return in_h // 2
 
-    @property
     def out_w(self, in_w: int) -> int:
         return in_w // 2
 
@@ -63,11 +61,9 @@ class AbstractUpBlock(AbstractBlock):
     def __init__(self, in_channels, out_channels, num_units, **kwargs):
         super().__init__(in_channels, out_channels, num_units, **kwargs)
 
-    @property
     def out_h(self, in_h: int) -> int:
         return in_h * 2
     
-    @property
     def out_w(self, in_w: int) -> int:
         return in_w * 2
 
