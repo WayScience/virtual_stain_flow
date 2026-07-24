@@ -40,7 +40,7 @@ from .utils import (
     get_norm,
     NormType,
 )
-from .abstract_block import AbstractBlock
+from .blocks import AbstractBlock
 
 """
 Abstract base class for downsampling and upsampling blocks with
