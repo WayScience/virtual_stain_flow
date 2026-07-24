@@ -21,7 +21,7 @@ import torch
 
 from .encoder import Encoder
 from .decoder import Decoder
-from .utils import (
+from .blocks import (
     get_activation,
     ActivationType
 )
