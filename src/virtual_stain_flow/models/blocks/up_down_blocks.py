@@ -38,9 +38,9 @@ from torch import Tensor
 
 from .utils import (
     get_norm,
-    NormType
+    NormType,
 )
-from .blocks import AbstractBlock
+from .abstract_block import AbstractBlock
 
 """
 Abstract base class for downsampling and upsampling blocks with
