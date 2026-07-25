@@ -13,18 +13,18 @@ from typing import List, Union, Dict, Literal, Any
 import torch
 import torch.nn as nn
 
-from .utils import ActivationType
 from .factory import qualname
 from .model import BaseGeneratorModel
 from .encoder import Encoder
 from .decoder import Decoder
-from .blocks import Conv2DNormActBlock
-from .up_down_blocks import (
+from .blocks import (
+    Conv2DNormActBlock,
     IdentityBlock,
     Conv2DDownBlock,
     MaxPool2DDownBlock,
     ConvTrans2DUpBlock,
-    Bilinear2DUpsampleBlock
+    Bilinear2DUpsampleBlock,
+    ActivationType
 )
 
 class UNet(BaseGeneratorModel):

@@ -29,7 +29,7 @@ from .blocks import (
     AbstractBlock,
     Conv2DNormActBlock
 )
-from .up_down_blocks import (
+from .blocks import (
     Conv2DDownBlock,
     ConvTrans2DUpBlock
 )

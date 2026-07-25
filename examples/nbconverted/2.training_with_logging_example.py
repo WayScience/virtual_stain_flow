@@ -11,10 +11,7 @@
 # In[1]:
 
 
-import re
 import pathlib
-from typing import List
-
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -25,172 +22,101 @@ from PIL import Image
 from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure
 from mlflow.tracking import MlflowClient
 
-from virtual_stain_flow.datasets.base_dataset import BaseImageDataset
+## Data
 from virtual_stain_flow.datasets.crop_dataset import CropImageDataset
+from virtual_stain_flow.datasets.base_dataset import BaseImageDataset
 from virtual_stain_flow.transforms.normalizations import MaxScaleNormalize
+from virtual_stain_flow.evaluation.visualization import plot_dataset_grid
+## Model & Trainer
 from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
 from virtual_stain_flow.vsf_logging.MlflowLogger import MlflowLogger
 from virtual_stain_flow.vsf_logging.callbacks.PlotCallback import PlotPredictionCallback
 from virtual_stain_flow.models.unet import UNet
-from virtual_stain_flow.evaluation.visualization import plot_dataset_grid
 
 
-# ## Pathing and Additional utils
-
-# Dataset processing and subsetting utils.
-# Please see [README.md](./README.md) and [0.download_data.py](./0.download_data.py) for data access details.
+# ## Retrieve Demo Data
+# The CPJUMP1 A549 dataset from notebook `0.download_example_dataset`
 
 # In[ ]:
 
 
-DATA_PATH = pathlib.Path("/YOUR/DATA/PATH/")  # Change to where the download_data script outputs data
+DATA_DOWNLOAD_DIR = pathlib.Path("/PATH/TO/WHERE/YOU/WANT/TO/DOWNLOAD/CPJUMP1")
+if not DATA_DOWNLOAD_DIR.exists():
+    raise FileNotFoundError(f"Data download directory not found: {DATA_DOWNLOAD_DIR}")
+a549_data_dir = DATA_DOWNLOAD_DIR / "cpjump1_a549_48h"
+if not a549_data_dir.exists():
+    raise FileNotFoundError(f"A549 data directory not found: {a549_data_dir}")
 
-# Sanity check for data existence
-if not DATA_PATH.exists() or not DATA_PATH.is_dir():
-    raise FileNotFoundError(f"Data path {DATA_PATH} does not exist or is not a directory.")
 
-# Matches filenames like:
-# r01c01f01p01-ch1sk1fk1fl1.tiff
-FIELD_RE = re.compile(
-    r"(r\d{2}c\d{2}f\d{2}p01)-ch(\d+)sk1fk1fl1\.tiff$"
-)
-
-def _collect_field_prefixes(
-    plate_dir: pathlib.Path,
-    max_fields: int = 16,
-) -> List[str]:
-    """
-    Scan a JUMP CPJUMP1 plate directory and collect distinct field prefixes.
-    Expects image filename like:
-        r01c01f01p01-ch1sk1fk1fl1.tiff
-    """
-    prefixes: List[str] = []
-    for path in sorted(plate_dir.glob("*.tiff")):
-        m = FIELD_RE.match(path.name)
-        if not m:
-            continue
-        prefix = m.group(1)  # e.g. "r01c01f01p01"
-        if prefix not in prefixes:
-            prefixes.append(prefix)
-            if len(prefixes) >= max_fields:
-                break
-    return prefixes
-
-def build_file_index(
-    plate_dir: pathlib.Path,
-    max_fields: int = 16,
-) -> pd.DataFrame:
-    """
-    Helper function to build a file index that specifies
-        the relationship of images across channels and field/fovs.
-    The result can directly be supplied to BaseImageDataset to create a
-        dataset with the correct image pairs.
-    """
-
-    fields = _collect_field_prefixes(
-        plate_dir,
-        max_fields=max_fields,
-    )
-
-    file_index_list = []
-    for field in fields:
-        sample = {}
-        for chan in DATA_PATH.glob(f"**/{field}*.tiff"):
-            match = FIELD_RE.match(chan.name)
-            if match and match.groups()[1]:
-                sample[f"ch{match.groups()[1]}"] = str(chan)
-
-        file_index_list.append(sample)
-
-    file_index = pd.DataFrame(file_index_list)
-    file_index.dropna(how='all', inplace=True)
-    if file_index.empty:
-        raise ValueError(f"No files found in {plate_dir} matching the expected pattern.")
-
-    return file_index.loc[:, sorted(file_index.columns)]
-
+# ## Create dataset and crop center 128 by 128
 
 # In[3]:
 
 
-# Load very small subset of CJUMP1, BF and Hoechst channel as input-target pairs
-# for demo purposes
-# See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1 for details
-file_index = build_file_index(DATA_PATH, max_fields=64)
-print(file_index.head())
+splits = ["train", "test"]
 
+raw_datasets = {}
+crop_datasets = {}
+for split in splits:
+    file_index_file = a549_data_dir / f"{split}" / "file_index.csv"
+    if not file_index_file.exists():
+        raise FileNotFoundError(f"{split} file index not found")
 
-# ## Create dataset that returns tensors needed for training, and visualize several patches
-
-# In[4]:
-
-
-# Create a dataset with Brightfield as input and Hoechst as target
-# See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1
-# for which channel codes correspond to which channel
-dataset = BaseImageDataset(
-    file_index=file_index,
-    check_exists=True,
-    pil_image_mode="I;16",
-    input_channel_keys=["ch7"],
-    target_channel_keys=["ch5"],
-)
-print(f"Dataset length: {len(dataset)}")
-print(
-    f"Input channels: {dataset.input_channel_keys}, target channels: {dataset._target_channel_keys}"
-)
-plot_dataset_grid(
-    dataset=dataset,
-    indices=[0,1,2,3],
-    wspace=0.025,
-    hspace=0.05
-)
-
-
-# ## Generate cropped dataset by taking the center 256 x 256 square using built in utilities.
-# Also visualize the first few crops
-
-# In[5]:
-
-
-cropped_dataset = CropImageDataset.from_base_dataset(
-    dataset,
-    crop_size=256,    
-    transforms=MaxScaleNormalize(
-        normalization_factor='16bit'
+    file_index = pd.read_csv(file_index_file)
+    print(f"Reading {split} dataset:")
+    dataset = BaseImageDataset(
+        file_index=file_index,
+        check_exists=True,
+        pil_image_mode="I;16",
+        input_channel_keys=["BF"],
+        target_channel_keys=["DNA"],
     )
-)
-plot_dataset_grid(
-    dataset=cropped_dataset,
-    indices=[0,1,2,3],
-    wspace=0.025,
-    hspace=0.05
-)
+    print(f"\tRaw dataset length: {len(dataset)}")
+    print(
+        f"\tInput channels: {dataset.input_channel_keys}, target channels: {dataset._target_channel_keys}"
+    )    
+
+    raw_datasets[split] = dataset
+
+    cropped_dataset = CropImageDataset.from_base_dataset(
+        dataset,
+        crop_size=128,
+        transforms=MaxScaleNormalize(
+            normalization_factor='16bit'),
+    )
+    print(f"\tCropped dataset length: {len(cropped_dataset)}")
+    crop_datasets[split] = cropped_dataset
+
+    _ = plot_dataset_grid(
+    cropped_dataset,
+        indices=[0,1,2,3,4],
+        wspace=0.025,
+        hspace=0.05
+    )
 
 
 # ## Configure and train
 
-# In[6]:
+# In[4]:
 
 
 ## Hyperparameters
 
-# Batch size arbitrarily chosen for demo purposes. 
-# With a value of 16, the training fits comfortably into a nvidia RTX 3090 and utilizing <10GB of VRAM.
-# Tune to your hardware capabilities.
-batch_size = 16 
 
-# Small number of epochs for demo purposes
-# For better training results, increase this number
-epochs = 100
+# Arbitrary big number of epochs, mainly for demo purposes
+epochs = 150
 
-# larger learning rate for demo purposes,
-# such that the epoch to epoch changes in model predictions are more visible
-learning_rate = 0.001 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Batch size and learning rate for the optimizer using parameters
+# from Liu et. al 2025 10.1038/s42256-025-01046-2, except we are training UNet
+# Should be optimized based on dataset and hardware. 
+batch_size = 32 
+learning_rate = 2e-4
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Batch with DataLoader
-train_loader = DataLoader(cropped_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(crop_datasets['train'], batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(crop_datasets['test'], batch_size=batch_size, shuffle=False)
 
 # Model & Optimizer
 fully_conv_unet = UNet(
@@ -212,14 +138,28 @@ optimizer = torch.optim.Adam(fully_conv_unet.parameters(), lr=learning_rate)
 # plots to the training. 
 plot_callback = PlotPredictionCallback(
     name="plot_callback_with_train_data",
-    dataset=cropped_dataset,
+    dataset=crop_datasets['train'],
     indices=[0,1,2,3,4], # first 5 samples
     plot_metrics=[torch.nn.L1Loss()],
-    every_n_epochs=5,
+    every_n_epochs=1, # plot predictions per epoch
     # kwargs passed to plotting backend
     show_plot=False, # don't show plot in notebook
     wspace=0.025, # small spacing between subplots
-    hspace=0.05 # small spacing between subplots
+    hspace=0.05, # small spacing between subplots    
+    tag="plot_train_predictions" # tag needed to plot train and val predictions separate
+)
+
+plot_callback_val = PlotPredictionCallback(
+    name="plot_callback_with_val_data",
+    dataset=crop_datasets['test'],
+    indices=[0,1,2,3,4], # first 5 samples
+    plot_metrics=[torch.nn.L1Loss()],
+    every_n_epochs=1, # plot predictions per epoch
+    # kwargs passed to plotting backend
+    show_plot=False, # don't show plot in notebook
+    wspace=0.025, # small spacing between subplots
+    hspace=0.05, # small spacing between subplots
+    tag="plot_heldout_predictions" # tag needed to plot train and val predictions separate
 )
 
 # MLflow Logger
@@ -236,9 +176,9 @@ logger = MlflowLogger(
     experiment_name="vsf_examples",
     # Change to your MLflow tracking server/local file based tracking URI
     tracking_uri="http://127.0.0.1:5000", 
-    run_name="experiment_training_with_plots",
-    description="Training a UNet model on a simple dataset for demo purposes",
-    callbacks=[plot_callback],
+    run_name="Example training UNet on unperturbed CPJUMP1 A549 @ 24h",
+    description="Training for demo purposes",
+    callbacks=[plot_callback, plot_callback_val],
     save_model_at_train_end=True,
     save_model_every_n_epochs=1,
     save_best_model=True
@@ -251,20 +191,29 @@ trainer = SingleGeneratorTrainer(
     losses=[ # Training with 2 losses: L1 and MS-SSIM
         torch.nn.L1Loss(), # simple per pixel error
         MultiScaleStructuralSimilarityIndexMeasure( # helps models converge much faster
-            data_range=1.0, 
+            data_range=None, # use per batch empirical data range 
             kernel_size=11,
             sigma=1.5,
+            # 4 instead of default 5 scales because 5 scales require images
+            #   to be minimal 160 by 160 but we are using 128 by 128 crops
+            betas=(0.0448, 0.2856, 0.3001, 0.2363) 
         )
     ],
     loss_weights=[1.0, -1.0], # minimize L1 distance (lower is better) and maximize MS-SSIM (higher is better)
     device=device, # use GPU if available
     train_loader=train_loader, # training data loader
-    val_loader=None, # for demo purposes, we don't supply a validation set
-    test_loader=None, # for demo purposes, we don't supply a test set
+    val_loader=test_loader, # using the test loader as a stand-in for validation
+    test_loader=None, # not used here in demo
 )
 
 # Start training
 trainer.train(logger=logger, epochs=epochs)
+
+
+# In[5]:
+
+
+logger.end_run()
 
 
 # ## Visualize training outcome through MLflow client
@@ -287,11 +236,11 @@ else:
     # Search for runs with the specific run name
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
-        filter_string="tags.mlflow.runName = 'experiment_training_with_plots'"
+        filter_string="tags.mlflow.runName = 'Example training UNet on unperturbed CPJUMP1 A549 @ 24h'"
     )
 
     if len(runs) == 0:
-        print("No runs found with name 'experiment_training_with_plots'")
+        print("No runs found with name 'Example training UNet on unperturbed CPJUMP1 A549 @ 24h'")
     else:
         # Get the most recent run (first in list)
         run = runs[0]
@@ -299,7 +248,7 @@ else:
         print(f"Run Name: {run.data.tags.get('mlflow.runName')}")
 
         # List artifacts (files) produced during training.
-        plot_artifacts = client.list_artifacts(run.info.run_id, path='plots/epoch/plot_predictions/')
+        plot_artifacts = client.list_artifacts(run.info.run_id, path='plots/epoch/plot_train_predictions/')
 
         # Filter for PNG files and sort by path (which includes epoch number)
         png_files = [artifact for artifact in plot_artifacts if artifact.path.endswith('.png')]

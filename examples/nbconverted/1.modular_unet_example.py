@@ -12,16 +12,16 @@
 # In[1]:
 
 
-import yaml
 import pathlib
 
 import pandas as pd
 import torch.nn as nn
-import torch.optim as optim
-import matplotlib.pyplot as plt
 
-## Dataset
-from virtual_stain_flow.datasets.PatchDataset import PatchDataset
+## Data
+from virtual_stain_flow.datasets.crop_dataset import CropImageDataset
+from virtual_stain_flow.datasets.base_dataset import BaseImageDataset
+from virtual_stain_flow.transforms.normalizations import MaxScaleNormalize
+from virtual_stain_flow.evaluation.visualization import plot_dataset_grid
 
 ## Model parts
 from virtual_stain_flow.models.blocks import (
@@ -43,74 +43,57 @@ from virtual_stain_flow.models.unext import ConvNeXtUNet
 
 
 # ## Retrieve Demo Data
+# The CPJUMP1 A549 dataset from notebook `0.download_example_dataset`
 
-# In[2]:
+# In[ ]:
 
 
-ANALYSIS_REPO_ROOT = pathlib.Path('.').absolute().parent / 'pediatric_cancer_atlas_analysis'
-CONFIG_PATH = ANALYSIS_REPO_ROOT / 'config.yml'
-config = yaml.safe_load(CONFIG_PATH.read_text())
+DATA_DOWNLOAD_DIR = pathlib.Path("/PATH/TO/WHERE/YOU/WANT/TO/DOWNLOAD/CPJUMP1")
+if not DATA_DOWNLOAD_DIR.exists():
+    raise FileNotFoundError(f"Data download directory not found: {DATA_DOWNLOAD_DIR}")
+a549_data_dir = DATA_DOWNLOAD_DIR / "cpjump1_a549_48h"
+if not a549_data_dir.exists():
+    raise FileNotFoundError(f"A549 data directory not found: {a549_data_dir}")
 
-LOADDATA_FILE_PATH = ANALYSIS_REPO_ROOT / '0.data_preprocessing' / 'data_split_loaddata' / 'loaddata_train.csv'
-PROFILING_DIR = pathlib.Path(config['paths']['pediatric_cancer_atlas_profiling_path'])
-SC_FEATURES_DIR = pathlib.Path(config['paths']['sc_features_path'])
 
-for path in [ANALYSIS_REPO_ROOT, CONFIG_PATH, LOADDATA_FILE_PATH]:
-    if not path.exists():
-        raise FileNotFoundError(f"File/Directory not found: {path}")
+# In[3]:
 
-# subset the loaddata_df to 100 samples for faster example run
-loaddata_df = pd.read_csv(LOADDATA_FILE_PATH)
-loaddata_df = loaddata_df.sample(n=100, random_state=42)
 
-sc_features = pd.DataFrame()
-for plate in loaddata_df['Metadata_Plate'].unique():
-    sc_features_parquet = SC_FEATURES_DIR / f'{plate}_sc_normalized.parquet'
-    if not sc_features_parquet.exists():
-        print(f'{sc_features_parquet} does not exist, skipping...')
-        continue 
-    else:
-        sc_features = pd.concat([
-            sc_features, 
-            pd.read_parquet(
-                sc_features_parquet,
-                columns=['Metadata_Plate', 'Metadata_Well', 'Metadata_Site', 'Metadata_Cells_Location_Center_X', 'Metadata_Cells_Location_Center_Y']
-            )
-        ])
+# for demo purpose just use the training split
 
-INPUT_CHANNEL_NAMES = config['data']['input_channel_keys']
-TARGET_CHANNEL_NAMES = config['data']['target_channel_keys']
-PATCH_SIZE = 256
+file_index_file = a549_data_dir / "train" / "file_index.csv"
+if not file_index_file.exists():
+    raise FileNotFoundError("Train file index not found")
 
-pds = PatchDataset(
-        _loaddata_csv=loaddata_df,
-        _sc_feature=sc_features,
-        _input_channel_keys=INPUT_CHANNEL_NAMES,
-        _target_channel_keys=TARGET_CHANNEL_NAMES,
-        _input_transform=None,
-        _target_transform=None,
-        patch_size=PATCH_SIZE,
-        verbose=False,
-        patch_generation_method="random_cell",
-        n_expected_patches_per_img=50,
-        patch_generation_random_seed=42
-    )
+file_index = pd.read_csv(file_index_file)
 
-panel_width = 3
-indices = [3, 5, 7]
-fig, ax = plt.subplots(len(indices), 2, figsize=(panel_width * 2, panel_width * len(indices)))
+print(len(file_index))
 
-for i, j in enumerate(indices):
+dataset = BaseImageDataset(
+    file_index=file_index,
+    check_exists=True,
+    pil_image_mode="I;16",
+    input_channel_keys=["BF"],
+    target_channel_keys=["DNA"],
+)
+print(f"Dataset length: {len(dataset)}")
+print(
+    f"Input channels: {dataset.input_channel_keys}, target channels: {dataset._target_channel_keys}"
+)    
 
-    input, target = pds[j]
-    ax[i][0].imshow(input[0], cmap='gray')
-    ax[i][0].set_title('Input Image')
-    ax[i][0].axis('off')
-    ax[i][1].imshow(target[0], cmap='gray')
-    ax[i][1].set_title('Target Image')
-    ax[i][1].axis('off')
-plt.tight_layout()
-plt.show()
+cropped_dataset = CropImageDataset.from_base_dataset(
+    dataset,
+    crop_size=128,
+    transforms=MaxScaleNormalize(
+    normalization_factor='16bit')
+)
+
+_ = plot_dataset_grid(
+    cropped_dataset,
+    indices=[0,33,444,2000],
+    wspace=0.025,
+    hspace=0.05
+)
 
 
 # ## Apply a 1×1 Convolution to Expand Input Channels
@@ -120,10 +103,10 @@ plt.show()
 # 
 # This operation transforms the input into a richer feature representation by producing many output channels. Each filter is expected to learn different spatial patterns, which are then propagated through the rest of the network.
 
-# In[3]:
+# In[4]:
 
 
-input, _ = pds[0]
+input, _ = cropped_dataset[0]
 input_tensor = input.unsqueeze(0)  # Add batch dimension
 print(f"Input tensor shape: {input_tensor.shape}")
 
@@ -162,7 +145,7 @@ print(f"Input tensor after up-convolution shape: {input_up_tensor.shape}")
 # The most common form of compute blocks found in UNets,
 # consisting of 2 repeats of Conv2D, BatchNorm and ReLu.
 
-# In[4]:
+# In[5]:
 
 
 num_units = 2  # most UNets use 2 repeated Conv2DBatchNormReLUs
@@ -189,7 +172,7 @@ print(f"Input tensor after Conv2DBatchNormReLU Block shape: {_.shape}")
 # Note here that when `in_channels == out_channels`, no leading Conv2D or Normalization
 # layer will be added to the ConvNeXt block.
 
-# In[5]:
+# In[6]:
 
 
 num_units = 1
@@ -208,7 +191,7 @@ print(f"Architecture of a {num_units} unit Conv2DConvNeXt Block: \n" +
 # Now observe that the Conv2DConvNeXtBlock has a leading Conv2D layer
 # and a leading Normalization layer to adjust the number of channels
 
-# In[6]:
+# In[7]:
 
 
 num_units = 1
@@ -225,7 +208,7 @@ print(f"Architecture of a {num_units} unit Conv2DConvNeXt Block with leading Con
       str(convnext_block2) + '\n')
 
 
-# In[7]:
+# In[8]:
 
 
 print(f"Input tensor before Conv2DConvNeXt Block shape: {input_up_tensor.shape}")
@@ -253,7 +236,7 @@ print(f"Input tensor after Conv2DConvNeXt Block shape: {_.shape}")
 # Meant for the first layer of UNet because we might not want to down-sample the
 # image before doing any compute.
 
-# In[8]:
+# In[9]:
 
 
 identity_block = IdentityBlock(
@@ -275,7 +258,7 @@ print(f"Input tensor after IdentityBlock shape: {_.shape}")
 # 
 # By default the spatial dimensions are halved, and the number of channels are doubled
 
-# In[ ]:
+# In[10]:
 
 
 conv_down_block = Conv2DDownBlock(
@@ -294,7 +277,7 @@ print(f"Input tensor after Conv2DDownBlock shape: {_.shape}")
 
 # #### Conv2DDownBlock can optionally be followed by a Normalization layer. 
 
-# In[10]:
+# In[11]:
 
 
 conv_down_block_norm = Conv2DDownBlock(
@@ -310,7 +293,7 @@ print(f"Architecture of Conv2DDownBlock with BatchNorm: \n" +
 # 
 # The spatial dimensions are halved, but the number of channels remains the same
 
-# In[11]:
+# In[12]:
 
 
 maxpool_down_block = MaxPool2DDownBlock(
@@ -346,7 +329,7 @@ print(f"Input tensor after MaxPool2DDownBlock shape: {_.shape}")
 # ### Tranposed Convoltuion based up Block
 # ConvTrans2DUpBlock uses a ConvTranspose2D layer to upsample the input tensor.
 
-# In[12]:
+# In[13]:
 
 
 convt_up_block = ConvTrans2DUpBlock(
@@ -364,7 +347,7 @@ print(f"Input tensor after ConvTrans2DUpBlock shape: {_.shape}")
 
 # #### ConvTrans2DUpBlock can optionally be followed by a Normalization layer, too. 
 
-# In[13]:
+# In[14]:
 
 
 convt_up_block_norm = ConvTrans2DUpBlock(
@@ -385,7 +368,7 @@ print(f"Architecture of ConvTrans2DUpBlock with BatchNorm: \n" +
 # See that the spatial dimensions are doubled, and the number of channels decrease by
 # a factor of 4 (2 per spatial dimension ^ 2 spatial dimensions)
 
-# In[14]:
+# In[15]:
 
 
 pixel_shuffle_up_block = PixelShuffle2DUpBlock(
@@ -409,7 +392,7 @@ print(f"Input tensor after PixelShuffle2DUpBlock shape: {_.shape}")
 
 # see that the spatial dimensions are halved, and the number of channels is doubled
 
-# In[15]:
+# In[16]:
 
 
 unet_down_stage = Stage(
@@ -435,7 +418,7 @@ print(f"Input tensor after UNet Down Stage shape: {_.shape}")
 # of channels, and the first Conv2DNormActBlock in the stage compensates for that by
 # upsampling the number of channels from base_channels to base_channels * 2
 
-# In[16]:
+# In[17]:
 
 
 unet_down_stage2 = Stage(
@@ -456,7 +439,7 @@ print(f"Input tensor after UNet Down Stage with MaxPool2DDownBlock shape: {_.sha
 
 # ### Constructing an fully convolution up-sampling stage that operates on a down stage output
 
-# In[17]:
+# In[18]:
 
 
 unet_up_stage = Stage(
@@ -479,7 +462,7 @@ print(f"Input tensor after UNet Up Stage shape: {_.shape}")
 
 # ### PixelShuffle stage example
 
-# In[18]:
+# In[19]:
 
 
 unet_up_stage2 = Stage(
@@ -503,7 +486,7 @@ print(f"Input tensor after UNet Up Stage with PixelShuffle2DUpBlock shape: {_.sh
 
 # ### Fully convolutional UNet Encoder
 
-# In[19]:
+# In[20]:
 
 
 unet_encoder = Encoder(
@@ -522,7 +505,7 @@ print(f"Architecture of UNet Encoder: \n" +
       str(unet_encoder) + '\n')
 
 
-# In[20]:
+# In[21]:
 
 
 # the forward pass of a Encoder returns a list of down sampled feature maps
@@ -537,7 +520,7 @@ for i, feature_map in enumerate(down_sample_feature_maps):
 
 # ### Maxpool UNet Encoder
 
-# In[21]:
+# In[22]:
 
 
 unet_encoder2 = Encoder(
@@ -555,7 +538,7 @@ print(f"Architecture of UNet Encoder with MaxPool2DDownBlock: \n" +
       str(unet_encoder2) + '\n')
 
 
-# In[22]:
+# In[23]:
 
 
 down_sample_feature_maps = unet_encoder2(input_up_tensor)
@@ -568,7 +551,7 @@ for i, feature_map in enumerate(down_sample_feature_maps):
 
 # ### Fully convolutional UNet Decoder accepting skip connections from the downsampling path
 
-# In[23]:
+# In[24]:
 
 
 unet_decoder = Decoder(
@@ -581,7 +564,7 @@ print(f"Architecture of UNet Decoder: \n" +
       str(unet_decoder) + '\n')
 
 
-# In[24]:
+# In[25]:
 
 
 decoder_output = unet_decoder(down_sample_feature_maps)
@@ -591,7 +574,7 @@ print(f"Decoder output shape: {decoder_output.shape}")
 
 # ### PixelShuffle Decoder Example
 
-# In[25]:
+# In[26]:
 
 
 pixel_shuffle_decoder = Decoder(
@@ -604,7 +587,7 @@ print(f"Architecture of PixelShuffle Decoder: \n" +
       str(pixel_shuffle_decoder) + '\n')
 
 
-# In[26]:
+# In[27]:
 
 
 decoder_output = unet_decoder(down_sample_feature_maps)
@@ -614,7 +597,7 @@ print(f"Decoder output shape: {decoder_output.shape}")
 
 # ## Decoder works with other convolutional model architectures!
 
-# In[27]:
+# In[28]:
 
 
 import timm
@@ -648,7 +631,7 @@ convnext_paired_decoder = Decoder(
 
 # ### See how forward pass through the convnextv2_model and then the decoder works
 
-# In[28]:
+# In[29]:
 
 
 print(f"Shape of input image tensor: {input_tensor.shape}")
@@ -667,7 +650,7 @@ print(f"Decoder output shape: {decoder_output.shape}")
 
 # ### From here just add an out convolution layer that adjusts the channel number and optionally a outptu activation to make a working virtual staining model 
 
-# In[29]:
+# In[30]:
 
 
 out_conv_layer = nn.Conv2d(
@@ -689,7 +672,7 @@ model_pred_activated = activation(model_pred)
 
 # ### Fully conovlutional UNet (equivalent to a FNet) with 4 layers
 
-# In[30]:
+# In[31]:
 
 
 fully_conv_unet = UNet(
@@ -707,7 +690,7 @@ print(f"Fully Conv UNet prediction shape: {pred.shape}")
 
 # ### Maxpooling UNet with 4 layers
 
-# In[31]:
+# In[32]:
 
 
 max_pool_unet = UNet(
@@ -725,7 +708,7 @@ print(f"Maxpooling UNet prediction shape: {pred.shape}")
 
 # ### UNeXt with ConvNeXtv2 encoder backbone and pixel shuffle decoder
 
-# In[32]:
+# In[33]:
 
 
 unext = ConvNeXtUNet(
