@@ -5,12 +5,10 @@
 
 # ## Dependencies
 
-# In[ ]:
+# In[1]:
 
 
-import re
 import pathlib
-from typing import List
 
 import pandas as pd
 from monai.transforms import (
@@ -31,119 +29,55 @@ from virtual_stain_flow.transforms.normalizations import MaxScaleNormalize
 from virtual_stain_flow.evaluation.visualization import plot_dataset_grid
 
 
-# ## Pathing and Additional utils
+# ## Retrieve Demo Data
+# The CPJUMP1 A549 dataset from notebook `0.download_example_dataset`
 
 # In[ ]:
 
 
-DATA_PATH = pathlib.Path("/YOUR/DATA/PATH/")  # Change to where the download_data script outputs data
-
-# Sanity check for data existence
-if not DATA_PATH.exists() or not DATA_PATH.is_dir():
-    raise FileNotFoundError(f"Data path {DATA_PATH} does not exist or is not a directory.")
-
-# Matches filenames like:
-# r01c01f01p01-ch1sk1fk1fl1.tiff
-FIELD_RE = re.compile(
-    r"(r\d{2}c\d{2}f\d{2}p01)-ch(\d+)sk1fk1fl1\.tiff$"
-)
-
-def _collect_field_prefixes(
-    plate_dir: pathlib.Path,
-    max_fields: int = 16,
-) -> List[str]:
-    """
-    Scan a JUMP CPJUMP1 plate directory and collect distinct field prefixes.
-    Expects image filename like:
-        r01c01f01p01-ch1sk1fk1fl1.tiff
-    """
-    prefixes: List[str] = []
-    for path in sorted(plate_dir.glob("*.tiff")):
-        m = FIELD_RE.match(path.name)
-        if not m:
-            continue
-        prefix = m.group(1)  # e.g. "r01c01f01p01"
-        if prefix not in prefixes:
-            prefixes.append(prefix)
-            if len(prefixes) >= max_fields:
-                break
-    return prefixes
-
-def build_file_index(
-    plate_dir: pathlib.Path,
-    max_fields: int = 16,
-) -> pd.DataFrame:
-    """
-    Helper function to build a file index that specifies
-        the relationship of images across channels and field/fovs.
-    The result can directly be supplied to BaseImageDataset to create a
-        dataset with the correct image pairs.
-    """
-
-    fields = _collect_field_prefixes(
-        plate_dir,
-        max_fields=max_fields,
-    )
-
-    file_index_list = []
-    for field in fields:
-        sample = {}
-        for chan in DATA_PATH.glob(f"**/{field}*.tiff"):
-            match = FIELD_RE.match(chan.name)
-            if match and match.groups()[1]:
-                sample[f"ch{match.groups()[1]}"] = str(chan)
-
-        file_index_list.append(sample)
-
-    file_index = pd.DataFrame(file_index_list)
-    file_index.dropna(how='all', inplace=True)
-    if file_index.empty:
-        raise ValueError(f"No files found in {plate_dir} matching the expected pattern.")
-
-    return file_index.loc[:, sorted(file_index.columns)]
+DATA_DOWNLOAD_DIR = pathlib.Path("/PATH/TO/WHERE/YOU/WANT/TO/DOWNLOAD/CPJUMP1")
+if not DATA_DOWNLOAD_DIR.exists():
+    raise FileNotFoundError(f"Data download directory not found: {DATA_DOWNLOAD_DIR}")
+a549_data_dir = DATA_DOWNLOAD_DIR / "cpjump1_a549_48h"
+if not a549_data_dir.exists():
+    raise FileNotFoundError(f"A549 data directory not found: {a549_data_dir}")
 
 
 # In[3]:
 
 
-# For stable wGAN, we don't want the dataset to be too small that the discriminator
-# quickly memorizes the set and overpowers the generator.
-# So here a bigger, 2048 FOV subset of CJUMP1 (BF and Hoechst channel) is used as demo dataset 
-# See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1 for details
-file_index = build_file_index(DATA_PATH, max_fields=64)
-print(file_index.head())
+# for demo purpose just use the training split
 
+file_index_file = a549_data_dir / "train" / "file_index.csv"
+if not file_index_file.exists():
+    raise FileNotFoundError("Train file index not found")
 
-# ## Create dataset from CPJUMP1 and take center crops 
+file_index = pd.read_csv(file_index_file)
 
-# In[4]:
+print(len(file_index))
 
-
-# Create a dataset with Brightfield as input and Hoechst as target
-# See https://github.com/jump-cellpainting/2024_Chandrasekaran_NatureMethods_CPJUMP1
-# for which channel codes correspond to which channel
 dataset = BaseImageDataset(
     file_index=file_index,
     check_exists=True,
     pil_image_mode="I;16",
-    input_channel_keys=["ch7"],
-    target_channel_keys=["ch5"],
+    input_channel_keys=["BF"],
+    target_channel_keys=["DNA"],
 )
 print(f"Dataset length: {len(dataset)}")
 print(
     f"Input channels: {dataset.input_channel_keys}, target channels: {dataset._target_channel_keys}"
-)
+)    
 
 cropped_dataset = CropImageDataset.from_base_dataset(
     dataset,
-    crop_size=128,    
+    crop_size=128,
     transforms=MaxScaleNormalize(
-        normalization_factor='16bit'
-    )
+    normalization_factor='16bit')
 )
-plot_dataset_grid(
-    dataset=cropped_dataset,
-    indices=[0],
+
+_ = plot_dataset_grid(
+    cropped_dataset,
+    indices=[0,33,444,2000],
     wspace=0.025,
     hspace=0.05
 )
@@ -151,7 +85,7 @@ plot_dataset_grid(
 
 # ## Transformation example
 
-# In[5]:
+# In[4]:
 
 
 monai_transform = Compose([
@@ -194,7 +128,7 @@ augmented_dataset = MonaiAdapter(cropped_dataset, transform=monai_transform)
 # ## Visualize the same augmented dataset multiple times to see effects of augmentation
 # Note that augmentation is only applied to the crop and the shown full FOV is always un-augmented
 
-# In[6]:
+# In[5]:
 
 
 for i in range(5):
