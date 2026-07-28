@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.7] - 2026-07-28
+
+### Fixed
+
+#### Package installation discovery, expose previously unexposed subpackage
+
+---
+
 ## [0.4.6] - 2026-07-22
 
 ### Added 
