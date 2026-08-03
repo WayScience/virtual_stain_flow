@@ -186,11 +186,11 @@ class TestSingleGeneratorTrainerInitialization:
 class TestSingleGeneratorTrainerSaveModel:
     """Tests for SingleGeneratorTrainer.save_model method."""
 
-    def test_save_model_creates_file(
+    def test_save_current_model_creates_file(
         self, mock_model_with_save, mock_optimizer, simple_loss, 
         train_dataloader, val_dataloader
     ):
-        """Test that save_model creates a file."""
+        """Test that saving the current model creates a file."""
         from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
         
         trainer = SingleGeneratorTrainer(
@@ -206,11 +206,66 @@ class TestSingleGeneratorTrainerSaveModel:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = pathlib.Path(tmpdir)
             
-            paths = trainer.save_model(save_path=tmpdir_path, best_model=True)
+            paths = trainer.save_model(save_path=tmpdir_path, best_model=False)
             
             assert paths is not None
             assert len(paths) == 1
             assert paths[0].exists()
+
+    def test_save_best_model_without_snapshot_returns_empty_list(
+        self, mock_model_with_save, mock_optimizer, simple_loss,
+        train_dataloader, val_dataloader
+    ):
+        """Test that saving a best model requires an established best snapshot."""
+        from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
+
+        trainer = SingleGeneratorTrainer(
+            model=mock_model_with_save,
+            optimizer=mock_optimizer,
+            losses=simple_loss,
+            device=torch.device('cpu'),
+            train_loader=train_dataloader,
+            val_loader=val_dataloader,
+            batch_size=2
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = trainer.save_model(
+                save_path=pathlib.Path(tmpdir),
+                best_model=True
+            )
+
+            assert paths == []
+
+    def test_save_best_model_creates_file_after_best_is_established(
+        self, mock_model_with_save, mock_optimizer, simple_loss,
+        train_dataloader, val_dataloader
+    ):
+        """Test that an established best-model snapshot is saved."""
+        from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
+
+        trainer = SingleGeneratorTrainer(
+            model=mock_model_with_save,
+            optimizer=mock_optimizer,
+            losses=simple_loss,
+            device=torch.device('cpu'),
+            train_loader=train_dataloader,
+            val_loader=val_dataloader,
+            batch_size=2
+        )
+        trainer._early_stop_helper.initialize_early_stop(patience=1)
+        trainer.val_losses["MSELoss"].append(0.5)
+        trainer._early_stop_helper.update(epoch=1, model=trainer.model)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = trainer.save_model(
+                save_path=pathlib.Path(tmpdir),
+                best_model=True
+            )
+
+            assert len(paths) == 1
+            assert paths[0].exists()
+            assert paths[0].name == "generator_weights_best.pth"
 
     def test_save_model_returns_list_of_paths(
         self, mock_model_with_save, mock_optimizer, simple_loss, 

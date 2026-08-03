@@ -13,6 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .trainer_protocol import TrainerProtocol
+from .trainer_utils import EarlyStopHelper, save_model
 from ..metrics.AbstractMetrics import AbstractMetrics
 from ..engine.progress import Progress
 from ..datasets.data_split import default_random_split
@@ -41,7 +42,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         test_ratio: Optional[float] = 0.15,
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
-        early_termination_metric: str = None,
+        early_termination_metric: Optional[str] = None,
         early_termination_mode: Literal['min', 'max'] = "min",
         **kwargs,
     ):
@@ -100,17 +101,10 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
     def _init_state(
         self, 
-        early_termination_metric,
-        early_termination_mode,
+        early_termination_metric: Optional[str] = None,
+        early_termination_mode: Literal['min', 'max'] = "min",
         **kwargs
     ):
-        # Early stopping state
-        self._best_model = None
-        self._best_loss = float("inf")
-        self._early_stop_counter = 0
-        self._early_termination_metric = early_termination_metric
-        self._early_termination_mode = early_termination_mode
-        self._early_termination = True if early_termination_metric else False
 
         # Epoch state
         self._epoch = 0
@@ -123,6 +117,15 @@ class AbstractTrainer(TrainerProtocol, ABC):
         self._val_losses = defaultdict(list)
         self._train_metrics = defaultdict(list)
         self._val_metrics = defaultdict(list)
+
+        # Early stopping state
+        self._early_stop_helper = EarlyStopHelper(
+            best_mode=early_termination_mode,
+            trainer_val_losses_ref=self._val_losses,
+            trainer_val_metrics_ref=self._val_metrics,
+            best_metric_name=early_termination_metric,
+            enabled=bool(self._val_loader),
+        )
 
         return None
 
@@ -308,10 +311,11 @@ class AbstractTrainer(TrainerProtocol, ABC):
             logger.on_train_start()
 
         self._epochs = epochs
-        self._patience = patience if patience else epochs # no early stopping
         self._epoch_pbar: Optional[tqdm] = tqdm(
             range(epochs), desc="Training", unit="epoch") if verbose else None
         iterable = self._epoch_pbar if self._epoch_pbar else range(epochs)
+
+        self._early_stop_helper.initialize_early_stop(patience=patience if patience else epochs)
 
         for epoch in iterable:
 
@@ -355,65 +359,22 @@ class AbstractTrainer(TrainerProtocol, ABC):
                     f"val_{metric_name}", val_metric, epoch
                 )
 
+            # Update early stopping
+            should_stop = self._early_stop_helper.update(
+                epoch=self.epoch,
+                model=self.model
+            )
+
             if hasattr(logger, "on_epoch_end"):
                 logger.on_epoch_end()
 
-            # Update early stopping
-            if self.update_early_stop_counter():
-                print(f"Early termination at epoch {epoch + 1} "
-                      f"with best validation metric {self._best_loss}")
+            if should_stop:
+                print(f"Early termination at epoch {self.epoch} "
+                      f"with best validation metric {self._early_stop_helper.best_epoch_state.best_metric_value}")
                 break
 
         if hasattr(logger, "on_train_end"):
             logger.on_train_end()
-
-    def _collect_early_stop_metric(self) -> Optional[float]:
-        if self._early_termination_metric is None:
-            # Do not perform early stopping when no termination metric is specified
-            early_term_metric = None
-        else:
-            # First look for the metric in validation loss
-            if self._early_termination_metric in list(
-                self._val_losses.keys()):
-                early_term_metric = self._val_losses[
-                    self._early_termination_metric][-1]
-            # Then look for the metric in validation metrics
-            elif self._early_termination_metric in list(
-                self._val_metrics.keys()):
-                early_term_metric = self._val_metrics[
-                    self._early_termination_metric][-1]
-            else:
-                raise ValueError("Invalid early termination metric")
-            
-        return early_term_metric
-
-    def update_early_stop_counter(self) -> bool:
-        """
-        Method to update the early stopping criterion
-
-        :return: True if early stopping criterion is met, False otherwise.
-        """
-        
-        early_term_metric = self._collect_early_stop_metric()
-
-        # When early termination is disabled, 
-        # the best model is updated with the current model
-        if not self._early_termination and early_term_metric is None:
-            self.best_model = self.model.state_dict().copy()
-            return False
-        
-        reset_counter = (early_term_metric < self.best_loss) \
-            if self._early_termination_mode == "min" \
-                else (early_term_metric > self.best_loss)
-
-        if reset_counter:
-            self.best_loss = early_term_metric
-            self.early_stop_counter = 0
-            self.best_model = self.model.state_dict().copy()
-        else:
-            self.early_stop_counter += 1
-
-        return self.early_stop_counter >= self.patience
     
     def _update_epoch_progress(
         self,
@@ -430,7 +391,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
             f"{phase} Batch {batch_idx + 1}/{num_batches}"
         )
 
-    @abstractmethod
     def save_model(
         self,
         save_path: pathlib.Path,
@@ -439,7 +399,14 @@ class AbstractTrainer(TrainerProtocol, ABC):
         file_ext: str = '.pth',
         best_model: bool = True
     ) -> Optional[List[pathlib.Path]]:
-        pass
+        return save_model(
+            self,
+            save_path=save_path,
+            file_name_prefix=file_name_prefix or 'generator',
+            file_name_suffix=file_name_suffix,
+            file_ext=file_ext,
+            save_best_model=best_model
+        )
 
     """
     Log property
@@ -500,15 +467,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         
     @property
     def best_model(self):
-        return self._best_model
-    
-    @property
-    def best_loss(self):
-        return self._best_loss
-    
-    @property
-    def early_stop_counter(self):
-        return self._early_stop_counter
+        return self._early_stop_helper.best_model
     
     @property
     def metrics(self):
@@ -543,18 +502,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
     Setters for best model and best loss and early stop counter
     Meant to be used by the subclasses to update the best model and loss
     """
-
-    @best_model.setter
-    def best_model(self, value: torch.nn.Module):
-        self._best_model = value
-    
-    @best_loss.setter
-    def best_loss(self, value):
-        self._best_loss = value
-
-    @early_stop_counter.setter
-    def early_stop_counter(self, value: int):
-        self._early_stop_counter = value
 
     @epoch.setter
     def epoch(self, value: int):

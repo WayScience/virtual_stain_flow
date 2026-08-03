@@ -202,6 +202,17 @@ class TestTrainEpochEpochCounter:
 
 class TestTrainEpochEdgeCases:
     """Test edge cases for train_epoch and evaluate_epoch."""
+
+    def test_train_without_validation_completes_all_epochs(
+        self, trainer_with_empty_val_loader, dummy_logger
+    ):
+        trainer = trainer_with_empty_val_loader
+
+        trainer.train(logger=dummy_logger, epochs=3, patience=1, verbose=False)
+
+        assert trainer.epoch == 3
+        assert trainer.best_model is None
+        assert all(len(values) == 3 for values in trainer.train_losses.values())
     
     def test_train_epoch_with_empty_dataloader(self, minimal_model, minimal_optimizer, empty_dataloader):
         """
@@ -528,177 +539,7 @@ class TestMetricComputation:
         assert "epoch" in log
         assert log["epoch"] == []
 
-
-class TestEarlyTermination:
-    """Test early termination logic."""
     
-    def test_early_termination_disabled_by_default(self, trainer_with_loaders):
-        """Verify that early termination is disabled when no metric is specified."""
-        trainer = trainer_with_loaders
-        
-        assert trainer._early_termination is False
-        assert trainer._early_termination_metric is None
-    
-    def test_early_termination_enabled_with_metric(self, minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
-        """Verify that early termination is enabled when metric is specified."""
-        trainer = MinimalTrainerRealization(
-            model=minimal_model,
-            optimizer=minimal_optimizer,
-            train_loader=train_dataloader,
-            val_loader=val_dataloader,
-            batch_size=2,
-            device=torch.device('cpu'),
-            early_termination_metric='loss_a'
-        )
-        
-        assert trainer._early_termination is True
-        assert trainer._early_termination_metric == 'loss_a'
-    
-    def test_update_early_stop_counter_improves(self, minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
-        """Verify that early stop counter resets when validation loss improves."""
-        trainer = MinimalTrainerRealization(
-            model=minimal_model,
-            optimizer=minimal_optimizer,
-            train_loader=train_dataloader,
-            val_loader=val_dataloader,
-            batch_size=2,
-            device=torch.device('cpu'),
-            early_termination_metric='val_loss',
-            early_termination_mode='min'
-        )
-        
-        trainer._patience = 3
-        trainer._early_stop_counter = 2
-        trainer._best_loss = 0.5
-        
-        # Add a better validation loss
-        trainer.update_loss(torch.tensor(0.3), "val_loss", validation=True)
-        
-        should_stop = trainer.update_early_stop_counter()
-        
-        assert trainer.early_stop_counter == 0  # Reset
-        assert trainer.best_loss == 0.3  # Updated
-        assert should_stop is False
-    
-    def test_update_early_stop_counter_worsens(self, minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
-        """Verify that early stop counter increments when validation loss worsens."""
-        trainer = MinimalTrainerRealization(
-            model=minimal_model,
-            optimizer=minimal_optimizer,
-            train_loader=train_dataloader,
-            val_loader=val_dataloader,
-            batch_size=2,
-            device=torch.device('cpu'),
-            early_termination_metric='val_loss',
-            early_termination_mode='min'
-        )
-        
-        trainer._patience = 3
-        trainer._early_stop_counter = 1
-        trainer._best_loss = 0.3
-        
-        # Add a worse validation loss
-        trainer.update_loss(torch.tensor(0.5), "val_loss", validation=True)
-        
-        should_stop = trainer.update_early_stop_counter()
-        
-        assert trainer.early_stop_counter == 2  # Incremented
-        assert trainer.best_loss == 0.3  # Not updated
-        assert should_stop is False
-    
-    def test_update_early_stop_counter_triggers_stop(self, minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
-        """Verify that early stopping triggers when patience is exceeded."""
-        trainer = MinimalTrainerRealization(
-            model=minimal_model,
-            optimizer=minimal_optimizer,
-            train_loader=train_dataloader,
-            val_loader=val_dataloader,
-            batch_size=2,
-            device=torch.device('cpu'),
-            early_termination_metric='val_loss',
-            early_termination_mode='min'
-        )
-        
-        trainer._patience = 3
-        trainer._early_stop_counter = 2
-        trainer._best_loss = 0.3
-        
-        # Add a worse validation loss
-        trainer.update_loss(torch.tensor(0.5), "val_loss", validation=True)
-        
-        should_stop = trainer.update_early_stop_counter()
-        
-        assert trainer.early_stop_counter == 3
-        assert should_stop is True
-    
-    def test_early_termination_mode_max(self, minimal_model, minimal_optimizer, train_dataloader, val_dataloader):
-        """Verify that early termination works in 'max' mode (e.g., for accuracy)."""
-        trainer = MinimalTrainerRealization(
-            model=minimal_model,
-            optimizer=minimal_optimizer,
-            train_loader=train_dataloader,
-            val_loader=val_dataloader,
-            batch_size=2,
-            device=torch.device('cpu'),
-            early_termination_metric='accuracy',
-            early_termination_mode='max'
-        )
-        
-        trainer._patience = 3
-        trainer._early_stop_counter = 1
-        trainer._best_loss = 0.8
-        
-        # Add a better accuracy (higher is better)
-        trainer.update_metrics(torch.tensor(0.9), "accuracy", validation=True)
-        
-        should_stop = trainer.update_early_stop_counter()
-        
-        assert trainer.early_stop_counter == 0  # Reset
-        assert trainer.best_loss == 0.9  # Updated
-        assert should_stop is False
-    
-    def test_collect_early_stop_metric_from_val_losses(self, trainer_with_loaders):
-        """Verify that early stop metric is collected from val_losses."""
-        trainer = trainer_with_loaders
-        trainer._early_termination_metric = "mse_loss"
-        
-        trainer.update_loss(torch.tensor(0.5), "mse_loss", validation=True)
-        
-        metric = trainer._collect_early_stop_metric()
-        
-        assert metric == torch.tensor(0.5)
-    
-    def test_collect_early_stop_metric_from_val_metrics(self, trainer_with_loaders):
-        """Verify that early stop metric is collected from val_metrics."""
-        trainer = trainer_with_loaders
-        trainer._early_termination_metric = "accuracy"
-        
-        trainer.update_metrics(torch.tensor(0.85), "accuracy", validation=True)
-        
-        metric = trainer._collect_early_stop_metric()
-        
-        assert metric == torch.tensor(0.85)
-    
-    def test_collect_early_stop_metric_invalid_metric_raises_error(self, trainer_with_loaders):
-        """Verify that invalid early termination metric raises ValueError."""
-        trainer = trainer_with_loaders
-        trainer._early_termination_metric = "nonexistent_metric"
-        
-        with pytest.raises(ValueError, match="Invalid early termination metric"):
-            trainer._collect_early_stop_metric()
-    
-    def test_early_termination_disabled_updates_best_model(self, trainer_with_loaders):
-        """Verify that when early termination is disabled, best model is still updated."""
-        trainer = trainer_with_loaders
-        trainer._early_termination = False
-        trainer._early_termination_metric = None
-        
-        should_stop = trainer.update_early_stop_counter()
-        
-        assert trainer.best_model is not None
-        assert should_stop is False
-
-
 class TestProperties:
     """Test that AbstractTrainer dataset properties work correctly."""
 

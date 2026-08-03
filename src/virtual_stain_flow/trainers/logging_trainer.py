@@ -7,7 +7,6 @@ generator model using the engine subpackage for forward passes and loss
 computations.
 """
 
-import pathlib
 from typing import Dict, List, Union, Optional
 
 import torch
@@ -151,27 +150,3 @@ class SingleGeneratorTrainer(AbstractTrainer):
     @property
     def loss_groups(self) -> Dict[str, LossGroup]:
         return {'main': self._loss_group}
-    
-    def save_model(
-        self,
-        save_path: pathlib.Path,
-        file_name_prefix: Optional[str] = None,
-        file_name_suffix: Optional[str] = None,
-        file_ext: str = '.pth',
-        best_model: bool = True
-    ) -> Optional[List[pathlib.Path]]:
-
-        if file_name_prefix is None:
-            file_name_prefix = 'generator'
-
-        if file_name_suffix is None:
-            file_name_suffix = 'weights_' + (
-                'best' if best_model else str(self.epoch)
-            )
-
-        path = self.model.save_weights(
-            filename=f"{file_name_prefix}_{file_name_suffix}{file_ext}",
-            dir=save_path
-        )
-
-        return [path]
