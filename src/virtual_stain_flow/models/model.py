@@ -16,6 +16,7 @@ Classes:
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Union, Any
 import pathlib
+import copy
 
 import torch
 
@@ -97,6 +98,15 @@ class BaseModel(ABC, torch.nn.Module):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
+    def copy(self) -> 'BaseModel':
+        """
+        Creates a deep copy of the model instance.
+        
+        :return: A deep copy of the model.
+        """
+        return clone_model(self)
+    
+
 class BaseGeneratorModel(BaseModel):
 
     def __init__(
@@ -148,3 +158,18 @@ class BaseGeneratorModel(BaseModel):
     def out_activation(self) -> torch.nn.Module:
         """Activation function for the output layer."""
         return self._out_activation
+
+
+def clone_model(model: torch.nn.Module) -> torch.nn.Module:
+    try:
+        snapshot = copy.deepcopy(model)
+    except Exception as error:
+        raise RuntimeError(
+            f"Unable to create an independent snapshot of {type(model).__name__}."
+        ) from error
+
+    if not isinstance(snapshot, torch.nn.Module) or snapshot is model:
+        raise RuntimeError(
+            f"Unable to create an independent snapshot of {type(model).__name__}."
+        )
+    return snapshot
