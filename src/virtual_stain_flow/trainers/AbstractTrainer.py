@@ -72,6 +72,11 @@ class AbstractTrainer(TrainerProtocol, ABC):
             early-termination count on the validation dataset. 
             If None, early termination is disabled and the
             training will run for the specified number of epochs.
+            This metric also controls best model updating which will
+            be reflected in the best_model property and the save_model method.
+            However, unlike the early termination, the best model will be
+            updated even if early_termination_metric is None, 
+            so that the best model can be saved at the end of training.
         :param early_termination_mode: (optional)
         """
 
@@ -118,6 +123,13 @@ class AbstractTrainer(TrainerProtocol, ABC):
         self._train_metrics = defaultdict(list)
         self._val_metrics = defaultdict(list)
 
+        validation_present = bool(self._val_loader)
+        if early_termination_metric is not None and not validation_present:
+            raise RuntimeError(
+                "Cannot specify early_termination_metric if validation set or loader is not supplied. "
+                "Please either provide a validation dataset/loader or set early_termination_metric to None."
+            )
+
         # Early stopping state
         self._early_stop_helper = EarlyStopHelper(
             model=self._model,
@@ -125,7 +137,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
             trainer_val_losses_ref=self._val_losses,
             trainer_val_metrics_ref=self._val_metrics,
             best_metric_name=early_termination_metric,
-            enabled=bool(self._val_loader),
+            enabled=validation_present,
         )
 
         return None
