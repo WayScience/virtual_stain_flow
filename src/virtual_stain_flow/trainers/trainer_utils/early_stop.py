@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal, Optional
 
 import torch
@@ -7,22 +7,18 @@ from ...models.model import clone_model
 
 
 @dataclass
-class BestEpochState:
+class _BestEpochState:
     """Track the best validation observation and its model snapshot."""
 
+    model_copy: Optional[torch.nn.Module]
     best_mode: Literal["min", "max"] = "min"
     best_metric_value: Optional[float] = None
     best_epoch: int = 0
-    best_model: Optional[torch.nn.Module] = field(default=None, init=False)
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         if self.best_mode not in ("min", "max"):
             raise ValueError("best_mode must be either 'min' or 'max'.")
-
-        if self.best_metric_value is None:
-            self.best_metric_value = (
-                float("inf") if self.best_mode == "min" else float("-inf")
-            )
 
     def update(
         self,
@@ -32,20 +28,44 @@ class BestEpochState:
     ) -> bool:
         """Record an improved observation and return whether it improved."""
         metric_value = float(metric_value)
-        is_better = (
-            self.best_mode == "min" and metric_value < self.best_metric_value
-        ) or (
-            self.best_mode == "max" and metric_value > self.best_metric_value
-        )
+        is_better = self._is_better(metric_value)
         if not is_better:
             return False
 
         self.best_metric_value = metric_value
         self.best_epoch = epoch if epoch is not None else self.best_epoch + 1
-        if model is not None:
-            self.best_model = clone_model(model)
+        if self.model_copy is not None:
+            self._update_best_model_state(model)
 
         return True
+
+    def _is_better(self, metric_value: float) -> bool:
+        """Return whether the incoming metric improves the current best value."""
+        if self.best_metric_value is None:
+            return True
+        if self.best_mode == "min":
+            return metric_value < self.best_metric_value
+        return metric_value > self.best_metric_value
+
+    @property
+    def best_model(self) -> Optional[torch.nn.Module]:
+        """Return the best model snapshot, if an observation was recorded."""
+        if not self.enabled or self.best_metric_value is None or self.model_copy is None:
+            return None
+        return self.model_copy
+
+    @torch.no_grad()
+    def _update_best_model_state(
+        self,
+        model: torch.nn.Module,
+    ) -> None:
+        if model is None:
+            raise ValueError("A valid PyTorch model reference is required for snapshotting.")
+        self.model_copy.load_state_dict(
+            model.state_dict(),
+            strict=True,
+            assign=False,
+        )
 
 
 class EarlyStopHelper:
@@ -53,13 +73,25 @@ class EarlyStopHelper:
 
     def __init__(
         self,
+        model: torch.nn.Module,
         best_mode: Literal["min", "max"] = "min",
         trainer_val_losses_ref: Optional[dict] = None,
         trainer_val_metrics_ref: Optional[dict] = None,
         best_metric_name: Optional[str] = None,
         enabled: bool = True,
     ) -> None:
-        self.best_epoch_state = BestEpochState(best_mode=best_mode)
+        if model is None or not isinstance(model, torch.nn.Module):
+            raise ValueError("A valid PyTorch model must be provided.")
+
+        # Store model reference and allocate a snapshot once when enabled.
+        self.model_reference = model
+        model_copy = self._create_cpu_snapshot(self.model_reference) if enabled else None
+
+        self.best_epoch_state = _BestEpochState(
+            model_copy=model_copy,
+            best_mode=best_mode,
+            enabled=enabled,
+        )
         self.trainer_val_losses_ref = (
             trainer_val_losses_ref if trainer_val_losses_ref is not None else {}
         )
@@ -82,7 +114,6 @@ class EarlyStopHelper:
     def update(
         self,
         epoch: Optional[int] = None,
-        model: Optional[torch.nn.Module] = None,
     ) -> bool:
         """Update tracking state and return whether training should stop."""
         if not self.enabled:
@@ -98,12 +129,22 @@ class EarlyStopHelper:
             self.trainer_val_metrics_ref,
             self.best_metric_name,
         )
-        if self.best_epoch_state.update(metric_value, epoch, model):
+        if self.best_epoch_state.update(metric_value, epoch, self.model_reference):
             self._counter = 0
         else:
             self._counter += 1
 
         return self._counter >= self._patience
+
+    @staticmethod
+    def _create_cpu_snapshot(model: torch.nn.Module) -> torch.nn.Module:
+        """Create a CPU snapshot while restoring the original model device."""
+        first_param = next(model.parameters(), None)
+        model_device = first_param.device if first_param is not None else torch.device("cpu")
+        model.to("cpu")
+        model_copy = clone_model(model)
+        model.to(model_device)
+        return model_copy
 
     @property
     def best_model(self) -> Optional[torch.nn.Module]:
@@ -114,6 +155,11 @@ class EarlyStopHelper:
     def counter(self) -> int:
         """Return the number of consecutive observations without improvement."""
         return self._counter
+
+    @property
+    def best_metric_value(self) -> Optional[float]:
+        """Return the best tracked metric value, if any."""
+        return self.best_epoch_state.best_metric_value
 
 
 def _get_latest_metric_value(

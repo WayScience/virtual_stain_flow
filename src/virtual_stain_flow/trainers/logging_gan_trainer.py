@@ -52,7 +52,7 @@ class BaseGANTrainer(AbstractTrainer):
         :kwargs: Additional arguments for the AbstractTrainer
         """
 
-        device = kwargs.get('device', torch.device('cpu'))
+        device = kwargs.pop('device', torch.device('cpu'))
 
         # Registry for logging model parameters
         self._models: List[torch.nn.Module] = [generator, discriminator]
@@ -85,6 +85,7 @@ class BaseGANTrainer(AbstractTrainer):
             model=generator, # register generator as main model for early stopping
             optimizer=generator_optimizer,
             losses=generator_loss_group,
+            device=device,
             **kwargs
         )
 

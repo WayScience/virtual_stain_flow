@@ -28,7 +28,6 @@ class SingleGeneratorTrainer(AbstractTrainer):
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         losses: Union[torch.nn.Module, List[torch.nn.Module]],
-        device: torch.device,
         loss_weights: Optional[Union[Scalar, List[Scalar]]] = None,
         **kwargs
     ):
@@ -38,10 +37,11 @@ class SingleGeneratorTrainer(AbstractTrainer):
         :param model: The generator model to be trained.
         :param optimizer: The optimizer to be used for training.
         :param losses: The loss function(s) to be used for training.
-        :param device: The device to run the training on.
         :param loss_weights: Optional weights for each loss function.
         :kwargs: Additional arguments for the AbstractTrainer (for data/metric and more)
         """
+
+        device = kwargs.pop('device', torch.device('cpu'))
         
         # Registry for logging model parameters
         self._models: List[torch.nn.Module] = [model]
@@ -82,6 +82,7 @@ class SingleGeneratorTrainer(AbstractTrainer):
         super().__init__(
             model=self._forward_group.model,
             optimizer=self._forward_group.optimizer, # type: ignore
+            device=device,
             **kwargs
         )
 

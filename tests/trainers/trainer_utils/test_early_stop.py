@@ -2,51 +2,9 @@ import pytest
 import torch
 
 from virtual_stain_flow.trainers.trainer_utils.early_stop import (
-    BestEpochState,
     EarlyStopHelper,
     _get_latest_metric_value,
 )
-
-
-class TestBestEpochState:
-    @pytest.mark.parametrize(
-        ("best_mode", "initial_value", "new_value"),
-        [("min", 0.5, 0.3), ("max", 0.8, 0.9)],
-    )
-    def test_update_records_improvement(
-        self, best_mode, initial_value, new_value
-    ):
-        state = BestEpochState(
-            best_mode=best_mode,
-            best_metric_value=initial_value,
-        )
-
-        is_better = state.update(new_value, epoch=4)
-
-        assert is_better is True
-        assert state.best_metric_value == new_value
-        assert state.best_epoch == 4
-
-    def test_update_ignores_worse_value(self):
-        state = BestEpochState(best_metric_value=0.3, best_epoch=2)
-
-        is_better = state.update(0.5, epoch=3)
-
-        assert is_better is False
-        assert state.best_metric_value == 0.3
-        assert state.best_epoch == 2
-
-    def test_update_snapshots_model(self, minimal_model):
-        state = BestEpochState()
-
-        state.update(0.5, model=minimal_model)
-
-        assert state.best_model is not None
-        assert state.best_model is not minimal_model
-        for copied_parameter, parameter in zip(
-            state.best_model.parameters(), minimal_model.parameters()
-        ):
-            assert torch.equal(copied_parameter, parameter)
 
 
 class TestGetLatestMetricValue:
@@ -94,9 +52,21 @@ class TestGetLatestMetricValue:
 
 
 class TestEarlyStopHelper:
+    def test_best_model_is_none_before_first_improvement(self):
+        losses = {"val_loss": [0.5]}
+        helper = EarlyStopHelper(
+            model=torch.nn.Linear(1, 1),
+            trainer_val_losses_ref=losses,
+            best_metric_name="val_loss",
+        )
+        helper.initialize_early_stop(patience=2)
+
+        assert helper.best_model is None
+
     def test_improvement_resets_counter(self):
         losses = {"val_loss": [0.5]}
         helper = EarlyStopHelper(
+            model=torch.nn.Linear(1, 1),
             trainer_val_losses_ref=losses,
             best_metric_name="val_loss",
         )
@@ -110,11 +80,12 @@ class TestEarlyStopHelper:
 
         assert should_stop is False
         assert helper.counter == 0
-        assert helper.best_epoch_state.best_metric_value == 0.4
+        assert helper.best_metric_value == 0.4
 
     def test_non_improvement_stops_at_patience(self):
         losses = {"val_loss": [0.3]}
         helper = EarlyStopHelper(
+            model=torch.nn.Linear(1, 1),
             trainer_val_losses_ref=losses,
             best_metric_name="val_loss",
         )
@@ -128,30 +99,52 @@ class TestEarlyStopHelper:
         assert helper.counter == 2
 
     def test_disabled_update_is_no_op(self, minimal_model):
-        helper = EarlyStopHelper(enabled=False)
+        helper = EarlyStopHelper(model=minimal_model, enabled=False)
         helper.initialize_early_stop(patience=1)
 
-        should_stop = helper.update(epoch=1, model=minimal_model)
+        should_stop = helper.update(epoch=1)
 
         assert should_stop is False
         assert helper.counter == 0
         assert helper.best_model is None
 
+    def test_snapshot_tracks_internal_model_reference(self, minimal_model):
+        losses = {"val_loss": [0.5]}
+        helper = EarlyStopHelper(
+            model=minimal_model,
+            trainer_val_losses_ref=losses,
+            best_metric_name="val_loss",
+        )
+        helper.initialize_early_stop(patience=2)
+
+        with torch.no_grad():
+            for parameter in minimal_model.parameters():
+                parameter.add_(1.0)
+
+        helper.update(epoch=1)
+
+        assert helper.best_model is not None
+        assert helper.best_model is not minimal_model
+        for copied_parameter, parameter in zip(
+            helper.best_model.parameters(), minimal_model.parameters()
+        ):
+            assert torch.equal(copied_parameter, parameter)
+
     def test_enabled_update_requires_initialization(self):
-        helper = EarlyStopHelper(trainer_val_losses_ref={"loss": [0.5]})
+        helper = EarlyStopHelper(model=torch.nn.Linear(1, 1),trainer_val_losses_ref={"loss": [0.5]})
 
         with pytest.raises(RuntimeError, match="has not been initialized"):
             helper.update()
 
     def test_initialize_rejects_invalid_patience(self):
-        helper = EarlyStopHelper()
+        helper = EarlyStopHelper(model=torch.nn.Linear(1, 1))
 
         with pytest.raises(ValueError, match="at least 1"):
             helper.initialize_early_stop(0)
 
     def test_reinitialize_resets_counter_and_preserves_best_state(self):
         losses = {"loss": [0.3]}
-        helper = EarlyStopHelper(trainer_val_losses_ref=losses)
+        helper = EarlyStopHelper(model=torch.nn.Linear(1, 1), trainer_val_losses_ref=losses)
         helper.initialize_early_stop(patience=2)
         helper.update(epoch=1)
         losses["loss"].append(0.4)
@@ -160,5 +153,5 @@ class TestEarlyStopHelper:
         helper.initialize_early_stop(patience=3)
 
         assert helper.counter == 0
-        assert helper.best_epoch_state.best_metric_value == 0.3
+        assert helper.best_metric_value == 0.3
         assert helper.best_epoch_state.best_epoch == 1

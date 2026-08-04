@@ -212,9 +212,9 @@ class TestSingleGeneratorTrainerSaveModel:
             assert len(paths) == 1
             assert paths[0].exists()
 
-    def test_save_best_model_without_snapshot_returns_empty_list(
+    def test_save_best_model_without_validation_returns_empty_list(
         self, mock_model_with_save, mock_optimizer, simple_loss,
-        train_dataloader, val_dataloader
+        train_dataloader,
     ):
         """Test that saving a best model requires an established best snapshot."""
         from virtual_stain_flow.trainers.logging_trainer import SingleGeneratorTrainer
@@ -225,7 +225,7 @@ class TestSingleGeneratorTrainerSaveModel:
             losses=simple_loss,
             device=torch.device('cpu'),
             train_loader=train_dataloader,
-            val_loader=val_dataloader,
+            val_loader=None,
             batch_size=2
         )
 
@@ -255,7 +255,7 @@ class TestSingleGeneratorTrainerSaveModel:
         )
         trainer._early_stop_helper.initialize_early_stop(patience=1)
         trainer.val_losses["MSELoss"].append(0.5)
-        trainer._early_stop_helper.update(epoch=1, model=trainer.model)
+        trainer._early_stop_helper.update(epoch=1)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             paths = trainer.save_model(

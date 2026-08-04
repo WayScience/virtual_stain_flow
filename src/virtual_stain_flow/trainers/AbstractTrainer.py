@@ -120,6 +120,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
         # Early stopping state
         self._early_stop_helper = EarlyStopHelper(
+            model=self._model,
             best_mode=early_termination_mode,
             trainer_val_losses_ref=self._val_losses,
             trainer_val_metrics_ref=self._val_metrics,
@@ -362,7 +363,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
             # Update early stopping
             should_stop = self._early_stop_helper.update(
                 epoch=self.epoch,
-                model=self.model
             )
 
             if hasattr(logger, "on_epoch_end"):
@@ -370,7 +370,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
 
             if should_stop:
                 print(f"Early termination at epoch {self.epoch} "
-                      f"with best validation metric {self._early_stop_helper.best_epoch_state.best_metric_value}")
+                    f"with best validation metric {self._early_stop_helper.best_metric_value}")
                 break
 
         if hasattr(logger, "on_train_end"):
