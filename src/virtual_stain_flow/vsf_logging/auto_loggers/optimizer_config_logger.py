@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+import inspect
 
 import mlflow
 from torch.optim import Optimizer
@@ -44,13 +45,22 @@ class AutoOptimizerConfigLogger:
                 continue
 
             try:
+                
+                defaults = dict(optimizer.defaults)
+                init_signature = inspect.signature(optimizer.__class__.__init__)
+                valid_params = init_signature.parameters.keys()
+                
                 opt_config: Optional[Dict[str, Any]] = {
                     "class_path": (
                         f"{optimizer.__class__.__module__}."
                         f"{optimizer.__class__.__name__}"
                     ),
-                    "defaults": dict(optimizer.defaults),
+                    "defaults": defaults,
+                    "init": {
+                        k: v for k, v in defaults.items() if k in valid_params
+                    }
                 }
+
             except Exception as e:
                 print(f"Could not get optimizer config for logging: {e}")
                 opt_config = None

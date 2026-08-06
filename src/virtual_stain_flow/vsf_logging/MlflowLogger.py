@@ -15,7 +15,9 @@ from .auto_loggers import (
     AutoLossGroupConfigLogger,
     AutoModelConfigLogger,
     AutoOptimizerConfigLogger,
+    AutoTrainerLogger
 )
+from .logger_utils import _log_artifact, _log_trainer_artifact
 from .callbacks.LoggerCallback import (
     AbstractLoggerCallback,
     log_type
@@ -145,6 +147,7 @@ class MlflowLogger:
         self._model_config_logger = AutoModelConfigLogger(self)
         self._optimizer_config_logger = AutoOptimizerConfigLogger(self)
         self._loss_group_config_logger = AutoLossGroupConfigLogger(self)
+        self._trainer_logger = AutoTrainerLogger(self)
 
         return None
     
@@ -208,7 +211,7 @@ class MlflowLogger:
         self._model_config_logger.log_model_configs(self.trainer)
         self._optimizer_config_logger.log_optimizer_configs(self.trainer)
         self._loss_group_config_logger.log_loss_group_configs(self.trainer)
-
+        self._trainer_logger.log_trainer_config(self.trainer)
         
         for callback in self.callbacks:
             # TODO consider if we want hasattr checks
@@ -248,16 +251,10 @@ class MlflowLogger:
 
         if self._save_model_every_n_epochs is not None:
             if self.trainer.epoch % self._save_model_every_n_epochs == 0:
-                self._save_model_weights(
-                    artifact_path='weights',
-                    best_model=False
-                )
+                _log_trainer_artifact(self.trainer, best_model=False)
 
         if self._save_best_model:
-            self._save_model_weights(
-                artifact_path='weights',
-                best_model=True
-            )
+            _log_trainer_artifact(self.trainer, best_model=True)
 
         # Call on_epoch_end for all registered callbacks
         for callback in self.callbacks:
@@ -323,14 +320,14 @@ class MlflowLogger:
             print("No active MLflow run to end.")
 
     """
-    Exposed? logging methods
+    Exposed logging methods
     """    
     def log_artifact(
-            self,
-            tag: str,
-            file_path: pathlib.Path,
-            stage: Optional[str] = None
-        ):
+        self,
+        tag: str,
+        file_path: pathlib.Path,
+        stage: Optional[str] = None
+    ):
         """
         Log an artifact to MLflow.
 
@@ -339,29 +336,11 @@ class MlflowLogger:
         :param stage: Optional stage to categorize the artifact, defaults to None.
         :raises TypeError: If file_path is not a pathlib.Path instance.
         """
-
-        if not isinstance(file_path, pathlib.Path):
-            raise TypeError("file_path must be a pathlib.Path instance.")
-
-        artifact_path = ''
-        artifact_ext = file_path.suffix.lower()
-        if artifact_ext in ['.png', '.jpg', '.jpeg', '.pdf', '.svg']:
-            # log as plot artifact
-            artifact_path += 'plots/'
-        elif artifact_ext in ['.pth', '.pt']:
-            # log as model artifact
-            artifact_path += 'weights/'
-        else:
-            # log as generic artifact
-            artifact_path += 'artifacts/'
-        
-        if stage is not None:
-            artifact_path += f"{stage}/"
-        artifact_path += f"{tag}"
-
-        mlflow.log_artifact(
-            str(file_path), 
-            artifact_path=artifact_path
+        log_subdirs = [stage] if stage is not None else []
+        log_subdirs = log_subdirs + [tag] if tag is not None else log_subdirs
+        _log_artifact(
+            file_path=file_path,
+            artifact_subdirs=log_subdirs
         )
 
     def log_metric(
@@ -464,31 +443,6 @@ class MlflowLogger:
                 continue
                 # raise TypeError("Unsupported callback return type for logging.")
 
-    def _save_model_weights(
-        self,
-        prefix: Optional[str] = None,
-        suffix: Optional[str] = None,
-        artifact_path: str = "weights",
-        best_model: bool = True
-    ):
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            
-            tmpdirpath = pathlib.Path(tmpdirname)
-            
-            saved_file_paths = self.trainer.save_model(
-                save_path=tmpdirpath,
-                file_name_prefix=prefix,
-                file_name_suffix=suffix,
-                file_ext='.pth',
-                best_model=best_model
-            )
-
-            for saved_file_path in (saved_file_paths or []):
-                mlflow.log_artifact(
-                    str(saved_file_path), 
-                    artifact_path=artifact_path
-                )
-
     def log_config(
         self,
         tag: str,
@@ -550,7 +504,6 @@ class MlflowLogger:
         if self.trainer is None:
             raise RuntimeError("No trainer bound to logger. Cannot access trainer attributes.")
 
-
     def get_epoch(
             self
         ) -> int:
@@ -595,48 +548,8 @@ class MlflowLogger:
     @property
     def run_id(self):
         return self._run_id
+
     
-    """
-    Unimplemented helper that might be useful
-    """
-    def _log_dict_as_yaml(
-        self,
-        dict: Dict[str, Any],
-    ):
-        """
-        Log a dictionary as a YAML file in MLflow.
-        
-        :param dict: The dictionary to log.
-        """
-        
-        # TODO implement this method to convert dict to YAML and log it
-        raise NotImplementedError(
-            "log_dict_as_yaml method is not implemented. "
-            "Please implement this method to log dictionary as YAML."
-        )
-    
-    def _log_dict_as_param(
-        self
-    ):
-        """
-        Log a dictionary as parameters in MLflow.
-        
-        :return: None
-        :raises NotImplementedError: If the method is not implemented.
-        
-        This method is intended to log a dictionary as parameters in MLflow.
-        It is currently not implemented and raises a NotImplementedError.
-        """
-
-        # 1. DO flatten dict
-
-        # 2. DO mlflow log
-        
-        raise NotImplementedError(
-            "log_dict_as_param method is not implemented. "
-            "Please implement this method to log dictionary as parameters."
-        )
-
     """
     Overridden destructor method to ensure MLflow run is ended
     """

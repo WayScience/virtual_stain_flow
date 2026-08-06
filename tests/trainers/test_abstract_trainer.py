@@ -697,8 +697,9 @@ class TestProperties:
             device=torch.device('cpu')
         )
         
-        # When providing loaders, batch_size is set to None
-        assert trainer.batch_size is None
+        # When providing loaders, batch_size is inferred from the train loader
+        # should therefore match
+        assert trainer.batch_size is train_dataloader.batch_size
     
     def test_batch_size_property_default_value(self, minimal_model, minimal_optimizer, dataset_for_splitting):
         """Verify that batch_size property uses default value when not specified."""

@@ -6,11 +6,14 @@ from ..trainer_protocol import TrainerProtocol
 def save_model(
     trainer: 'TrainerProtocol',
     save_path: Path,
-    file_name_prefix: str = 'generator',
+    file_name_prefix: Optional[str] = None,
     file_name_suffix: Optional[str] = None,
     file_ext: str = '.pth',
     save_best_model: bool = True,
 ) -> List[Path]:
+
+    if file_name_prefix is None:
+        file_name_prefix = 'generator'
 
     if file_name_suffix is None:
         file_name_suffix = 'weights_' + (
