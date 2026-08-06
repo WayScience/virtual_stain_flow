@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .trainer_protocol import TrainerProtocol
-from .trainer_utils import EarlyStopHelper, save_model
+from .trainer_utils import EarlyStopHelper, save_model, save_optimizer_state
 from ..metrics.AbstractMetrics import AbstractMetrics
 from ..engine.progress import Progress
 from ..datasets.data_split import default_random_split
@@ -42,6 +42,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
         test_ratio: Optional[float] = 0.15,
         metrics: Dict[str, AbstractMetrics] = None,
         device: Optional[torch.device] = None,
+        epoch: Optional[int] = 0,
         early_termination_metric: Optional[str] = None,
         early_termination_mode: Literal['min', 'max'] = "min",
         **kwargs,
@@ -102,17 +103,19 @@ class AbstractTrainer(TrainerProtocol, ABC):
             **kwargs
         )
         self._init_state(
+            epoch,
             early_termination_metric, early_termination_mode, **kwargs)
 
     def _init_state(
         self, 
+        epoch,
         early_termination_metric: Optional[str] = None,
         early_termination_mode: Literal['min', 'max'] = "min",
         **kwargs
     ):
 
         # Epoch state
-        self._epoch = 0
+        self._epoch = epoch
         
         # Progress tracking for loss weight scheduling
         self._progress = Progress(epoch=0, step=0)
@@ -183,7 +186,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 **kwargs
             )
 
-            self._batch_size = batch_size
             self._train_ratio, self._val_ratio, self._test_ratio = (
                 train_ratio, val_ratio, test_ratio
             )
@@ -193,6 +195,11 @@ class AbstractTrainer(TrainerProtocol, ABC):
                 "Either provide dataset and specify datasplit parameters, "
                 "or provide at least train_loader."
             )
+
+        self._batch_size = self._train_loader.batch_size if hasattr(self._train_loader, 'batch_size') else None
+        self._train_n = len(self._train_loader.dataset) if hasattr(self._train_loader, 'dataset') else None
+        self._val_n = len(self._val_loader.dataset) if hasattr(self._val_loader, 'dataset') else None
+        self._test_n = len(self._test_loader.dataset) if hasattr(self._test_loader, 'dataset') else None
 
         return None
 
@@ -323,7 +330,6 @@ class AbstractTrainer(TrainerProtocol, ABC):
         if hasattr(logger, "on_train_start"):
             logger.on_train_start()
 
-        self._epochs = epochs
         self._epoch_pbar: Optional[tqdm] = tqdm(
             range(epochs), desc="Training", unit="epoch") if verbose else None
         iterable = self._epoch_pbar if self._epoch_pbar else range(epochs)
@@ -420,6 +426,30 @@ class AbstractTrainer(TrainerProtocol, ABC):
             save_best_model=best_model
         )
 
+    def save_optimizer_state(
+        self, 
+        save_path: pathlib.Path, 
+        file_name_prefix: Optional[str] = None, 
+        file_name_suffix: Optional[str] = None, 
+        file_ext: str = '.pth',
+        recent: bool = True
+    ) -> Optional[List[pathlib.Path]]:
+        """
+        Save the optimizer state to the specified path.
+        """
+        if not recent:
+            raise NotImplementedError(
+                "Saving non-recent optimizer states is not implemented yet."
+            )
+        file_name_suffix = file_name_suffix or 'recent'
+        return save_optimizer_state(
+            trainer=self,
+            save_path=save_path,
+            file_name_prefix=file_name_prefix,
+            file_name_suffix=file_name_suffix,
+            file_ext=file_ext
+        )
+
     """
     Log property
     """
@@ -452,6 +482,18 @@ class AbstractTrainer(TrainerProtocol, ABC):
     @property
     def test_ratio(self):
         return self._test_ratio
+
+    @property
+    def train_n(self):
+        return self._train_n
+
+    @property
+    def val_n(self):
+        return self._val_n
+
+    @property
+    def test_n(self):
+        return self._test_n
     
     @property
     def model(self):
@@ -468,11 +510,7 @@ class AbstractTrainer(TrainerProtocol, ABC):
     @property
     def batch_size(self):
         return self._batch_size
-    
-    @property
-    def epochs(self):
-        return self._epochs
-    
+        
     @property
     def patience(self):
         return self._patience
