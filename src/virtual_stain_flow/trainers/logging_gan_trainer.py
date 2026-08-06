@@ -6,7 +6,6 @@ AbstractTrainer to provide training and evaluation functionalities for a GAN
 model using the engine subpackage for forward passes and loss computations.
 """
 
-import pathlib
 from typing import Dict, List, Union, Optional
 
 import torch
@@ -53,7 +52,7 @@ class BaseGANTrainer(AbstractTrainer):
         :kwargs: Additional arguments for the AbstractTrainer
         """
 
-        device = kwargs.get('device', torch.device('cpu'))
+        device = kwargs.pop('device', torch.device('cpu'))
 
         # Registry for logging model parameters
         self._models: List[torch.nn.Module] = [generator, discriminator]
@@ -86,6 +85,7 @@ class BaseGANTrainer(AbstractTrainer):
             model=generator, # register generator as main model for early stopping
             optimizer=generator_optimizer,
             losses=generator_loss_group,
+            device=device,
             **kwargs
         )
 
@@ -200,27 +200,7 @@ class BaseGANTrainer(AbstractTrainer):
             'generator': self._generator_loss_group,
             'discriminator': self._discriminator_loss_group
         }
-    
-    def save_model(
-        self,
-        save_path: pathlib.Path,
-        file_name_prefix: Optional[str] = None,
-        file_name_suffix: Optional[str] = None,
-        file_ext: str = '.pth',
-        best_model: bool = True
-    ) -> Optional[List[pathlib.Path]]:
 
-        if file_name_suffix is None:
-            file_name_suffix = 'weights_' + (
-                'best' if best_model else str(self.epoch)
-            )
-
-        gen_path = self.model.save_weights(
-            filename=f"generator_{file_name_suffix}{file_ext}",
-            dir=save_path
-        )
-
-        return [gen_path]
 
 class LoggingWGANTrainer(BaseGANTrainer):
     """

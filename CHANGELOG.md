@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.8] - 2026-08-03
+
+### Fixed 
+
+#### Best model updating/saving behavior (`virtual_stain_flow/trainers/`)
+- Fixes best model updates storing only a shallow copy of statedict of models as opposed to immutable statedict. 
+- Fixes best model saving happens regardless of absent validation set. 
+In previous versions if the valiadtion set is absent from training and best model cannot possibly be determined, the trainer silently updates the `.best_model` property by the most recent model weights from training and that gets saved by the logger as the "best model". 
+With this fix the `trainer.best_model` will return `None` if best model cannot be determined due to missing of validation set, and correspondingly the logger will no longer write best model artifacts if not available.  
+
+### Refactored
+
+#### Early stopping logic (`virtual_stain_flow/trainers/`)
+- The early stopping related functionalities are now moved outside of `AbstractTrainer` to standalone utility classes to facilitate unit testing and reduce size of single module. 
+
+---
+
 ## [0.4.7] - 2026-07-28
 
 ### Fixed
