@@ -47,7 +47,8 @@ class ConvNeXtUNet(BaseGeneratorModel):
         decoder_up_block: Literal['pixelshuffle', 'convt'] = 'pixelshuffle',
         decoder_compute_block: Literal['convnext', 'conv2d'] = 'convnext',
         act_type: ActivationType = 'sigmoid',
-        _num_units: Union[List[int], int] = 2
+        _num_units: Union[List[int], int] = 2,
+        _pixel_shuffle_preserve_channels: bool = False,
     ):
         """
         Initializes the ConvNeXtUNet model.
@@ -98,13 +99,16 @@ class ConvNeXtUNet(BaseGeneratorModel):
 
         if decoder_up_block == 'pixelshuffle':
             in_block_handles = [PixelShuffle2DUpBlock] * (depth - 1)
+            in_block_kwargs = [{'preserve_channels': _pixel_shuffle_preserve_channels}] * (depth - 1)
         elif decoder_up_block == 'convt':
             in_block_handles = [ConvTrans2DUpBlock] * (depth - 1)
+            in_block_kwargs = [{'norm_type': 'layer'}] * (depth - 1)
         else:
             raise ValueError(
                 f"Unsupported decoder_up_block: {decoder_up_block!r}. "
                 "Expected 'pixelshuffle' or 'convt'."
             )
+        self._pixel_shuffle_preserve_channels = _pixel_shuffle_preserve_channels
         self._decoder_up_block = decoder_up_block
         
         if decoder_compute_block == 'convnext':
@@ -138,7 +142,7 @@ class ConvNeXtUNet(BaseGeneratorModel):
             encoder_feature_map_channels=convnextv2_model.feature_info.channels(),
             # use convolutional up-sampling blocks
             in_block_handles=in_block_handles,
-            in_block_kwargs=[{'norm_type': 'layer'}] * (depth - 1),
+            in_block_kwargs=in_block_kwargs,
             comp_block_handles=comp_block_handles,
             comp_block_kwargs=comp_block_kwargs,
         )
@@ -194,6 +198,7 @@ class ConvNeXtUNet(BaseGeneratorModel):
                 "decoder_compute_block": self._decoder_compute_block,
                 "act_type": self._act_type,
                 "_num_units": self._num_units_cfg,
+                "_pixel_shuffle_preserve_channels": self._pixel_shuffle_preserve_channels,
             },
         }
     
@@ -205,5 +210,8 @@ class ConvNeXtUNet(BaseGeneratorModel):
         """
         
         init_cfg = config.get("init", config)
+        if "_pixel_shuffle_preserve_channels" not in init_cfg:
+            # For backward compatibility with configs that don't have this key
+            init_cfg["_pixel_shuffle_preserve_channels"] = True
 
         return cls(**init_cfg)

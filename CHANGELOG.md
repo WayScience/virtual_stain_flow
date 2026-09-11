@@ -1,9 +1,39 @@
 # Changelog
 
-All notable chagnes to this project will be documented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.10] - 2026-09-11
+
+### Added
+
+#### Backward-compatibility config flag for ConvNeXtUNet (`virtual_stain_flow/models/unext.py`)
+- Added `_pixel_shuffle_preserve_channels` to ConvNeXtUNet init/config serialization.
+- `from_config` now defaults `_pixel_shuffle_preserve_channels=True` when loading older configs that do not include this key, preserving legacy behavior for previously trained models.
+
+### Fixed
+
+#### Output channel calculation in PixelShuffle2DUpBlock (`virtual_stain_flow/models/blocks/up_down_blocks.py`)
+- Corrected default output-channel inference for pixel-shuffle upsampling.
+- Output channels now reduce with the spatial expansion factor (for 2D: `in_channels // scale_factor^2`) instead of being preserved by default.
+- Added a validation error when channel reduction would produce fewer than 1 output channel.
+- Added `preserve_channels` to keep the previous behavior when needed for compatibility.
+
+#### Stage spatial-shape propagation for upsampling blocks (`virtual_stain_flow/models/stages.py`)
+- Fixed `Stage.out_h` and `Stage.out_w` to apply shape transforms from both stage blocks, not only `Conv2DDownBlock`.
+- This ensures correct output-shape reporting for stages that use upsampling blocks such as pixel shuffle and transposed convolution.
+
+#### Tests for PixelShuffle2DUpBlock behavior (`tests/models/test_up_down_blocks.py`)
+- Updated expected output-channel assertions to match corrected pixel-shuffle defaults.
+- Added tests for compatibility mode (`preserve_channels=True`).
+- Added a regression test asserting that insufficient `in_channels` raises a clear `ValueError`.
+
+#### Added clipping to [0,1] range in max scale normalization (`virtual_stain_flow/transforms/normalizations.py`)
+- Good to have for the sake of ensuring post normalization values fall within expected ranges even if normalization factor is misspecified.
+
+---
 
 ## [0.4.9] - 2026-09-11
 

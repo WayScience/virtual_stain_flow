@@ -23,8 +23,10 @@ class TestUpDownBlocks:
 			(MaxPool2DDownBlock, {"out_channels": 8}, 3, 3, 0.5),
 			(ConvTrans2DUpBlock, {}, 4, 2, 2),
 			(ConvTrans2DUpBlock, {"out_channels": 3}, 4, 3, 2),
-			(PixelShuffle2DUpBlock, {}, 4, 4, 2),
-			(PixelShuffle2DUpBlock, {"out_channels": 8}, 4, 4, 2),
+			(PixelShuffle2DUpBlock, {}, 4, 1, 2),
+			(PixelShuffle2DUpBlock, {"out_channels": 8}, 4, 1, 2),
+			(PixelShuffle2DUpBlock, {"preserve_channels": True}, 4, 4, 2),
+			(PixelShuffle2DUpBlock, {"preserve_channels": True, "out_channels": 8}, 4, 4, 2),
 			(Bilinear2DUpsampleBlock, {}, 3, 3, 2),
 			(Bilinear2DUpsampleBlock, {"out_channels": 8}, 3, 3, 2),
 		],
@@ -48,3 +50,10 @@ class TestUpDownBlocks:
 		)
 		assert block.out_h(input_tensor.shape[2]) == output.shape[2]
 		assert block.out_w(input_tensor.shape[3]) == output.shape[3]
+
+	def test_pixel_shuffle_requires_enough_channels(self):
+		with pytest.raises(
+			ValueError,
+			match=r"requires at least 4 input channels[\s\S]*in_channels=1",
+		):
+			PixelShuffle2DUpBlock(in_channels=1)

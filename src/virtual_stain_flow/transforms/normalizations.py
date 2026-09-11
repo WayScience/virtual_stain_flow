@@ -90,10 +90,16 @@ class MaxScaleNormalize(LoggableTransform):
         img: np.ndarray, 
         **params
     ) -> np.ndarray:
+        """
+        Apply the normalization to the input image.
         
+        :param img: Input image as a NumPy array.
+        :param params: Additional parameters (not used here).
+        :return: Normalized image as a NumPy array.
+        """
         if isinstance(img, np.ndarray):
             # Normalize the image using the normalization factor
-            return img / self._normalization_factor
+            return np.clip(img / self._normalization_factor, 0.0, 1.0)
         else:
             raise TypeError(
                 "Expected input image to be a NumPy array, "
@@ -183,7 +189,13 @@ class ZScoreNormalize(LoggableTransform):
         )
 
     def apply(self, img, **params):        
-
+        """
+        Apply Z-Score normalization to the input image.
+        
+        :param img: Input image as a NumPy array.
+        :param params: Additional parameters (not used here).
+        :return: Normalized image as a NumPy array.
+        """
         if isinstance(img, np.ndarray):
             
             mean = self._mean or img.mean(axis=(1, 2), keepdims=True)
