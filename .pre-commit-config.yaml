@@ -30,3 +30,13 @@ repos:
           .*nbconverted.*|
           .*\.ipynb$
         )
+
+- repo: https://github.com/CU-DBMI/onesentence
+  rev: v0.1.1
+  hooks:
+    # run checks
+    - id: check
+      types: [markdown]
+    # run checks and fixes where possible
+    - id: fix
+      types: [markdown]
