@@ -12,6 +12,7 @@ import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from torch.utils.data import TensorDataset
 
 from ..datasets.base_dataset import BaseImageDataset
 from ..datasets.crop_dataset import CropImageDataset
@@ -19,6 +20,7 @@ from ..datasets.base_wrapper_dataset import BaseWrapperDataset
 from .evaluation_utils import evaluate_per_image_metric
 from .predict_utils import predict_image
 from .visualization_utils import extract_samples_from_dataset
+from .display_normalization import DisplayLimits, image_norms, unpaired_norms
 
 
 def _select_channels(
@@ -88,6 +90,13 @@ def plot_predictions_grid(
     input_channel_indices: Optional[List[int]] = None,
     target_channel_indices: Optional[List[int]] = None,
     prediction_channel_indices: Optional[List[int]] = None,
+    target_scaling: str = "target",
+    target_scale_scope: str = "image",
+    target_limits: Optional[DisplayLimits] = None,
+    input_scaling: str = "independent",
+    input_limits: Optional[DisplayLimits] = None,
+    raw_scaling: str = "independent",
+    raw_limits: Optional[DisplayLimits] = None,
 ) -> plt.Figure:
     """
     Core visualization function for visualizing grid of input/target and predictions. 
@@ -127,6 +136,29 @@ def plot_predictions_grid(
     :param input_channel_indices: Optional list of channel indices to display for inputs.
     :param target_channel_indices: Optional list of channel indices to display for targets.
     :param prediction_channel_indices: Optional list of channel indices to display for predictions.
+    :param target_scaling: 'target' (default) uses only the target's range for
+        each target/prediction pair; 'joint' uses their combined range;
+        'independent' scales them separately (legacy); 'fixed' uses target_limits.
+        Values outside shared limits saturate at the colormap endpoints (black
+        and white for gray). Only display mapping changes, never data or metrics.
+    :param target_scale_scope: 'image' computes ranges per row/channel;
+        'channel' shares each displayed channel's range across all rows.
+        Independent mode still keeps target and prediction ranges separate.
+        Fixed mode is always shared across rows.
+    :param target_limits: Required only with target_scaling='fixed': a finite
+        (min, max) pair, or one pair per selected target channel in display order.
+        The corresponding prediction uses the same pair. Requires min < max.
+    :param input_scaling: 'independent' (default), 'channel' (shared across rows
+        per channel), or 'fixed'. Input scaling never shares target/raw limits.
+    :param input_limits: Fixed limits for inputs, in selected channel order.
+    :param raw_scaling: Like input_scaling, independently controls raw panels.
+    :param raw_limits: Fixed limits for raw images, in selected channel order.
+
+    A constant shared reference maps equal values to the colormap midpoint,
+    lower predictions to its low endpoint, and higher predictions to its high
+    endpoint. Independent image scaling retains Matplotlib's legacy constant
+    image behavior. Automatic ranges ignore nonfinite values; a reference with
+    no finite values raises ValueError.
     """
     if inputs.ndim != 4:
         raise ValueError(f"Inputs must have shape (N, C, H, W), received {inputs.shape}.")
@@ -188,6 +220,25 @@ def plot_predictions_grid(
             "Target and prediction channel counts must match for paired display."
         )
 
+    if target_scaling not in ("target", "joint", "independent", "fixed"):
+        raise ValueError("target_scaling must be 'target', 'joint', 'independent', or 'fixed'.")
+    if (target_scaling == "fixed") != (target_limits is not None):
+        raise ValueError("target_limits must be provided if and only if target_scaling='fixed'.")
+    target_norms = image_norms(
+        targets, scope=target_scale_scope, limits=target_limits,
+        other=predictions if target_scaling == "joint" else None,
+        legacy=target_scaling == "independent",
+    )
+    prediction_norms = (
+        image_norms(predictions, scope=target_scale_scope, legacy=True)
+        if has_predictions and target_scaling == "independent" else target_norms
+    )
+    input_norms = unpaired_norms(inputs, input_scaling, input_limits, "input")
+    raw_norms = (
+        unpaired_norms(raw_images, raw_scaling, raw_limits, "raw")
+        if has_raw_images else [[] for _ in range(num_samples)]
+    )
+
     raw_titles = _build_titles("Raw Input", raw_indices, raw_channel_names)
     input_titles = _build_titles("Input", input_indices, input_channel_names)
     target_titles = _build_titles("Target", target_indices, target_channel_names)
@@ -212,11 +263,7 @@ def plot_predictions_grid(
     # Create figure
     fig_width = panel_width * num_cols
     fig_height = panel_width * num_samples
-    fig, axes = plt.subplots(num_samples, num_cols, figsize=(fig_width, fig_height))
-
-    # Handle single-row case where axes is 1D
-    if num_samples == 1:
-        axes = axes.reshape(1, -1)
+    fig, axes = plt.subplots(num_samples, num_cols, figsize=(fig_width, fig_height), squeeze=False)
 
     for row_idx in range(num_samples):
         raw_row = list(raw_images[row_idx]) if has_raw_images else []
@@ -231,6 +278,12 @@ def plot_predictions_grid(
         ] if has_predictions else target_row
 
         img_set = raw_row + input_row + target_pred_row
+        paired_norms = [
+            norm
+            for target_norm, prediction_norm in zip(target_norms[row_idx], prediction_norms[row_idx])
+            for norm in (target_norm, prediction_norm)
+        ] if has_predictions else target_norms[row_idx]
+        norms = raw_norms[row_idx] + input_norms[row_idx] + paired_norms
 
         if len(img_set) != num_cols:
             raise ValueError(
@@ -242,7 +295,7 @@ def plot_predictions_grid(
 
             # Squeeze to 2D for display (handles (1, H, W) or (H, W))
             img_2d = np.squeeze(img)
-            ax.imshow(img_2d, cmap=cmap)
+            ax.imshow(img_2d, cmap=cmap, norm=norms[col_idx], interpolation="nearest")
 
             # Column title only on first row
             if row_idx == 0:
@@ -271,12 +324,8 @@ def plot_predictions_grid(
                 # Sample a small region (e.g., top-left 10% of image)
                 sample_size = max(1, int(min(img_2d.shape) * 0.1))
                 corner_region = img_2d[:sample_size, :sample_size]
-                # Normalize to 0-1 range for brightness check
-                img_min, img_max = img_2d.min(), img_2d.max()
-                if img_max > img_min:
-                    normalized_brightness = (corner_region.mean() - img_min) / (img_max - img_min)
-                else:
-                    normalized_brightness = 0.5
+                # Use the actual display mapping, including channel-shared limits.
+                normalized_brightness = norms[col_idx](corner_region).mean()
                 text_color = "black" if normalized_brightness > 0.5 else "white"
                 ax.text(
                     0.02, 0.98,  # Top-left corner in axes coordinates
@@ -332,7 +381,7 @@ def plot_dataset_grid(
     :param indices: List of dataset indices to display.
     :param save_path: Optional path to save the figure.
     :param kwargs: Additional arguments passed to `plot_predictions_grid`.
-        Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace,
+        Includes all display scaling/limits options, row_label_prefix, cmap, panel_width, show_plot, wspace, hspace,
         raw_channel_indices, input_channel_indices, target_channel_indices, prediction_channel_indices,
         raw_channel_names, input_channel_names, target_channel_names, prediction_channel_names.
     """
@@ -371,9 +420,9 @@ def plot_predictions_grid_from_model(
     Plot predictions grid by running inference on a model.
 
     Performs the following steps:
-    1. Run inference on the specified dataset indices.
-    2. Compute per-image metrics.
-    3. Extract samples and plot using `plot_predictions_grid`.
+    1. Snapshot transformed samples and raw/crop metadata in one dataset pass.
+    2. Run inference and compute metrics on that same snapshot.
+    3. Plot the snapshot and predictions using `plot_predictions_grid`.
 
     :param model: PyTorch model for inference.
     :param dataset: BaseImageDataset, CropImageDataset, or BaseWrapperDataset to visualize.
@@ -385,32 +434,23 @@ def plot_predictions_grid_from_model(
     :param device: Device for inference ("cpu" or "cuda").
     :param save_path: Optional path to save the figure.
     :param kwargs: Additional arguments passed to `plot_predictions_grid`.
-        Supported: row_label_prefix, cmap, panel_width, show_plot, wspace, hspace,
+        Includes all display scaling/limits options, row_label_prefix, cmap, panel_width, show_plot, wspace, hspace,
         raw_channel_indices, input_channel_indices, target_channel_indices, prediction_channel_indices,
         raw_channel_names, input_channel_names, target_channel_names, prediction_channel_names.
     """
-    # Step 1: Run inference
-    targets_tensor, predictions_tensor, inputs_tensor = predict_image(
-        dataset, model, indices=indices, device=device
-    )
+    # Capture metadata immediately after each access, not in a second traversal
+    # that could resample stochastic transforms or replace mutable crop state.
+    (
+        inputs, targets, raw_images, patch_coords, input_channel_names, target_channel_names
+    ) = extract_samples_from_dataset(dataset, indices)
+    snapshot = TensorDataset(torch.from_numpy(inputs), torch.from_numpy(targets))
+    targets_tensor, predictions_tensor, _ = predict_image(snapshot, model, device=device)
 
     # Step 2: Compute metrics (if any)
     metrics_df = None
     if metrics:
         metrics_df = evaluate_per_image_metric(predictions_tensor, targets_tensor, metrics)
 
-    # Step 3: Re-access the dataset for CropImageDataset raw images and crop metadata.
-    (
-        _, _, raw_images, patch_coords, input_channel_names, target_channel_names
-    ) = extract_samples_from_dataset(dataset, indices)
-    if isinstance(inputs_tensor, list):
-        raise ValueError(
-            "Visualization requires a single batched input tensor with shape (N, C, H, W); "
-            "multi-input sequences are not supported."
-        )
-
-    inputs = inputs_tensor.detach().cpu().numpy()
-    targets = targets_tensor.detach().cpu().numpy()
     predictions = predictions_tensor.detach().cpu().numpy()
 
     # Step 4: Plot

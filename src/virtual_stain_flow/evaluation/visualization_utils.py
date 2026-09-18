@@ -33,7 +33,8 @@ def _to_numpy_image(value: Union[np.ndarray, torch.Tensor], name: str) -> np.nda
             f"{name} must have shape (C, H, W), received shape {value.shape}."
         )
 
-    return value
+    # Freeze reused NumPy/tensor buffers before accessing the next sample.
+    return value.copy()
 
 
 def _stack_images(images: List[np.ndarray], name: str) -> np.ndarray:
@@ -73,7 +74,10 @@ def extract_samples_from_dataset(
     Primary function of this abstraction is to provide a consistent data
         access interface between Dataset objects and plotting functions by
         extracting input/target with __get_item__ and also accessing raw
-        images and crop annotations when available. 
+        images and crop annotations when available. Each requested sample is
+        accessed once and copied immediately, including its raw image metadata.
+        Wrappers around crop datasets must keep the underlying crop metadata
+        synchronized with the sample they return.
 
     :param dataset: A BaseImageDataset, CropImageDataset, or BaseWrapperDataset.
     :param indices: Dataset indices to extract, in the displayed order.
