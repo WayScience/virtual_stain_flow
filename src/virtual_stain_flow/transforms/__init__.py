@@ -3,6 +3,7 @@
 """
 
 from .channelwise import ChannelwiseTransform
+from .gamma import ContinuousGammaTransform
 from .normalizations import (
     MaxScaleNormalize,
     ZScoreNormalize,
@@ -10,6 +11,7 @@ from .normalizations import (
 
 __all__ = [
     "ChannelwiseTransform",
+    "ContinuousGammaTransform",
     "MaxScaleNormalize",
     "ZScoreNormalize",
 ]
