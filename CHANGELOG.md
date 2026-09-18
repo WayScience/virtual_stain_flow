@@ -1,343 +1,62 @@
-# Changelog
+# Datasets Subpackage Documentation
 
-All notable changes to this project will be documented in this file.
+This subpackage provides the infrastructure for managing and loading image datasets in a lazy-loaded and efficient manner, and  materialized dataset classes.
+It is designed to handle datasets with multiple channels and fields of view (FOVs), supporting dynamic image loading and caching to optimize memory usage and access speed.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## Overview
 
-## [0.4.10] - 2026-09-11
+The subpackage consists of three main components:
 
-### Added
-
-#### Backward-compatibility config flag for ConvNeXtUNet (`virtual_stain_flow/models/unext.py`)
-- Added `_pixel_shuffle_preserve_channels` to ConvNeXtUNet init/config serialization.
-- `from_config` now defaults `_pixel_shuffle_preserve_channels=True` when loading older configs that do not include this key, preserving legacy behavior for previously trained models.
-
-### Fixed
-
-#### Output channel calculation in PixelShuffle2DUpBlock (`virtual_stain_flow/models/blocks/up_down_blocks.py`)
-- Corrected default output-channel inference for pixel-shuffle upsampling.
-- Output channels now reduce with the spatial expansion factor (for 2D: `in_channels // scale_factor^2`) instead of being preserved by default.
-- Added a validation error when channel reduction would produce fewer than 1 output channel.
-- Added `preserve_channels` to keep the previous behavior when needed for compatibility.
-
-#### Stage spatial-shape propagation for upsampling blocks (`virtual_stain_flow/models/stages.py`)
-- Fixed `Stage.out_h` and `Stage.out_w` to apply shape transforms from both stage blocks, not only `Conv2DDownBlock`.
-- This ensures correct output-shape reporting for stages that use upsampling blocks such as pixel shuffle and transposed convolution.
-
-#### Tests for PixelShuffle2DUpBlock behavior (`tests/models/test_up_down_blocks.py`)
-- Updated expected output-channel assertions to match corrected pixel-shuffle defaults.
-- Added tests for compatibility mode (`preserve_channels=True`).
-- Added a regression test asserting that insufficient `in_channels` raises a clear `ValueError`.
-
-#### Added clipping to [0,1] range in max scale normalization (`virtual_stain_flow/transforms/normalizations.py`)
-- Good to have for the sake of ensuring post normalization values fall within expected ranges even if normalization factor is misspecified.
+1. **`DatasetManifest`**: Defines the immutable structure of a dataset, including file paths and image modes.
+2. **`FileState`**: Defines the backend memory-efficient lazy loading infranstructure bridging the `DatasetManifest` and the image dataset class.
+3. **`BaseImageDataset`**: A PyTorch-compatible dataset class that uses `DatasetManifest` and `FileState` to manage image loading and caching.
 
 ---
 
-## [0.4.9] - 2026-09-11
+## `DatasetManifest`
 
-### Added
+The `DatasetManifest` class is responsible for defining the structure of a dataset.
+It holds a file index (a `pandas.DataFrame`) where each row corresponds to a sample or FOV, and columns represent channels associated with that sample.
+It also specifies the image mode to use when reading images.
 
+## `FileState`
 
-#### Initial training resume support (`virtual_stain_flow/vsf_logging/`, `virtual_stain_flow/trainers/`)
-- Added MLflow logging for optimizer state to support resuming training runs from logged artifacts and trainer state.
-
-### Fixed
-
-#### Pandas validation API update (`virtual_stain_flow/datasets/ds_engine/`)
-- Replaced deprecated `DataFrame.applymap` usage with `DataFrame.map` in dataset input validation to keep the GH Actions test suite green.
-
-
+The `FileState` class wraps a constructred `DatasetManifest` object and handles the loading of images from filepaths on-demand.
+The dataset class should call the `FileState.update(idx, input_keys, target_keys)` method to request for the images corresponding to the `idx`th sample and the input/target keys to be loaded, stacked, and accessible from `FileState.input_image_raw` and `FileState.target_image_raw` attributes.
 
 ---
 
-## [0.4.8] - 2026-08-03
-
-### Fixed 
-
-#### Best model updating/saving behavior (`virtual_stain_flow/trainers/`)
-- Fixes best model updates storing only a shallow copy of statedict of models as opposed to immutable statedict. 
-- Fixes best model saving happens regardless of absent validation set. 
-In previous versions if the valiadtion set is absent from training and best model cannot possibly be determined, the trainer silently updates the `.best_model` property by the most recent model weights from training and that gets saved by the logger as the "best model". 
-With this fix the `trainer.best_model` will return `None` if best model cannot be determined due to missing of validation set, and correspondingly the logger will no longer write best model artifacts if not available.  
-
-### Refactored
-
-#### Early stopping logic (`virtual_stain_flow/trainers/`)
-- The early stopping related functionalities are now moved outside of `AbstractTrainer` to standalone utility classes to facilitate unit testing and reduce size of single module. 
-
----
-
-## [0.4.7] - 2026-07-28
-
-### Fixed
-
-#### Package installation discovery, expose previously unexposed subpackage
-
----
-
-## [0.4.6] - 2026-07-22
-
-### Added 
-
-#### MLflow auto logging enhancements (`virtual_stain_flow/vsf_logging/`):
-- The logger now records model optimizer parameters.
-
-#### Channel-specific normalization/transformation specification (`virtual_stain_flow/transforms/`):
-- Allows separate normalizations applied to different channels.
-
-#### Support for visualization of multi-channel input/target/prediction (`virtual_stain_flow/evaluation/`):
-- Displays channels as additional columns in visualization grid.
-- Allows selection of which channels to display vias indexing.
-
-### Refactored
-
-#### Crop generation module as subpackage (`virtual_stain_flow/datasets/ds_engine/crop_generators/`):
-- Reduce size of module by breaking into subpackage.
-- Added tiling crop.
-
-#### Logger auto-logging functionalities isolated (`virtual_stain_flow/transforms/`):
-- Moved auto-logging of optimizer, model and loss group configs outside to reduce size of main logger module and facilitate testing.
-
-#### Data access during plotting (`virtual_stain_flow/evaluation/`):
-- Now images are retrieved from dataset and uniformly normalized as (N, C, H, W) before passed to plotting functions.
-
-
----
-
-## [0.4.5] - 2026-04-30
-
-### Added
-
-#### MLflow auto logging enhancements (`virtual_stain_flow/vsf_logging/`):
-
-- The logger now records model architecture tags by capturing each model config's `class_path` and setting `model.<idx>.class_path` at train start.
-- The loss-group auto logging routine `_log_loss_groups_config_and_tags` logs loss item names and weights as MLflow tags and persists the full loss group configuration as a JSON config artifact.
-
----
-
-## [0.4.4] - 2026-04-23
-
-### Added
-
-#### Dataset wrapper and MONAI augmentation adapter (`virtual_stain_flow/datasets/`):
-
-Introduces a lightweight wrapper abstraction for dataset composition and a MONAI-compatible adapter for dictionary-based augmentation pipelines. This enables augmentation workflows to be layered on top of existing dataset implementations without modifying core dataset logic.
-
-- **`BaseWrapperDataset`** (`base_wrapper_dataset.py`): Abstract wrapper base class that forwards dataset access to an underlying dataset instance and provides recursive access to the original base dataset via the `original` property. Establishes a reusable pattern for composing dataset behaviors (e.g., augmentation, caching, preprocessing) while preserving compatibility with existing dataset APIs.
-- **`MonaiAdapter`** (`monai_aug_adapter_dataset.py`): Wrapper dataset that adapts `(input, target)` tuple samples into MONAI dictionary format (`{"input": ..., "target": ...}`), applies optional MONAI `Compose` transforms, and returns transformed samples back as `(input, target)` tuples for trainer compatibility.
-
-#### MONAI augmentation usage example (`examples/`):
-
-- Added/updated **`4.data_augmentation_example.ipynb`** demonstrating:
-  - construction of a base dataset and crop dataset,
-  - application of MONAI dictionary transforms through `MonaiAdapter`,
-  - visualization of repeated stochastic augmentations,
-  - integration of the augmented dataset into a standard training dataloader/trainer workflow.
-
-### Refactored
-
-#### Visualization suite to support `BaseWrapperDataset` 
-
----
-
-## [0.4.3] - 2025-12-16
-
-### Added
-
-#### Crop dataset (`virtual_stain_flow/datasets/`):
-
-Allows the dataset to return user specified crops dynamically obtained from the full images. Supports serialization and reserialization to facilitate reproducibility. 
-
-- **`CropImageDataset`** (`crop_dataset.py`): Dataset class for serving image crops based on a `CropManifest`. Extends `BaseImageDataset` with crop-specific state management and lazy loading via `CropFileState`.
-- **`CropManifest`** (`ds_engine/crop_manifest.py`): Immutable collection of crop definitions wrapping a `DatasetManifest` for file access. Supports serialization/deserialization and factory construction from coordinate specifications.
-- **`Crop`** (`ds_engine/crop_manifest.py`): Dataclass defining a single crop region with manifest index, position (x, y), and dimensions (width, height).
-- **`CropIndexState`** (`ds_engine/crop_manifest.py`): Mutable state tracker for the currently active crop region.
-- **`CropFileState`** (`ds_engine/crop_manifest.py`): Lazy image loading backend that wraps `FileState` to load full images and dynamically extract crop regions on demand.
-
-### Removed
-
-#### All obselete dataset classes
-
----
-
-## [0.4.2] - 2025-11-17
-
-### Added
-
-#### training infrastructure (`virtual_stain_flow/engine/...`)
-- Abstract away the forward pass and multiple loss accumulation from trainers
-#### logging trainer (`virutal_stain_flow/trainers/logging_trainer.py`)
-- New logging trainer for single generator model training using `engine`
-
-### Refactors
-
-#### abstract trainer (`virutal_stain_flow/trainers/AbstractTrainer.py`)
-- Add progress bar
-
-### Removes
-
-#### Obselete trainer classes (`virutal_stain_flow/trainers/logging_trainers/...`)
-
----
-
-## [0.4.1] - 2025-10-16
-
-### Added
-
-#### Loss Computation Infrastructure 
-- Added `LossGroup` class to abstract out the complexity of computating multiple losses surrounding a single forward pass iteration from the trainer. 
-Itended as prepwork for incorporating more complex wGAN training.
-
-##### Components:
-- **`LossItem`** (`loss_group.py`): Wrapper around a `torch.nn.Module` loss to specify weights and arguments needed for computing. 
-- **`LossGroup`** (`loss_group.py`): Container class organizing all `LossItem`s to be computed during the same forward pass on the same set of context objects. 
-
----
-
-## [0.4.0] - 2025-09-07
-
-### Added
-
-#### Dataset Infrastructure Refactoring (`datasets`)
-- Introduced a comprehensive refactoring of the dataset infrastructure for improved modularity, lazy loading, and memory efficiency.
-
-##### Core Components:
-- **`DatasetManifest`** (`manifest.py`): Immutable manifest class that defines the structure of a dataset, holding a file index DataFrame where each row corresponds to a sample/FOV and columns represent channels. Validates file paths and PIL image modes during initialization.
-- **`IndexState`** (`manifest.py`): Lightweight tracker for maintaining the last accessed dataset index.
-- **`FileState`** (`manifest.py`): Lazy loading backend that manages image loading with configurable LRU caching. 
-- **`BaseImageDataset`** (`base_dataset.py`): PyTorch-compatible dataset class built on the manifest infrastructure. 
-
-### Refactored
-- Restructured dataset loading logic to use the new modular manifest-based architecture.
-- Improved error handling and validation throughout the dataset pipeline.
-- Enhanced type annotations and documentation for better developer experience.
-
----
-
-## [0.3.0] - 2025-08
-
-### Added
-
-#### New modular backbone for `models` subpackage
-##### Major changes:
-- Introduced a new modular and extensible `models` subpackage for building image-to-image translation models. 
-The subpackage is designed around a declarative style for creating U-Net-like architectures, with a hierarchy of abstractions:
-  - **Blocks** (`blocks.py`, `up_down_blocks.py`): Smallest modular units, categorized into computational blocks (e.g., `Conv2DNormActBlock`, `Conv2DConvNeXtBlock`) and spatial dimension altering blocks (e.g., `Conv2DDownBlock`, `PixelShuffle2DUpBlock`).
-  - **Stages** (`stages.py`): Sequences of blocks for downsampling or upsampling, such as `DownStage` and `UpStage`.
-  - **Encoder** (`encoder.py`): Implements the downsampling path of U-Net-like architectures using `DownStage` objects.
-  - **Decoder** (`decoder.py`): Implements the upsampling path with skip connections using `UpStage` objects.
-  - **BaseModel** and **BaseGeneratorModel** (`model.py`): Added abstract base classes for models, including functionality for saving weights, configuration handling, and defining the forward pass.
-  - **UNet** (`unet.py`): Predefined model class supporting fully convolutional and maxpooling-based U-Net variants.
-  - **UNeXt** (`unext.py`): Predefined U-Net variant with a ConvNeXtV2_tiny encoder and customizable decoder.
-- Added utility functions for normalization layers, activation functions, and type checking of block handles and configurations.
-- Refer to the `models` README for detailed explanations of components and usage examples.
-
-### Refactored 
-
-#### Repository Restructuring
-- Restructured the repository from a flat layout to the conventional `/src/package_name/` structure. 
-This change improves module discoverability, aligns with modern Python packaging standards, and reduces potential import conflicts. 
-All package-related code now resides under the `src/virtual_stain_flow/` directory.
-- Updated import paths throughout the codebase to reflect the new structure.
-- Adjusted setup scripts and documentation to accommodate the restructuring.
-
----
-
-## [0.2.0] - 2025-06-19
-
-### Added
-
-#### Overhaul Phase 1/? - Logging Framework Overhaul
-A minimal rework of the logging framework as the first step to a complete overhual of the `virtual_stain_flow` software. 
-
-This version defines a new logging subpackage that better integrates MLflow into the virtual staining model training process for a more comprehensive logging framework.
-
-#### Introduced `logging.MlflowLogger` class
-Notes: This class is simiar to the old `virtual_stain_flow.callback.MlflowLogger` class, but promoted to be an independent logger class, with ability to accept logger callbacks. Key design/functionality:
-- Files/metrics/parameters produced by Logger callbacks gets automatically logged to MLflow appropriately instead of being independent products untracked. 
-- Included some more pre-defined fine-grained run logging tags such as `experiment_type`, `model_architecture`, `target_channel_name`, `description` as logger class parameter.
-- Has a `bind_trainer` and `unbind_trainer` methods to bind and unbind with the trainer instance during train step. 
-- User controlled mlflow run cycle, no longer autoamtically ends with the train loop, so user can perform additional logging operation before explicity ending the run.
-- Has exposed `log_artifact`, `log_metric`, and `log_param` methods for manual logging of artifacts, metrics, and parameters.
-- Has some access point of trainer attributes for use by logger callbacks, but subject to optimization/change.
-
-#### Introduced `trainers.trainerAbstractLoggingTrainer` class
-Notes: This class subclasses the `virtual_stain_flow.trainers.AbstractTrainer` class and preserves most of its behavior and functionalities. 
-Design/functionality change include:
-- Binding of logger class moved from initialization to `train` method to reflect the design that logger instances should live with the training sessions.
-- Early termination mode is now a parameter of the class to allow for selection of min/max optimzation mode.
-- The `train` method loop invokes the logger life cycle methods:
-    - `logger.on_train_start()`
-    - `logger.on_epoch_start()`
-    - `logger.on_epoch_end()`
-    - `logger.on_train_end()` methods which in turn leads to logger's invocation of the logger callback methods.
-- Requires child classes to implement the @abstract `save_model` method for unified handle for saving model weights that can be called by the logger.
-
-#### Introduced `trainers.LoggingTrainer` class
-Notes: This class is nearly identical to the old Trainer class, except that:
-- It is the realization of the new `AbstractLoggingTrainer` class instead of the `AbstractTrainer` class.
-- It overrides the parent class `save_model` method that defines saving of the model weight.
-
-#### Introduced `logging.callbacks` subpackage
-Notes: This is a new subpackage that is distinct from the existing `virtual_stain_flow.callbacks` 
-subpackage in that classes under this subpackage are passed to `logging.MlflowLogger` instances as 
-opposed to a `trainers.*` instances.     
-
-##### The subpackage currently contains:
-- `AbstractLoggerCallback` class: A newly introduced abstract class that defines behavior for logger
-callbacks interacting with the `logging.MlflowLogger` class so product of callback gets logged appropriately as artifacts/metrics/parameters.
-- `PlotPredictionCallback` class: A newly introduced class that is a realization of the `AbstractLoggerCallback` class. Serves as an example implementation of a logger callback. Similar to the `virtual_stain_flow.callbacks.intermediatePlotCallback`, plots predictions of the model on a subset of the dataset, but the additional interface with the `MlflowLogger` class ensures the 
-plots produced are logged as mlflow artifacts.
-
-### Refactored
-- Internal function renames for clarity.
-- Consistent attribute/property usage.
-- Updated `__init__.py` directly exposing classes under subpackage.
-
----
-
-## [0.1.0] - 2025-03-03
-
-### Added
-
-#### Core Framework
-- Introduced a minimal yet self-contained virtual staining framework structured around modular components for model training, dataset handling, transformations, metrics, and logging.
-
-#### Models (`models`)
-- Added `FNet`: Fully convolutional encoder-decoder for image-to-image translation.
-- Added `UNet`: U-Net variant using bilinear interpolation for upsampling.
-- Added GaN discriminators:
-  - `PatchBasedDiscriminator`: Outputs a probability map.
-  - `GlobalDiscriminator`: Outputs a global scalar probability.
-
-#### Transforms (`transforms`)
-- `MinMaxNormalize`: Albumentations transform for range-based normalization.
-- `ZScoreNormalize`: Albumentations transform for z-score normalization.
-- `PixelDepthTransform`: Converts between image bit depths (e.g., 16-bit to 8-bit).
-
-#### Datasets (`datasets`)
-- `ImageDataset`: Dynamically loads multi-channel microscopy images from a PE2LoadData-formatted CSV; supports input/target channel selection and Albumentations transforms.
-- `PatchDataset`: Extends `ImageDataset` with configurable fixed-size cropping; supports object-centric patching and state retrieval (e.g., patch coordinates).
-- `GenericImageDataset`: A simplified dataset for user-formatted directories using regex-based site/channel parsing.
-- `CachedDataset`: Caches any of the above datasets in RAM to reduce I/O and speed up training.
-
-#### Losses (`losses`)
-- `AbstractLoss`: Base class defining standardized loss interface and trainer binding.
-- `GeneratorLoss`: Combines image reconstruction and adversarial loss for training GaN generators.
-- `WassersteinLoss`: Computes Wasserstein distance for GaN discriminator training.
-- `GradientPenaltyLoss`: Adds gradient penalty to improve discriminator stability.
-
-#### Metrics (`metrics`)
-- `AbstractMetrics`: Base class for accumulating, aggregating, and resetting batch-wise metrics.
-- `MetricsWrapper`: Wraps `torch.nn.Module` metrics with accumulation and aggregation logic.
-- `PSNR`: Computes Peak Signal-to-Noise Ratio (PSNR) for image quality evaluation.
-
-#### Callbacks (`callbacks`)
-- `AbstractCallback`: Base class for trainer-stage hooks (`on_train_start`, `on_epoch_end`, etc.).
-- `IntermediatePlot`: Visualizes model inference during training.
-- `MlflowLogger`: Logs trainer metrics and losses to an MLflow server.
-
-#### Training (`trainers`)
-- `AbstractTrainer`: Defines a modular training loop with support for custom models, datasets, losses, metrics, and callbacks. Exposes extensible hooks for batch and epoch-level logic.
+## `BaseImageDataset`
+
+The `BaseImageDataset` class builds on `DatasetManifest` to provide a PyTorch-compatible dataset.
+It supports lazy loading of images, caching, and efficient handling of input and target channels.
+- Returns paired input/target image stack as numpy arrays or torch Tensors
+- Provides methods to save and load dataset configurations as JSON files for reproducibility.
+
+### Usage:
+
+```python
+import pandas as pd
+
+from base_dataset import BaseImageDataset
+
+# Example file index
+file_index = pd.DataFrame({
+    "input_channel": ["path/to/input1.tif", "path/to/input2.tif"],
+    "target_channel": ["path/to/target1.tif", "path/to/target2.tif"]
+})
+
+dataset = BaseImageDataset(
+    file_index=file_index,
+    pil_image_mode="I;16",
+    input_channel_keys="input_channel",
+    target_channel_keys="target_channel",
+    cache_capacity=10
+)
+```
+### Serialization for logging
+```python
+ds_config = dataset.to_config()
+# or
+dataset.to_json_config('loggable_artifact.json')
+```
