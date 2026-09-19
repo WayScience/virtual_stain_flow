@@ -21,6 +21,11 @@ def test_defaults_and_repr():
     )
 
 
+def test_rejects_gamma_whose_inverse_cannot_be_inverted():
+    with pytest.raises(ValueError, match="finite reciprocal"):
+        ContinuousGammaTransform(gamma=np.finfo(np.float64).max)
+
+
 @pytest.mark.parametrize("gamma", [0.25, 0.5, 1.0, 2.0, 4.0])
 def test_default_interval_is_power_law(gamma):
     image = np.linspace(0, 1, 101).reshape(1, 101)

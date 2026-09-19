@@ -47,8 +47,15 @@ class ContinuousGammaTransform(LoggableTransform):
 		lower = self._finite_real(lower, "lower")
 		upper = self._finite_real(upper, "upper")
 		p = self._finite_real(p, "p")
-		if gamma <= 0 or not np.isfinite(1.0 / gamma):
-			raise ValueError("gamma must be positive with a finite reciprocal.")
+		inverse_gamma = 1.0 / gamma
+		with np.errstate(over="ignore"):
+			inverse_inverse_gamma = 1.0 / inverse_gamma
+		if (
+			gamma <= 0
+			or not np.isfinite(inverse_gamma)
+			or not np.isfinite(inverse_inverse_gamma)
+		):
+			raise ValueError("gamma must be positive with finite reciprocal values.")
 		if not 0.0 <= lower < upper <= 1.0:
 			raise ValueError("Expected 0 <= lower < upper <= 1.")
 		if p != 1.0:
