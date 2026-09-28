@@ -26,6 +26,29 @@ def test_rejects_gamma_whose_inverse_cannot_be_inverted():
         ContinuousGammaTransform(gamma=np.finfo(np.float64).max)
 
 
+def test_gamma_serialization_round_trip():
+    transform = ContinuousGammaTransform(
+        gamma=0.5,
+        lower=0.1,
+        upper=0.9,
+        name="gamma_custom",
+    )
+    config = transform.to_config()
+    restored = ContinuousGammaTransform.from_config(config)
+
+    assert isinstance(restored, ContinuousGammaTransform)
+    assert restored.name == transform.name
+    assert (restored.gamma, restored.lower, restored.upper, restored.p) == (
+        transform.gamma,
+        transform.lower,
+        transform.upper,
+        transform.p,
+    )
+
+    image = np.linspace(0, 1, 101).reshape(1, 101)
+    np.testing.assert_allclose(restored.apply(image), transform.apply(image), rtol=0, atol=0)
+
+
 @pytest.mark.parametrize("gamma", [0.25, 0.5, 1.0, 2.0, 4.0])
 def test_default_interval_is_power_law(gamma):
     image = np.linspace(0, 1, 101).reshape(1, 101)
