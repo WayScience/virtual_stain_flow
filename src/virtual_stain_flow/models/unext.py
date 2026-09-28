@@ -47,6 +47,7 @@ class ConvNeXtUNet(BaseGeneratorModel):
         decoder_up_block: Literal['pixelshuffle', 'convt'] = 'pixelshuffle',
         decoder_compute_block: Literal['convnext', 'conv2d'] = 'convnext',
         act_type: ActivationType = 'sigmoid',
+        pretrained_backbone: bool = False,
         _num_units: Union[List[int], int] = 2,
         _pixel_shuffle_preserve_channels: bool = False,
     ):
@@ -61,6 +62,8 @@ class ConvNeXtUNet(BaseGeneratorModel):
         :param decoder_compute_block: Type of computation block to use in the
             decoder. Can be 'convnext' for Conv2DConvNeXtBlock or 'conv2d' for
             Conv2DNormActBlock. Default is 'convnext'.
+        :param pretrained_backbone: Whether to use a pretrained ConvNeXtV2_tiny backbone.
+            Default is False.
         :param act_type: Type of activation function to use in the output layer.
             Default is 'sigmoid'.
         :param _num_units: Number of computation units in each stage.
@@ -80,7 +83,7 @@ class ConvNeXtUNet(BaseGeneratorModel):
         convnextv2_model = timm.create_model(
             "convnextv2_tiny", 
             features_only=True, 
-            pretrained=False
+            pretrained=pretrained_backbone
         )
         # replace the first convolutional layer to work with (N, in_channels, H, W)
         # images
@@ -93,6 +96,7 @@ class ConvNeXtUNet(BaseGeneratorModel):
             stride=1,
             padding=0
         )
+        self._pretrained_backbone = pretrained_backbone
         depth = len(convnextv2_model.feature_info.channels())
 
         self.encoder = convnextv2_model
@@ -197,6 +201,7 @@ class ConvNeXtUNet(BaseGeneratorModel):
                 "decoder_up_block": self._decoder_up_block,
                 "decoder_compute_block": self._decoder_compute_block,
                 "act_type": self._act_type,
+                "pretrained_backbone": self._pretrained_backbone,
                 "_num_units": self._num_units_cfg,
                 "_pixel_shuffle_preserve_channels": self._pixel_shuffle_preserve_channels,
             },
@@ -213,5 +218,8 @@ class ConvNeXtUNet(BaseGeneratorModel):
         if "_pixel_shuffle_preserve_channels" not in init_cfg:
             # For backward compatibility with configs that don't have this key
             init_cfg["_pixel_shuffle_preserve_channels"] = True
+        if "pretrained_backbone" not in init_cfg:
+            # For backward compatibility with configs that don't have this key
+            init_cfg["pretrained_backbone"] = False
 
         return cls(**init_cfg)
