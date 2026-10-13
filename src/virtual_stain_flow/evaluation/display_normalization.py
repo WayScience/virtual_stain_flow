@@ -1,6 +1,6 @@
 """Display-only intensity scaling; never modifies image or metric data."""
 
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union, Literal
 
 import numpy as np
 from matplotlib.colors import Normalize
@@ -52,7 +52,7 @@ def _finite_range(images: np.ndarray) -> Tuple[float, float]:
 def image_norms(
     images: np.ndarray,
     *,
-    scope: str = "image",
+    scope: Literal["image", "channel"] = "image",
     limits: Optional[DisplayLimits] = None,
     other: Optional[np.ndarray] = None,
     legacy: bool = False,
@@ -84,7 +84,7 @@ def image_norms(
 
 
 def unpaired_norms(
-    images: np.ndarray, scaling: str, limits: Optional[DisplayLimits], name: str
+    images: np.ndarray, scaling: Literal["independent", "channel", "fixed"], limits: Optional[DisplayLimits], name: str
 ) -> List[List[Normalize]]:
     """Input/raw panels have their own independent, channel-shared or fixed scale."""
     if scaling not in ("independent", "channel", "fixed"):

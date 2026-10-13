@@ -5,7 +5,7 @@ Core visualization tools for plotting model predictions alongside inputs and tar
 Supports both BaseImageDataset and CropImageDataset with optional metrics display.
 """
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -90,12 +90,12 @@ def plot_predictions_grid(
     input_channel_indices: Optional[List[int]] = None,
     target_channel_indices: Optional[List[int]] = None,
     prediction_channel_indices: Optional[List[int]] = None,
-    target_scaling: str = "target",
-    target_scale_scope: str = "image",
+    target_scaling: Literal["target", "joint", "independent", "fixed"] = "target",
+    target_scale_scope: Literal["image", "channel"] = "image",
     target_limits: Optional[DisplayLimits] = None,
-    input_scaling: str = "independent",
+    input_scaling: Literal["independent", "channel", "fixed"] = "independent",
     input_limits: Optional[DisplayLimits] = None,
-    raw_scaling: str = "independent",
+    raw_scaling: Literal["independent", "channel", "fixed"] = "independent",
     raw_limits: Optional[DisplayLimits] = None,
 ) -> plt.Figure:
     """
