@@ -154,6 +154,30 @@ def test_auto_limits_ignore_nonfinite_values():
         plot_predictions_grid(np.zeros_like(targets), targets * np.nan, show_plot=False)
 
 
+def test_joint_limits_use_finite_target_when_prediction_channel_is_all_nonfinite():
+    targets = np.array([np.nan, np.inf, 0.2, 0.8]).reshape(1, 1, 2, 2)
+    predictions = np.full_like(targets, np.nan)
+    artists = _images(plot_predictions_grid(
+        np.zeros_like(targets), targets, predictions,
+        target_scaling="joint", show_plot=False,
+    ))
+    assert artists[1].get_clim() == artists[2].get_clim() == (0.2, 0.8)
+
+    predictions = np.array([-0.1, np.inf, 0.5, np.nan]).reshape(1, 1, 2, 2)
+    artists = _images(plot_predictions_grid(
+        np.zeros_like(targets), np.full_like(targets, np.nan), predictions,
+        target_scaling="joint", show_plot=False,
+    ))
+    assert artists[1].get_clim() == artists[2].get_clim() == (-0.1, 0.5)
+
+    predictions = np.full_like(targets, np.nan)
+    with pytest.raises(ValueError, match="no finite values"):
+        plot_predictions_grid(
+            np.zeros_like(targets), predictions, predictions,
+            target_scaling="joint", show_plot=False,
+        )
+
+
 @pytest.mark.parametrize("kwargs", [
     {"target_scaling": "invalid"},
     {"target_scale_scope": "invalid"},

@@ -42,11 +42,19 @@ def _fixed_limits(limits: Optional[DisplayLimits], channels: int, name: str) -> 
     return values
 
 
-def _finite_range(images: np.ndarray) -> Tuple[float, float]:
+def _finite_range(images: np.ndarray, other: Optional[np.ndarray] = None) -> Tuple[float, float]:
     finite = images[np.isfinite(images)]
+    other_finite = other[np.isfinite(other)] if other is not None else np.array([])
+    if not finite.size:
+        finite = other_finite
+        other_finite = np.array([])
     if not finite.size:
         raise ValueError("Cannot determine display limits from an image/channel with no finite values.")
-    return float(finite.min()), float(finite.max())
+    lower, upper = float(finite.min()), float(finite.max())
+    if other_finite.size:
+        lower = min(lower, float(other_finite.min()))
+        upper = max(upper, float(other_finite.max()))
+    return lower, upper
 
 
 def image_norms(
@@ -72,11 +80,11 @@ def image_norms(
                 lower, upper = fixed[channel]
             else:
                 reference = images[:, channel] if scope == "channel" else images[row, channel]
-                lower, upper = _finite_range(reference)
                 if other is not None:
                     comparison = other[:, channel] if scope == "channel" else other[row, channel]
-                    other_lower, other_upper = _finite_range(comparison)
-                    lower, upper = min(lower, other_lower), max(upper, other_upper)
+                    lower, upper = _finite_range(reference, comparison)
+                else:
+                    lower, upper = _finite_range(reference)
             norm_type = Normalize if legacy else _ClippedNormalize
             norms.append(norm_type(vmin=lower, vmax=upper, clip=True))
         rows.append(norms)
