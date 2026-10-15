@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.11] - 2026-10-15
+
+### Refactored
+
+#### Visualization normalization/joint normalization modes and checks (`virtual_stain_flow/evluation/`)
+- Added configurable  image scaling for displaying the evaluation grids, including: 
+  1. target-referenced (prediction range is clamped in reference to target vmin and vmax to expose localized over-darkening and brightening)
+  2. joint (both target and reference are clamped by the pooled vim and vmax to reveal contrast differences)
+  3. independent (target and reference are independently optimized to display best effort contrast, for checking if texture and details and properly reconstructed correcting for illumination and contrast differences)
+  4. fixed ranges (manual free form)
+- Bumped minimal python version and pinned matplotlib version due to coupling with the normalization modes. 
+
 ## [0.4.10] - 2026-09-11
 
 ### Added
