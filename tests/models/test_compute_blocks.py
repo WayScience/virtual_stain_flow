@@ -10,6 +10,12 @@ from virtual_stain_flow.models.blocks import (
 )
 
 
+def _has_padding(layer: nn.Conv2d) -> bool:
+	if isinstance(layer.padding, str):
+		return layer.padding != "valid"
+	return any(p > 0 for p in layer.padding)
+
+
 class DummyBlock(AbstractBlock):
 	def forward(self, x):
 		return x
@@ -88,6 +94,23 @@ class TestConv2DConvNeXtBlock:
 		assert block.num_units == 2
 		assert block.out_h(input_tensor.shape[2]) == output.shape[2]
 		assert block.out_w(input_tensor.shape[3]) == output.shape[3]
+
+	def test_convnext_block_sets_padding_mode_on_padded_convolutions(self):
+		block = Conv2DConvNeXtBlock(
+			in_channels=3,
+			out_channels=8,
+			num_units=2,
+			padding_mode="reflect",
+		)
+
+		padded_convolutions = [
+			layer
+			for layer in block.network.modules()
+			if isinstance(layer, nn.Conv2d) and _has_padding(layer)
+		]
+
+		assert padded_convolutions
+		assert all(layer.padding_mode == "reflect" for layer in padded_convolutions)
 
 
 class TestConv2DNormActBlock:
@@ -174,3 +197,18 @@ class TestConv2DNormActBlock:
 		assert block.num_units == 2
 		assert block.out_h(input_tensor.shape[2]) == output.shape[2]
 		assert block.out_w(input_tensor.shape[3]) == output.shape[3]
+
+	def test_norm_act_block_sets_padding_mode_on_convolutions(self):
+		block = Conv2DNormActBlock(
+			in_channels=3,
+			out_channels=8,
+			num_units=2,
+			padding_mode="reflect",
+		)
+
+		convolutions = [
+			layer for layer in block.network if isinstance(layer, nn.Conv2d)
+		]
+
+		assert convolutions
+		assert all(layer.padding_mode == "reflect" for layer in convolutions)

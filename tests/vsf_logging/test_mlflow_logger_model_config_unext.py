@@ -74,6 +74,9 @@ def test_on_train_start_logs_unext_model_config_and_loss_items(
         if artifact["content"]["class_path"].endswith("ConvNeXtUNet")
     )
     assert "init" in model_config
+    assert model_config["init"]["padding_mode"] == "zeros"
+    assert model_config["init"]["_encoder_padding_mode"] == "zeros"
+    assert model_config["init"]["_decoder_padding_mode"] == "zeros"
 
     assert captured["tags"]["model.0.class_path"].endswith("ConvNeXtUNet")
 

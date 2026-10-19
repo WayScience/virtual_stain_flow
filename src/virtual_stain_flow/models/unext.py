@@ -25,6 +25,7 @@ from .blocks import (
     PixelShuffle2DUpBlock,
     ActivationType
 )
+from .blocks.blocks import PaddingMode, _set_padding_mode_on_padded_convs
 
 class ConvNeXtUNet(BaseGeneratorModel):
     """
@@ -50,6 +51,9 @@ class ConvNeXtUNet(BaseGeneratorModel):
         pretrained_backbone: bool = False,
         _num_units: Union[List[int], int] = 2,
         _pixel_shuffle_preserve_channels: bool = False,
+        padding_mode: PaddingMode = 'zeros',
+        _encoder_padding_mode: PaddingMode | None = None,
+        _decoder_padding_mode: PaddingMode | None = None,
     ):
         """
         Initializes the ConvNeXtUNet model.
@@ -62,20 +66,49 @@ class ConvNeXtUNet(BaseGeneratorModel):
         :param decoder_compute_block: Type of computation block to use in the
             decoder. Can be 'convnext' for Conv2DConvNeXtBlock or 'conv2d' for
             Conv2DNormActBlock. Default is 'convnext'.
-        :param pretrained_backbone: Whether to use a pretrained ConvNeXtV2_tiny backbone.
-            Default is False.
         :param act_type: Type of activation function to use in the output layer.
             Default is 'sigmoid'.
+        :param pretrained_backbone: Whether to use a pretrained ConvNeXtV2_tiny backbone.
+            Default is False.
         :param _num_units: Number of computation units in each stage.
             Can be an integer for uniform number of units in all stages,
             or a list of integers specifying the number of units for each stage.
+        :param _pixel_shuffle_preserve_channels: Whether to preserve the number of channels
+            when using PixelShuffle2DUpBlock in the decoder. Default is False.
+        :param padding_mode: Shared padding mode for padded encoder convolutions
+            and decoder compute blocks (not upsampling blocks). Supports 'zeros'
+            (default) and 'reflect'. Reflection
+            padding requires feature-map dimensions larger than the padding
+            size (3 for the encoder's 7x7 depthwise convolutions).
+        :param _encoder_padding_mode: Padding mode used by padded convolution
+            layers in the ConvNeXtV2 encoder. Supports 'zeros' and 'reflect'.
+            Defaults to None, inheriting padding_mode; otherwise overrides it.
+        :param _decoder_padding_mode: Padding mode used by padded convolution
+            layers in decoder compute blocks. Supports 'zeros' and 'reflect'.
+            Defaults to None, inheriting padding_mode; otherwise overrides it.
         """
+        if _encoder_padding_mode is None:
+            _encoder_padding_mode = padding_mode
+        if _decoder_padding_mode is None:
+            _decoder_padding_mode = padding_mode
+
+        for mode_name, mode_value in (
+            ('padding_mode', padding_mode),
+            ('_encoder_padding_mode', _encoder_padding_mode),
+            ('_decoder_padding_mode', _decoder_padding_mode),
+        ):
+            if mode_value not in ('zeros', 'reflect'):
+                raise ValueError(
+                    f"Unsupported {mode_name}: {mode_value!r}. "
+                    "Expected 'zeros' or 'reflect'."
+                )
 
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             out_activation=act_type,
         )
+        self._padding_mode = padding_mode
         
         # timm implementation of the depth 4 ConvNeXtV2 model
         # with only down-sampling path, originally optimized
@@ -101,6 +134,10 @@ class ConvNeXtUNet(BaseGeneratorModel):
 
         self.encoder = convnextv2_model
 
+        # Leave unpadded stem, downsampling, and pointwise convolutions unchanged.
+        _set_padding_mode_on_padded_convs(self.encoder, _encoder_padding_mode)
+        self._encoder_padding_mode = _encoder_padding_mode
+
         if decoder_up_block == 'pixelshuffle':
             in_block_handles = [PixelShuffle2DUpBlock] * (depth - 1)
             in_block_kwargs = [{'preserve_channels': _pixel_shuffle_preserve_channels}] * (depth - 1)
@@ -114,6 +151,7 @@ class ConvNeXtUNet(BaseGeneratorModel):
             )
         self._pixel_shuffle_preserve_channels = _pixel_shuffle_preserve_channels
         self._decoder_up_block = decoder_up_block
+        self._decoder_padding_mode = _decoder_padding_mode
         
         if decoder_compute_block == 'convnext':
             comp_block_handles = [Conv2DConvNeXtBlock] * (depth - 1)
@@ -127,14 +165,25 @@ class ConvNeXtUNet(BaseGeneratorModel):
         self._decoder_compute_block = decoder_compute_block
         
         if isinstance(_num_units, int):
-            comp_block_kwargs = [{'num_units': _num_units}] * (depth - 1)
+            comp_block_kwargs = [
+                {
+                    'num_units': _num_units,
+                    'padding_mode': _decoder_padding_mode,
+                }
+            ] * (depth - 1)
         elif isinstance(_num_units, list):
             if len(_num_units) != (depth - 1):
                 raise ValueError(
                     f"Expected _num_units to be a list of length {(depth - 1)}, "
                     f"got {len(_num_units)}"
                 )
-            comp_block_kwargs = [{'num_units': n} for n in _num_units]
+            comp_block_kwargs = [
+                {
+                    'num_units': n,
+                    'padding_mode': _decoder_padding_mode,
+                }
+                for n in _num_units
+            ]
         else:
             raise TypeError(
                 f"Expected _num_units to be int or list, "
@@ -202,8 +251,11 @@ class ConvNeXtUNet(BaseGeneratorModel):
                 "decoder_compute_block": self._decoder_compute_block,
                 "act_type": self._act_type,
                 "pretrained_backbone": self._pretrained_backbone,
+                "padding_mode": self._padding_mode,
                 "_num_units": self._num_units_cfg,
                 "_pixel_shuffle_preserve_channels": self._pixel_shuffle_preserve_channels,
+                "_decoder_padding_mode": self._decoder_padding_mode,
+                "_encoder_padding_mode": self._encoder_padding_mode,
             },
         }
     
@@ -214,12 +266,9 @@ class ConvNeXtUNet(BaseGeneratorModel):
         Accepts either the full dict or just the "init" sub-dict.
         """
         
-        init_cfg = config.get("init", config)
-        if "_pixel_shuffle_preserve_channels" not in init_cfg:
-            # For backward compatibility with configs that don't have this key
-            init_cfg["_pixel_shuffle_preserve_channels"] = True
-        if "pretrained_backbone" not in init_cfg:
-            # For backward compatibility with configs that don't have this key
-            init_cfg["pretrained_backbone"] = False
+        init_cfg = dict(config.get("init", config))
+        # Preserve historical pixel-shuffle behavior for configs without this key.
+        init_cfg.setdefault("_pixel_shuffle_preserve_channels", True)
+        # All other missing options use constructor defaults, including padding.
 
         return cls(**init_cfg)

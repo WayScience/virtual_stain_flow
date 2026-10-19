@@ -51,21 +51,21 @@ def file_index(tmp_path):
     for idx, path in enumerate(paths["input_ch1"]):
         value = 1 + idx * 2  # 1, 3, 5
         img_array = np.full((10, 10), value, dtype=np.uint16)
-        img = Image.fromarray(img_array, mode='I;16')
+        img = Image.fromarray(img_array)
         img.save(path)
     
     # input_ch2: 2, 4, 6 for images 0, 1, 2
     for idx, path in enumerate(paths["input_ch2"]):
         value = 2 + idx * 2  # 2, 4, 6
         img_array = np.full((10, 10), value, dtype=np.uint16)
-        img = Image.fromarray(img_array, mode='I;16')
+        img = Image.fromarray(img_array)
         img.save(path)
     
     # target_ch1: 1, 2, 3 for images 0, 1, 2
     for idx, path in enumerate(paths["target_ch1"]):
         value = 1 + idx  # 1, 2, 3
         img_array = np.full((10, 10), value, dtype=np.uint16)
-        img = Image.fromarray(img_array, mode='I;16')
+        img = Image.fromarray(img_array)
         img.save(path)
     
     return pd.DataFrame(paths)

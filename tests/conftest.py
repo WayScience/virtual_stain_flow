@@ -194,9 +194,9 @@ def file_index(tmp_path):
     for index in range(3):
         for channel, start_value in (("input_ch1", 1), ("input_ch2", 2), ("target_ch1", 1)):
             value = start_value + index * (2 if channel.startswith("input") else 1)
-            Image.fromarray(np.full((10, 10), value, dtype=np.uint16), mode="I;16").save(
-                paths[channel][index]
-            )
+            Image.fromarray(
+                np.full((10, 10), value, dtype=np.uint16),
+            ).save(paths[channel][index])
 
     return pd.DataFrame(paths)
 

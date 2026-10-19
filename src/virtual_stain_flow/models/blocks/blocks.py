@@ -31,7 +31,7 @@ Classes:
         Activation layers, commonly used in UNet architectures.
 """
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Literal
 
 import timm
 import torch.nn as nn
@@ -44,8 +44,56 @@ from .utils import (
     ActivationType
 )
 
-class AbstractBlock(ABC, nn.Module):
+PaddingMode = Literal['zeros', 'reflect']
 
+
+def _validate_padding_mode(padding_mode: PaddingMode) -> None:
+    """
+    Validate the padding mode.
+
+    :param padding_mode: Padding mode to validate.
+    :raises ValueError: If the padding mode is not 'zeros' or 'reflect'.
+    """
+    if padding_mode not in ('zeros', 'reflect'):
+        raise ValueError(
+            f"Unsupported padding_mode: {padding_mode!r}. "
+            "Expected 'zeros' or 'reflect'."
+        )
+
+
+def _is_padded_conv(conv: nn.Conv2d) -> bool:
+    """
+    Check if a convolution layer has padding applied.
+
+    :param conv: Convolution layer to check.
+    :return: True if the convolution has padding, False otherwise.
+    """
+    if isinstance(conv.padding, str):
+        return conv.padding != 'valid'
+    return any(p > 0 for p in conv.padding)
+
+
+def _set_padding_mode_on_padded_convs(module: nn.Module, padding_mode: PaddingMode) -> None:
+    """
+    Set the padding mode on all padded convolution layers within the module.
+
+    :param module: Module containing convolution layers.
+    :param padding_mode: Padding mode to set ('zeros' or 'reflect').
+    """
+    if padding_mode == 'zeros':
+        return
+    for layer in module.modules():
+        if isinstance(layer, nn.Conv2d) and _is_padded_conv(layer):
+            layer.padding_mode = padding_mode
+
+
+class AbstractBlock(ABC, nn.Module):
+    """
+    Abstract base class for all computational blocks.
+
+    This class centralizes input type checking and provides common properties
+    for blocks, such as in_channels, out_channels, and num_units.
+    """
     def __init__(
         self,
         in_channels: int,
@@ -53,6 +101,15 @@ class AbstractBlock(ABC, nn.Module):
         num_units: int = 1,
         **kwargs: dict
     ):
+        """
+        Initialize the block with input and output channels, number of units, 
+            and additional keyword arguments.
+
+        :param in_channels: Number of input channels.
+        :param out_channels: Number of output channels. Defaults to in_channels if None.
+        :param num_units: Number of units in the block.
+        :param kwargs: Additional keyword arguments. Not used by the base class.
+        """
         
         super().__init__()
 
@@ -86,6 +143,9 @@ class AbstractBlock(ABC, nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """
         Forward pass of the block.
+
+        :param x: Input tensor.
+        :return: Output tensor after applying the block.
         """
         raise NotImplementedError
     
@@ -100,14 +160,32 @@ class AbstractBlock(ABC, nn.Module):
     def num_units(self) -> int:
         return self._num_units
     
-    # These 2 below should be overriden to reflect the actual spatial dimension
-    # changes the block applies. By default they indicate spatial preserving
-    # blocks, i.e. the height and width of the input tensor remain unchanged.
+    """
+    Compute the output spatial dimensions of the block.
+
+    By default, the block is assumed to preserve spatial dimensions,
+    i.e., the output height and width are the same as the input.
+
+    Should be overridden by blocks that change spatial dimensions.
+    """
     def out_h(self, in_h: int) -> int:
+        """
+        Compute the output height given the input height.
+
+        :param in_h: Input height.
+        :return: Output height after applying the block.
+        """
         return in_h
     
     def out_w(self, in_w: int) -> int:
+        """
+        Compute the output width given the input width.
+
+        :param in_w: Input width.
+        :return: Output width after applying the block.
+        """
         return in_w    
+
 
 class Conv2DConvNeXtBlock(AbstractBlock):    
     """
@@ -123,7 +201,8 @@ class Conv2DConvNeXtBlock(AbstractBlock):
         num_units: int = 1,
         norm_type: NormType = 'layer',
         conv_kernel_size: int = 1,
-        convnext_kernel_size: int = 7
+        convnext_kernel_size: int = 7,
+        padding_mode: PaddingMode = 'zeros',
     ):
         """
         Initializes a ConvNeXt block with the specified parameters.
@@ -142,7 +221,10 @@ class Conv2DConvNeXtBlock(AbstractBlock):
         :param convnext_kernel_size: Kernel size for the depth-wise convolution
             layers inside the ConvNeXtBlock. Default is 7, 
             as recommended by Liu et al. (2022), for large receptive fields.
+        :param padding_mode: Padding mode for padded convolutional layers in
+            this block. Supported values are 'zeros' and 'reflect'.
         """
+        _validate_padding_mode(padding_mode)
         
         out_channels = out_channels or in_channels
 
@@ -165,7 +247,8 @@ class Conv2DConvNeXtBlock(AbstractBlock):
                     out_channels=out_channels,
                     kernel_size=conv_kernel_size,
                     stride=1, # fixed
-                    padding='same' # ensure spatial dimensions are preserved
+                    padding='same', # ensure spatial dimensions are preserved
+                    padding_mode=padding_mode,
                 )
             )
             # timm.models.convnext.ConvNeXtStage adds a normalization
@@ -191,8 +274,8 @@ class Conv2DConvNeXtBlock(AbstractBlock):
         # spatial and channel-wise feature extraction computations, 
         # contrasting with the standard Conv2D whose kernel does both
         # simultaneously.
-        layers = layers + [
-            timm.models.convnext.ConvNeXtBlock(
+        for _ in range(num_units):
+            convnext_block = timm.models.convnext.ConvNeXtBlock(
                 in_chs=out_channels, # same input/output channels
                 out_chs=out_channels, 
                 kernel_size=convnext_kernel_size,
@@ -205,8 +288,9 @@ class Conv2DConvNeXtBlock(AbstractBlock):
                 conv_mlp=True, 
                 use_grn=True, # GlobalResponseNorm for mlp layers
                 norm_layer=timm.layers.LayerNorm2d, 
-            ) for _ in range(num_units)
-        ]
+            )
+            _set_padding_mode_on_padded_convs(convnext_block, padding_mode)
+            layers.append(convnext_block)
 
         self.network = nn.Sequential(*layers)
 
@@ -233,7 +317,8 @@ class Conv2DNormActBlock(AbstractBlock):
         out_channels: Optional[int] = None,
         num_units: int = 1,
         norm_type: NormType = 'batch',
-        act_type: ActivationType = 'relu'
+        act_type: ActivationType = 'relu',
+        padding_mode: PaddingMode = 'zeros',
     ):
         """
         Initializes a Conv2D block with the specified parameters.
@@ -245,7 +330,10 @@ class Conv2DNormActBlock(AbstractBlock):
         :param norm_type: Type of normalization to apply. Default is 'batch'
             (GroupNorm with 1 group).
         :param act_type: Type of activation function to apply. Default is 'relu'.
+        :param padding_mode: Padding mode for Conv2d layers. Supported values
+            are 'zeros' and 'reflect'.
         """
+        _validate_padding_mode(padding_mode)
 
         out_channels = out_channels or in_channels
 
@@ -271,7 +359,8 @@ class Conv2DNormActBlock(AbstractBlock):
                     out_channels=_out,
                     kernel_size=3, # fixed for now
                     stride=1, # fixed
-                    padding='same' # indicate spatial preserving unit
+                    padding='same', # indicate spatial preserving unit
+                    padding_mode=padding_mode,
                 )
             )
             layers.append(
